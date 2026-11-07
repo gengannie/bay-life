@@ -357,3 +357,4 @@ export const SimInspectorSheet: React.FC = () => {
     </div>
   );
 };
+

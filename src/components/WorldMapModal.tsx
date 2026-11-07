@@ -346,3 +346,4 @@ export const WorldMapModal: React.FC = () => {
     </div>
   );
 };
+

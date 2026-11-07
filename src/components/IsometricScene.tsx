@@ -787,3 +787,4 @@ export const IsometricScene: React.FC = () => {
     </div>
   );
 };
+

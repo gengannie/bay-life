@@ -212,3 +212,4 @@ export const Portrait: React.FC<PortraitProps> = ({
     </span>
   );
 };
+

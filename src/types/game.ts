@@ -398,3 +398,4 @@ export interface GameState {
   };
   goalIndex: number;
 }
+

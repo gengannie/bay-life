@@ -161,3 +161,4 @@ export const BuyFurnishModal: React.FC = () => {
     </div>
   );
 };
+
