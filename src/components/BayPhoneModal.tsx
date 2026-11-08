@@ -1667,67 +1667,494 @@ export const BayPhoneModal: React.FC = () => {
               </div>
 
               {blindTab === 'dm' ? (
-                <div className="space-y-2.5">
-                  {NPCS.map((npc) => {
-                    const rel = relationships[npc.id];
-                    const score = rel?.score || 12;
-                    const lastMsg = rel?.messages[rel.messages.length - 1]?.text || npc.greeting;
+                (() => {
+                  const activeDmNpc = selectedDmNpcId
+                    ? NPCS.find((n) => n.id === selectedDmNpcId) || null
+                    : null;
+
+                  if (activeDmNpc) {
+                    const rel = relationships[activeDmNpc.id];
+                    const score = rel?.score ?? 12;
+                    const trust = rel?.trust ?? 10;
+                    const romance = rel?.romance ?? 5;
+                    const tierInfo = getRelationshipTierInfo(score);
+                    const spotDef = LOCATION_BY_ID[activeDmNpc.favoriteSpot];
+                    const npcMilestones = getNpcMilestones(activeDmNpc.id);
+                    const claimedIds = rel?.claimedMilestones || [];
+                    const unclaimedMilestones = npcMilestones.filter(
+                      (m) =>
+                        (score >= m.threshold ||
+                          (rel?.unlockedMilestones || []).includes(m.id)) &&
+                        !claimedIds.includes(m.id)
+                    );
+                    const availTopics = getAvailableTopicsForNpc(
+                      activeDmNpc.id,
+                      score,
+                      rel?.completedTopics || []
+                    );
+                    const activeTopic =
+                      availTopics.find((t) => t.id === rel?.activeTopicId) ||
+                      availTopics[0] ||
+                      null;
+                    const messages = rel?.messages || [
+                      { from: 'npc' as const, text: activeDmNpc.greeting, time: 450 },
+                    ];
+                    const unlockedInteractions = NPC_INTERACTIONS.filter(
+                      (i) => score >= i.minScore
+                    );
+                    const lockedInteractions = NPC_INTERACTIONS.filter(
+                      (i) => score < i.minScore
+                    );
+
                     return (
-                      <div key={npc.id} className="rounded-3xl bg-[var(--mist)] p-3 space-y-2">
+                      <div className="space-y-2.5">
+                        {/* Back Bar & Full Hub Shortcut */}
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Portrait appearance={npc.appearance} size={38} />
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-xs font-black">{npc.name}</span>
-                                <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[9px] font-extrabold text-[#007AFF]">
-                                  {rel?.status || 'Stranger'}
-                                </span>
-                              </div>
-                              <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
-                                {npc.role} · {npc.company}
+                          <button
+                            onClick={() => {
+                              setSelectedDmNpcId(null);
+                              setShowDmGiftDrawer(false);
+                            }}
+                            className="btn-press inline-flex items-center gap-1 rounded-full bg-[var(--mist)] px-3 py-1 text-[11px] font-extrabold text-[#007AFF]"
+                          >
+                            ← All DMs
+                          </button>
+                          <button
+                            onClick={() => setActiveModal('sim', 'relationships')}
+                            className="btn-press inline-flex items-center gap-1 rounded-full bg-[#007AFF]/15 px-3 py-1 text-[10.5px] font-extrabold text-[#007AFF]"
+                          >
+                            🤝 Open Circle Hub
+                          </button>
+                        </div>
+
+                        {/* NPC iMessage Header */}
+                        <div className="rounded-3xl bg-[var(--mist)] p-3 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Portrait
+                                appearance={activeDmNpc.appearance}
+                                size={42}
+                                ringColor={tierInfo.color}
+                              />
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-xs font-black">{activeDmNpc.name}</span>
+                                  <span
+                                    className="rounded-full px-2 py-0.5 text-[9px] font-extrabold text-white"
+                                    style={{ backgroundColor: tierInfo.color }}
+                                  >
+                                    {tierInfo.status} · {score}%
+                                  </span>
+                                </div>
+                                <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
+                                  {activeDmNpc.role} · {activeDmNpc.company}
+                                </div>
                               </div>
                             </div>
+
+                            <button
+                              onClick={() => inviteNpcHangout(activeDmNpc.id)}
+                              className="btn-press shrink-0 rounded-xl bg-[#007AFF] px-2.5 py-1.5 text-[9.5px] font-black text-white shadow-xs"
+                            >
+                              📍 {spotDef?.shortName || 'Hangout'}
+                            </button>
                           </div>
-                          <span className="shrink-0 text-[10px] font-black text-emerald-600">{score}%</span>
+
+                          {/* Sub-meter Pills */}
+                          <div className="flex flex-wrap items-center gap-1.5 text-[9.5px] font-extrabold">
+                            <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-indigo-600 dark:text-indigo-300">
+                              🤝 {trust} Trust
+                            </span>
+                            <span className="rounded-full bg-pink-500/15 px-2 py-0.5 text-pink-600 dark:text-pink-300">
+                              💖 {romance} Vibe
+                            </span>
+                            <span className="rounded-full bg-black/5 px-2 py-0.5 text-[var(--ink-soft)] dark:bg-white/10">
+                              ✨ {tierInfo.perkSummary}
+                            </span>
+                          </div>
+
+                          {/* Unclaimed Milestone Alert Banner */}
+                          {unclaimedMilestones.map((um) => (
+                            <div
+                              key={um.id}
+                              className="flex items-center justify-between gap-2 rounded-2xl border border-amber-500/50 bg-gradient-to-r from-amber-500/20 to-emerald-500/20 px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <div className="text-[10.5px] font-black text-amber-800 dark:text-amber-200">
+                                  {um.emoji} {um.title} Ready!
+                                </div>
+                                <div className="truncate text-[9.5px] font-bold text-emerald-700 dark:text-emerald-300">
+                                  {um.perkLabel}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  claimRelationshipMilestone(activeDmNpc.id, um.id)
+                                }
+                                className="btn-press shrink-0 animate-pulse rounded-xl bg-amber-500 px-2.5 py-1.5 text-[10px] font-black text-white shadow-sm"
+                              >
+                                🎁 Claim Reward
+                              </button>
+                            </div>
+                          ))}
                         </div>
 
-                        {/* iMessage Bubble */}
-                        <div className="rounded-2xl rounded-tl-sm bg-white/80 px-3 py-2 text-[11px] font-medium text-[var(--ink)] dark:bg-black/35">
-                          “{lastMsg}”
+                        {/* Scrollable Multi-Bubble iMessage Chat Thread */}
+                        <div className="max-h-60 space-y-2 overflow-y-auto rounded-3xl border border-black/5 bg-[var(--mist)] p-3 dark:border-white/10">
+                          {messages.map((msg, idx) => {
+                            if (msg.from === 'milestone') {
+                              return (
+                                <div
+                                  key={msg.id || idx}
+                                  className="mx-auto rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-emerald-500/15 px-3 py-2 text-center"
+                                >
+                                  <div className="text-[10px] font-extrabold text-amber-700 dark:text-amber-300">
+                                    {msg.text}
+                                  </div>
+                                  {unclaimedMilestones[0] && (
+                                    <button
+                                      onClick={() =>
+                                        claimRelationshipMilestone(
+                                          activeDmNpc.id,
+                                          unclaimedMilestones[0].id
+                                        )
+                                      }
+                                      className="btn-press mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-0.5 text-[9.5px] font-black text-white"
+                                    >
+                                      🎁 Claim {unclaimedMilestones[0].title}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            const isMe = msg.from === 'me';
+                            return (
+                              <div
+                                key={msg.id || idx}
+                                className={`flex flex-col ${
+                                  isMe ? 'items-end' : 'items-start'
+                                }`}
+                              >
+                                <div className="mb-0.5 flex items-center gap-1 px-1 text-[8.5px] font-bold text-[var(--ink-soft)]">
+                                  <span>{isMe ? 'You' : activeDmNpc.name.split(' ')[0]}</span>
+                                  {msg.tag && (
+                                    <span className="rounded bg-black/5 px-1 py-0.2 dark:bg-white/10">
+                                      {msg.emoji} {msg.tag}
+                                    </span>
+                                  )}
+                                  <span>· {formatTime(msg.time)}</span>
+                                </div>
+                                <div
+                                  className={`max-w-[85%] rounded-2xl px-3 py-2 text-[11px] font-medium leading-snug shadow-xs ${
+                                    isMe
+                                      ? 'rounded-br-xs bg-[#007AFF] text-white'
+                                      : 'rounded-bl-xs bg-white/90 text-[var(--ink)] dark:bg-black/45'
+                                  }`}
+                                >
+                                  {msg.text}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
 
-                        {/* 1-Tap iMessage Action Pills */}
-                        <div className="grid grid-cols-4 gap-1.5">
-                          <button
-                            onClick={() => interactWithNpc(npc.id, 'coffeeChat')}
-                            className="btn-press rounded-xl bg-[#007AFF]/15 py-1.5 text-[10px] font-extrabold text-[#007AFF]"
-                          >
-                            ☕ Coffee
-                          </button>
-                          <button
-                            onClick={() => interactWithNpc(npc.id, 'whiteboard')}
-                            className="btn-press rounded-xl bg-indigo-500/15 py-1.5 text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400"
-                          >
-                            🧠 Arch
-                          </button>
-                          <button
-                            onClick={() => interactWithNpc(npc.id, 'pitch')}
-                            className="btn-press rounded-xl bg-orange-500/15 py-1.5 text-[10px] font-extrabold text-orange-600 dark:text-orange-400"
-                          >
-                            🦄 Pitch
-                          </button>
-                          <button
-                            onClick={() => interactWithNpc(npc.id, 'flirt')}
-                            className="btn-press rounded-xl bg-rose-500/15 py-1.5 text-[10px] font-extrabold text-rose-600 dark:text-rose-400"
-                          >
-                            ❤️ Vibe
-                          </button>
+                        {/* Incoming Topic Prompt Card Inside iMessage Thread */}
+                        {activeTopic && (
+                          <div className="rounded-3xl border border-[#007AFF]/40 bg-gradient-to-br from-[#007AFF]/12 via-indigo-500/10 to-purple-500/10 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="text-[10.5px] font-black text-[#007AFF] dark:text-sky-400">
+                                💬 Incoming Topic · {activeTopic.emoji} {activeTopic.title}
+                              </span>
+                              <span className="rounded-full bg-[#007AFF] px-2 py-0.5 text-[8.5px] font-extrabold uppercase text-white">
+                                {activeTopic.category}
+                              </span>
+                            </div>
+
+                            <div className="rounded-2xl rounded-tl-xs bg-white/85 px-3 py-2 text-[11px] font-semibold text-[var(--ink)] dark:bg-black/40">
+                              “{activeTopic.promptText}”
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {activeTopic.choices.map((choice, idx) => {
+                                const skCheck = choice.skillCheck;
+                                const skMeta = skCheck
+                                  ? SKILLS_META.find((m) => m.key === skCheck.skill)
+                                  : null;
+                                const playerSkLvl = skCheck ? skills[skCheck.skill] || 0 : 0;
+                                const meetsSkill = skCheck
+                                  ? playerSkLvl >= skCheck.level
+                                  : true;
+
+                                return (
+                                  <button
+                                    key={idx}
+                                    onClick={() =>
+                                      answerNpcTopic(activeDmNpc.id, activeTopic.id, idx)
+                                    }
+                                    className="btn-press w-full rounded-2xl border border-black/10 bg-white/85 p-2.5 text-left transition-all hover:border-[#007AFF] dark:border-white/10 dark:bg-black/35"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-1">
+                                      <span className="text-[10.5px] font-black text-[#007AFF] dark:text-sky-400">
+                                        {choice.emoji} {choice.label}
+                                      </span>
+                                      <div className="flex items-center gap-1 text-[9px] font-extrabold">
+                                        {skCheck && (
+                                          <span
+                                            className={`rounded-full px-1.5 py-0.5 ${
+                                              meetsSkill
+                                                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                                : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                            }`}
+                                          >
+                                            {skMeta?.emoji} Lv.{skCheck.level}{' '}
+                                            {meetsSkill ? '✓' : `(Lv.${Math.floor(playerSkLvl)})`}
+                                          </span>
+                                        )}
+                                        <span className="rounded-full bg-pink-500/15 px-1.5 py-0.5 text-pink-600 dark:text-pink-300">
+                                          +{choice.scoreDelta} Bond
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="mt-0.5 text-[10.5px] font-medium text-[var(--ink)]">
+                                      “{choice.playerText}”
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Quick-Tap Action Pills + Gift Toggle Below Thread */}
+                        <div className="rounded-3xl bg-[var(--mist)] p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
+                              ⚡ Quick-Tap iMessage Actions
+                            </span>
+                            <button
+                              onClick={() => setShowDmGiftDrawer(!showDmGiftDrawer)}
+                              className={`btn-press rounded-full px-2.5 py-0.5 text-[10px] font-extrabold transition-all ${
+                                showDmGiftDrawer
+                                  ? 'bg-pink-500 text-white'
+                                  : 'bg-pink-500/15 text-pink-600 dark:text-pink-300'
+                              }`}
+                            >
+                              🎁 {showDmGiftDrawer ? 'Hide Gifts' : 'Send Gift'}
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {unlockedInteractions.map((act) => (
+                              <button
+                                key={act.id}
+                                onClick={() => interactWithNpc(activeDmNpc.id, act.id)}
+                                className="btn-press flex flex-col items-center justify-center rounded-xl border border-black/5 bg-white/80 px-2 py-1.5 text-center dark:border-white/10 dark:bg-black/35"
+                              >
+                                <span className="text-[10.5px] font-extrabold">
+                                  {act.emoji} {act.shortLabel}
+                                </span>
+                                <span
+                                  className="text-[8.5px] font-bold"
+                                  style={{ color: act.accent }}
+                                >
+                                  +{act.baseScoreDelta} Bond
+                                  {act.cashCost ? ` · $${act.cashCost}` : ''}
+                                </span>
+                              </button>
+                            ))}
+                            {lockedInteractions.slice(0, 3).map((act) => (
+                              <button
+                                key={act.id}
+                                onClick={() => interactWithNpc(activeDmNpc.id, act.id)}
+                                className="btn-press flex flex-col items-center justify-center rounded-xl bg-black/5 px-2 py-1.5 text-center opacity-55 dark:bg-white/5"
+                              >
+                                <span className="text-[10px] font-bold text-[var(--ink-soft)]">
+                                  🔒 {act.shortLabel}
+                                </span>
+                                <span className="text-[8.5px] font-semibold text-[var(--ink-soft)]">
+                                  Req {act.minScore}%
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Expandable Quick Gift Drawer */}
+                          {showDmGiftDrawer && (
+                            <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-black/5 pt-2 dark:border-white/10">
+                              {NPC_GIFTS.map((g) => {
+                                const isFav = g.favoriteOfNpcIds.includes(activeDmNpc.id);
+                                const inBag = g.backpackItemId
+                                  ? (inventory || []).find(
+                                      (i) =>
+                                        i.itemId === g.backpackItemId && i.quantity > 0
+                                    )
+                                  : undefined;
+
+                                return (
+                                  <button
+                                    key={g.id}
+                                    onClick={() => giftNpc(activeDmNpc.id, g.id)}
+                                    className={`btn-press flex items-center justify-between gap-1.5 rounded-xl border p-2 text-left ${
+                                      isFav
+                                        ? 'border-pink-500/40 bg-pink-500/12'
+                                        : 'border-black/5 bg-white/75 dark:border-white/10 dark:bg-black/30'
+                                    }`}
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="truncate text-[10px] font-extrabold">
+                                        {g.emoji} {g.name}
+                                      </div>
+                                      <div className="text-[8.5px] font-bold text-pink-600 dark:text-pink-300">
+                                        {isFav ? '⭐ Favorite!' : `+${g.baseScoreDelta} Bond`}
+                                      </div>
+                                    </div>
+                                    <span className="shrink-0 rounded-full bg-[#007AFF] px-1.5 py-0.5 text-[8.5px] font-black text-white">
+                                      {inBag ? '🎒 Free' : `$${g.price}`}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
-                  })}
-                </div>
+                  }
+
+                  return (
+                    <div className="space-y-2.5">
+                      {NPCS.map((npc) => {
+                        const rel = relationships[npc.id];
+                        const score = rel?.score || 12;
+                        const trust = rel?.trust ?? 10;
+                        const romance = rel?.romance ?? 5;
+                        const tierInfo = getRelationshipTierInfo(score);
+                        const lastMsg =
+                          rel?.messages[rel.messages.length - 1]?.text || npc.greeting;
+                        const npcMilestones = getNpcMilestones(npc.id);
+                        const claimedIds = rel?.claimedMilestones || [];
+                        const unclaimedCount = npcMilestones.filter(
+                          (m) =>
+                            (score >= m.threshold ||
+                              (rel?.unlockedMilestones || []).includes(m.id)) &&
+                            !claimedIds.includes(m.id)
+                        ).length;
+                        const hasTopic =
+                          getAvailableTopicsForNpc(
+                            npc.id,
+                            score,
+                            rel?.completedTopics || []
+                          ).length > 0;
+
+                        return (
+                          <div
+                            key={npc.id}
+                            className="rounded-3xl bg-[var(--mist)] p-3 space-y-2 transition-all hover:ring-1 hover:ring-[#007AFF]/40"
+                          >
+                            <div
+                              onClick={() => setSelectedDmNpcId(npc.id)}
+                              className="flex cursor-pointer items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Portrait
+                                  appearance={npc.appearance}
+                                  size={40}
+                                  ringColor={tierInfo.color}
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-xs font-black">{npc.name}</span>
+                                    <span
+                                      className="rounded-full px-2 py-0.5 text-[9px] font-extrabold text-white"
+                                      style={{ backgroundColor: tierInfo.color }}
+                                    >
+                                      {tierInfo.status}
+                                    </span>
+                                    {unclaimedCount > 0 && (
+                                      <span className="animate-pulse rounded-full bg-amber-500 px-1.5 py-0.2 text-[8.5px] font-black text-white">
+                                        🎁 {unclaimedCount} Reward
+                                      </span>
+                                    )}
+                                    {hasTopic && (
+                                      <span className="rounded-full bg-[#007AFF]/15 px-1.5 py-0.2 text-[8.5px] font-extrabold text-[#007AFF]">
+                                        💬 Topic
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[9.5px] font-semibold text-[var(--ink-soft)]">
+                                    <span>
+                                      {npc.role} · {npc.company}
+                                    </span>
+                                    <span className="text-indigo-600 dark:text-indigo-400">
+                                      🤝 {trust}
+                                    </span>
+                                    <span className="text-pink-600 dark:text-pink-400">
+                                      💖 {romance}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-0.5 shrink-0">
+                                <span
+                                  className="text-[11px] font-black"
+                                  style={{ color: tierInfo.color }}
+                                >
+                                  {score}%
+                                </span>
+                                <span className="text-[9px] font-extrabold text-[#007AFF]">
+                                  Thread →
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Latest iMessage Bubble (Tap to Open Thread) */}
+                            <div
+                              onClick={() => setSelectedDmNpcId(npc.id)}
+                              className="cursor-pointer rounded-2xl rounded-tl-sm bg-white/80 px-3 py-2 text-[11px] font-medium text-[var(--ink)] dark:bg-black/35"
+                            >
+                              “{lastMsg}”
+                            </div>
+
+                            {/* 1-Tap iMessage Action Pills + Open Thread */}
+                            <div className="grid grid-cols-5 gap-1.5">
+                              <button
+                                onClick={() => interactWithNpc(npc.id, 'coffeeChat')}
+                                className="btn-press rounded-xl bg-[#007AFF]/15 py-1.5 text-[10px] font-extrabold text-[#007AFF]"
+                              >
+                                ☕ Coffee
+                              </button>
+                              <button
+                                onClick={() => interactWithNpc(npc.id, 'whiteboard')}
+                                className="btn-press rounded-xl bg-indigo-500/15 py-1.5 text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400"
+                              >
+                                🧠 Arch
+                              </button>
+                              <button
+                                onClick={() => interactWithNpc(npc.id, 'pitch')}
+                                className="btn-press rounded-xl bg-orange-500/15 py-1.5 text-[10px] font-extrabold text-orange-600 dark:text-orange-400"
+                              >
+                                🦄 Pitch
+                              </button>
+                              <button
+                                onClick={() => interactWithNpc(npc.id, 'flirt')}
+                                className="btn-press rounded-xl bg-rose-500/15 py-1.5 text-[10px] font-extrabold text-rose-600 dark:text-rose-400"
+                              >
+                                ❤️ Vibe
+                              </button>
+                              <button
+                                onClick={() => setSelectedDmNpcId(npc.id)}
+                                className="btn-press rounded-xl bg-[#007AFF] py-1.5 text-[10px] font-extrabold text-white shadow-xs"
+                              >
+                                💬 Chat
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="space-y-2.5">
                   {BLIND_POSTS.map((post) => {

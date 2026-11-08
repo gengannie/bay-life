@@ -8,35 +8,54 @@ export const ISO_TILE_W = 68;
 export const ISO_TILE_H = 35;
 export const ISO_ORIGIN_X = 450;
 export const ISO_ORIGIN_Y = 175;
+export const ISO_VIEWBOX_W = 900;
+export const ISO_VIEWBOX_H = 580;
 
 const uid = () => Math.random().toString(36).substring(2, 9);
 
 /**
- * Converts a client (mouse/pointer) coordinate into an isometric floor tile (x, y)
- * by inverting the active SVG screen transformation matrix on #isometric-room-svg.
+ * Converts a client (mouse/pointer) coordinate into exact SVG viewBox (900x580) space
+ * using the post-transform bounding box of #isometric-room-svg and xMidYMid meet scaling.
+ * This avoids WebKit/Safari getScreenCTM() bugs when CSS transforms are applied on <svg>.
  */
-export function getIsoTileFromClientPoint(
+export function getSvgPointFromClientPoint(
   clientX: number,
-  clientY: number,
-  gridSize: number,
-  clampToGrid = false
+  clientY: number
 ): { x: number; y: number } | null {
   if (typeof document === 'undefined') return null;
   const svgEl = document.getElementById('isometric-room-svg') as SVGSVGElement | null;
   if (!svgEl) return null;
-  const ctm = svgEl.getScreenCTM();
-  if (!ctm) return null;
+  const rect = svgEl.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
 
-  const pt = svgEl.createSVGPoint();
-  pt.x = clientX;
-  pt.y = clientY;
-  const svgPt = pt.matrixTransform(ctm.inverse());
+  const scale = Math.min(rect.width / ISO_VIEWBOX_W, rect.height / ISO_VIEWBOX_H);
+  const renderedW = ISO_VIEWBOX_W * scale;
+  const renderedH = ISO_VIEWBOX_H * scale;
+  const offsetX = rect.left + (rect.width - renderedW) / 2;
+  const offsetY = rect.top + (rect.height - renderedH) / 2;
 
-  // Slight +8px vertical offset maps the visual center of a 3D furniture block to its base tile
-  const dx = (svgPt.x - ISO_ORIGIN_X) / (ISO_TILE_W / 2);
-  const dy = (svgPt.y + 8 - ISO_ORIGIN_Y) / (ISO_TILE_H / 2);
-  const rawX = Math.floor((dx + dy) / 2);
-  const rawY = Math.floor((dy - dx) / 2);
+  return {
+    x: (clientX - offsetX) / scale,
+    y: (clientY - offsetY) / scale,
+  };
+}
+
+/**
+ * Converts an SVG viewBox (x, y) coordinate into an isometric floor tile (x, y).
+ */
+export function getIsoTileFromSvgPoint(
+  svgX: number,
+  svgY: number,
+  gridSize: number,
+  clampToGrid = false,
+  tolerance = 0
+): { x: number; y: number } | null {
+  const dx = (svgX - ISO_ORIGIN_X) / (ISO_TILE_W / 2);
+  const dy = (svgY - ISO_ORIGIN_Y) / (ISO_TILE_H / 2);
+  const floatX = (dx + dy) / 2;
+  const floatY = (dy - dx) / 2;
+  const rawX = Math.floor(floatX);
+  const rawY = Math.floor(floatY);
 
   if (clampToGrid) {
     return {
@@ -45,10 +64,33 @@ export function getIsoTileFromClientPoint(
     };
   }
 
-  if (rawX < 0 || rawX >= gridSize || rawY < 0 || rawY >= gridSize) {
+  if (
+    floatX < -tolerance ||
+    floatX >= gridSize + tolerance ||
+    floatY < -tolerance ||
+    floatY >= gridSize + tolerance
+  ) {
     return null;
   }
-  return { x: rawX, y: rawY };
+  return {
+    x: Math.max(0, Math.min(gridSize - 1, rawX)),
+    y: Math.max(0, Math.min(gridSize - 1, rawY)),
+  };
+}
+
+/**
+ * Converts a client (mouse/pointer) coordinate into an isometric floor tile (x, y).
+ */
+export function getIsoTileFromClientPoint(
+  clientX: number,
+  clientY: number,
+  gridSize: number,
+  clampToGrid = false,
+  tolerance = 0
+): { x: number; y: number } | null {
+  const svgPt = getSvgPointFromClientPoint(clientX, clientY);
+  if (!svgPt) return null;
+  return getIsoTileFromSvgPoint(svgPt.x, svgPt.y, gridSize, clampToGrid, tolerance);
 }
 
 export interface RoomSynergy {
