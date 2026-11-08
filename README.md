@@ -59,3 +59,12 @@ Build for production:
 npm run build
 ```
 
+---
+
+## 🔒 License
+
+**All Rights Reserved — Source-Available (View-Only, Non-Commercial)**
+
+Copyright (c) 2026 hii (`gengannie`). The source code in this repository is publicly visible for **viewing, personal reference, and portfolio inspection only**. You may **not** modify, create derivative works from, redistribute, re-host, monetize, or use any part of this project for commercial purposes without prior written permission. See the [LICENSE](./LICENSE) file for full terms.
+
+

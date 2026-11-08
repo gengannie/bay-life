@@ -2,6 +2,7 @@
   "name": "bay-life",
   "private": true,
   "version": "1.0.0",
+  "license": "SEE LICENSE IN LICENSE",
   "description": "Bay Life — A Sims-style life simulation game set in the San Francisco Bay Area for software engineers, inspired by Lagos Life and crafted with Apple Human Interface Guidelines.",
   "type": "module",
   "scripts": {
