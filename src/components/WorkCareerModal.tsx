@@ -1319,6 +1319,580 @@ export const WorkCareerModal: React.FC = () => {
           )}
 
           {/* =======================================================
+              TAB 2.5: INTERACTIVE SKILL TECH TREE & DEEP-DIVE LAB
+          ======================================================= */}
+          {activeTab === 'tree' && (
+            <div className="space-y-6">
+              {/* Top Row: Interactive SVG Tech Tree Blueprint (7 cols) + Node Lab Inspector (5 cols) */}
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+                {/* LEFT: Interactive SVG 4-Branch Skill Tech Tree Graph (7 cols) */}
+                <div className="flex flex-col justify-between rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-slate-950 via-indigo-950/95 to-slate-900 p-5 text-white shadow-xl lg:col-span-7">
+                  <div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-0.5 text-[10px] font-black tracking-wider text-amber-300 uppercase">
+                          🌳 SILICON VALLEY SPECIALIZATION DAG
+                        </span>
+                        <h3 className="mt-1.5 text-lg font-black tracking-tight">
+                          Custom Skill Tech Tree & Career Offer Gates
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-amber-500/20 px-3 py-1 text-xs font-black text-amber-300">
+                          ⚡ {karma} Karma Available
+                        </span>
+                        <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-300">
+                          {unlockedNodes.length}/{SKILL_TREE_NODES.length} Unlocked
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-xs font-medium text-white/70">
+                      Click any node in the blueprint to inspect prerequisites, run a{' '}
+                      <strong className="text-sky-300">Deep-Dive Lab Study</strong>, or unlock custom
+                      specializations required for{' '}
+                      <strong className="text-purple-300">OpenMind Frontier Lab</strong>,{' '}
+                      <strong className="text-amber-300">Fruit Co. Cupertino</strong>, and{' '}
+                      <strong className="text-emerald-300">Sand Hill Venture</strong> onsite loops.
+                    </p>
+
+                    {/* Interactive SVG Tech Tree Canvas */}
+                    <div className="mt-3.5 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/90 p-3">
+                      <svg viewBox="0 0 560 320" className="h-72 w-full overflow-visible">
+                        <defs>
+                          <pattern
+                            id="treeGrid"
+                            width="28"
+                            height="28"
+                            patternUnits="userSpaceOnUse"
+                          >
+                            <path
+                              d="M 28 0 L 0 0 0 28"
+                              fill="none"
+                              stroke="rgba(148,163,184,0.08)"
+                              strokeWidth="1"
+                            />
+                          </pattern>
+                        </defs>
+                        <rect width="560" height="320" rx="12" fill="url(#treeGrid)" />
+
+                        {/* Tier Column Headers */}
+                        {[
+                          { tier: 1, label: 'TIER 1 · FOUNDATION', x: 118 },
+                          { tier: 2, label: 'TIER 2 · OFFER GATE', x: 236 },
+                          { tier: 3, label: 'TIER 3 · SENIOR/STAFF', x: 354 },
+                          { tier: 4, label: 'TIER 4 · APEX FELLOW', x: 472 },
+                        ].map((col) => (
+                          <text
+                            key={col.tier}
+                            x={col.x}
+                            y="18"
+                            textAnchor="middle"
+                            fontSize="8"
+                            fontWeight="bold"
+                            fill="#94A3B8"
+                          >
+                            {col.label}
+                          </text>
+                        ))}
+
+                        {/* Branch Row Labels */}
+                        {SKILL_TREE_BRANCHES.map((b, bIdx) => {
+                          const yCenter = 56 + bIdx * 68;
+                          return (
+                            <g key={b.id}>
+                              <rect
+                                x="6"
+                                y={yCenter - 20}
+                                width="58"
+                                height="40"
+                                rx="8"
+                                fill="rgba(15,23,42,0.85)"
+                                stroke={b.accent}
+                                strokeWidth="1"
+                              />
+                              <text
+                                x="35"
+                                y={yCenter - 3}
+                                textAnchor="middle"
+                                fontSize="12"
+                              >
+                                {b.emoji}
+                              </text>
+                              <text
+                                x="35"
+                                y={yCenter + 11}
+                                textAnchor="middle"
+                                fontSize="7.5"
+                                fontWeight="bold"
+                                fill="#E2E8F0"
+                              >
+                                {b.shortLabel}
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {/* Edges between prereqNodes and child nodes */}
+                        {SKILL_TREE_NODES.map((node) => {
+                          const bIdx = SKILL_TREE_BRANCHES.findIndex((b) => b.id === node.branch);
+                          const x2 = 118 + (node.tier - 1) * 118;
+                          const y2 = 56 + bIdx * 68;
+                          const isUnlocked = unlockedNodes.includes(node.id);
+
+                          return node.prereqNodes.map((prereqId) => {
+                            const parent = SKILL_TREE_NODE_BY_ID[prereqId];
+                            if (!parent) return null;
+                            const pBranchIdx = SKILL_TREE_BRANCHES.findIndex(
+                              (b) => b.id === parent.branch
+                            );
+                            const x1 = 118 + (parent.tier - 1) * 118;
+                            const y1 = 56 + pBranchIdx * 68;
+                            const parentUnlocked = unlockedNodes.includes(prereqId);
+                            const strokeColor = isUnlocked
+                              ? node.accent
+                              : parentUnlocked
+                                ? '#FBBF24'
+                                : 'rgba(148,163,184,0.25)';
+
+                            const midX = (x1 + x2) / 2;
+                            const d = `M ${x1 + 36} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2 - 36} ${y2}`;
+
+                            return (
+                              <path
+                                key={`${prereqId}->${node.id}`}
+                                d={d}
+                                fill="none"
+                                stroke={strokeColor}
+                                strokeWidth={isUnlocked ? '2.5' : parentUnlocked ? '2' : '1.5'}
+                                strokeDasharray={
+                                  isUnlocked ? undefined : parentUnlocked ? '5 3' : '3 3'
+                                }
+                              />
+                            );
+                          });
+                        })}
+
+                        {/* Interactive SVG Nodes */}
+                        {SKILL_TREE_NODES.map((node) => {
+                          const bIdx = SKILL_TREE_BRANCHES.findIndex((b) => b.id === node.branch);
+                          const cx = 118 + (node.tier - 1) * 118;
+                          const cy = 56 + bIdx * 68;
+                          const isUnlocked = unlockedNodes.includes(node.id);
+                          const prereqsOk = node.prereqNodes.every((pid) =>
+                            unlockedNodes.includes(pid)
+                          );
+                          const skillsOk = node.requiredSkills.every(
+                            (req) => Math.floor(skills[req.skill] ?? 0) >= req.level
+                          );
+                          const isReady = !isUnlocked && prereqsOk && skillsOk && karma >= node.karmaCost;
+                          const isSelected = selectedNode.id === node.id;
+
+                          const boxStroke = isSelected
+                            ? '#FFFFFF'
+                            : isUnlocked
+                              ? node.accent
+                              : isReady
+                                ? '#FBBF24'
+                                : prereqsOk
+                                  ? '#64748B'
+                                  : '#334155';
+
+                          return (
+                            <g
+                              key={node.id}
+                              className="cursor-pointer"
+                              onClick={() => setSelectedNodeId(node.id)}
+                            >
+                              {isSelected && (
+                                <rect
+                                  x={cx - 46}
+                                  y={cy - 27}
+                                  width="92"
+                                  height="54"
+                                  rx="13"
+                                  fill="none"
+                                  stroke={node.accent}
+                                  strokeWidth="2"
+                                  strokeDasharray="4 2"
+                                />
+                              )}
+                              <rect
+                                x={cx - 42}
+                                y={cy - 23}
+                                width="84"
+                                height="46"
+                                rx="10"
+                                fill={
+                                  isUnlocked
+                                    ? `${node.accent}2E`
+                                    : isReady
+                                      ? 'rgba(245,158,11,0.18)'
+                                      : 'rgba(15,23,42,0.92)'
+                                }
+                                stroke={boxStroke}
+                                strokeWidth={isSelected ? '2.2' : '1.5'}
+                              />
+                              <text x={cx - 26} y={cy - 3} fontSize="13" textAnchor="middle">
+                                {node.emoji}
+                              </text>
+                              <text
+                                x={cx + 6}
+                                y={cy - 5}
+                                fontSize="8.5"
+                                fontWeight="bold"
+                                fill={isUnlocked ? '#FFFFFF' : '#CBD5E1'}
+                                textAnchor="middle"
+                              >
+                                {node.codeName}
+                              </text>
+                              <text
+                                x={cx}
+                                y={cy + 12}
+                                fontSize="7.2"
+                                fontWeight="bold"
+                                fill={
+                                  isUnlocked
+                                    ? '#34D399'
+                                    : isReady
+                                      ? '#FBBF24'
+                                      : prereqsOk
+                                        ? '#93C5FD'
+                                        : '#64748B'
+                                }
+                                textAnchor="middle"
+                              >
+                                {isUnlocked
+                                  ? '✓ UNLOCKED'
+                                  : isReady
+                                    ? `⚡ READY (${node.karmaCost}⚡)`
+                                    : node.unlocksCareerId
+                                      ? '🔥 OFFER GATE'
+                                      : `🔒 ${node.karmaCost}⚡`}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Legend Footer */}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-white/75">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        ● Unlocked Specialization
+                      </span>
+                      <span className="flex items-center gap-1 text-amber-300">
+                        ● Ready to Unlock
+                      </span>
+                      <span className="flex items-center gap-1 text-purple-300">
+                        🔥 Tier 2 = Company Onsite Offer Gate
+                      </span>
+                    </div>
+                    <span>Click any node to inspect or study →</span>
+                  </div>
+                </div>
+
+                {/* RIGHT: Selected Node Blueprint & Deep-Dive Lab Inspector (5 cols) */}
+                <div className="flex flex-col justify-between rounded-3xl border border-black/10 bg-white/80 p-5 shadow-xs lg:col-span-5 dark:border-white/10 dark:bg-white/5">
+                  {(() => {
+                    const isNodeUnlocked = unlockedNodes.includes(selectedNode.id);
+                    const missingPrereqs = selectedNode.prereqNodes.filter(
+                      (pid) => !unlockedNodes.includes(pid)
+                    );
+                    const skillsMet = selectedNode.requiredSkills.every(
+                      (req) => Math.floor(skills[req.skill] ?? 0) >= req.level
+                    );
+                    const canUnlockNow =
+                      !isNodeUnlocked &&
+                      missingPrereqs.length === 0 &&
+                      skillsMet &&
+                      karma >= selectedNode.karmaCost;
+                    const branchMeta = SKILL_TREE_BRANCHES.find(
+                      (b) => b.id === selectedNode.branch
+                    );
+
+                    return (
+                      <>
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className="grid size-12 place-items-center rounded-2xl text-2xl shadow-xs"
+                                style={{
+                                  backgroundColor: `${selectedNode.accent}20`,
+                                  border: `1px solid ${selectedNode.accent}50`,
+                                }}
+                              >
+                                {selectedNode.emoji}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className="rounded-md px-2 py-0.5 font-mono text-[10px] font-black text-white"
+                                    style={{ backgroundColor: selectedNode.accent }}
+                                  >
+                                    {selectedNode.codeName}
+                                  </span>
+                                  <span className="text-[10px] font-extrabold text-[var(--ink-soft)] uppercase">
+                                    Tier {selectedNode.tier} · {branchMeta?.shortLabel}
+                                  </span>
+                                </div>
+                                <h4 className="mt-0.5 text-base font-black leading-snug">
+                                  {selectedNode.title}
+                                </h4>
+                              </div>
+                            </div>
+                            {isNodeUnlocked ? (
+                              <span className="shrink-0 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                                ✓ Unlocked
+                              </span>
+                            ) : (
+                              <span className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-1 text-[10px] font-black text-amber-600 dark:text-amber-300">
+                                {selectedNode.karmaCost} ⚡ Karma
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-2.5 text-xs font-medium leading-relaxed text-[var(--ink-soft)]">
+                            {selectedNode.desc}
+                          </p>
+
+                          {/* Passive Bonus & Career Gate Callout */}
+                          <div className="mt-3 rounded-2xl border border-indigo-500/25 bg-indigo-500/10 p-3">
+                            <div className="text-[10px] font-black tracking-wider text-indigo-600 uppercase dark:text-indigo-300">
+                              ✨ SPECIALIZATION PERK & CAREER UNLOCK
+                            </div>
+                            <div className="mt-0.5 text-xs font-extrabold text-[var(--ink)]">
+                              {selectedNode.perkSummary}
+                            </div>
+                            {selectedNode.unlocksLevelLabel && (
+                              <div className="mt-1 inline-flex items-center gap-1 rounded-lg bg-white/80 px-2 py-0.5 text-[10px] font-black text-purple-600 dark:bg-black/40 dark:text-purple-300">
+                                <span>🔑 Gate:</span>
+                                <span>{selectedNode.unlocksLevelLabel}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Prerequisite Nodes */}
+                          <div className="mt-3 space-y-2">
+                            <div className="text-[10px] font-black tracking-wider text-[var(--ink-soft)] uppercase">
+                              1. PREREQUISITE TECH TREE NODES
+                            </div>
+                            {selectedNode.prereqNodes.length === 0 ? (
+                              <div className="rounded-xl bg-emerald-500/12 px-3 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                                ✓ Root Foundation Node (No prior node required)
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {selectedNode.prereqNodes.map((pid) => {
+                                  const pNode = SKILL_TREE_NODE_BY_ID[pid];
+                                  const pDone = unlockedNodes.includes(pid);
+                                  return (
+                                    <button
+                                      key={pid}
+                                      onClick={() => setSelectedNodeId(pid)}
+                                      className={`btn-press flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold ${
+                                        pDone
+                                          ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                          : 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                      }`}
+                                    >
+                                      <span>{pDone ? '✓' : '🔒'}</span>
+                                      <span>
+                                        {pNode?.emoji} {pNode?.title || pid}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Required Core Skills */}
+                          <div className="mt-3 space-y-2">
+                            <div className="text-[10px] font-black tracking-wider text-[var(--ink-soft)] uppercase">
+                              2. REQUIRED CORE SKILL BARS
+                            </div>
+                            <div className="space-y-1.5">
+                              {selectedNode.requiredSkills.map((req) => {
+                                const skMeta = SKILLS_META.find((m) => m.key === req.skill);
+                                const rawVal = skills[req.skill] ?? 0;
+                                const curFloor = Math.floor(rawVal);
+                                const met = curFloor >= req.level;
+                                const pct = Math.min(100, Math.round((rawVal / req.level) * 100));
+
+                                return (
+                                  <div
+                                    key={req.skill}
+                                    className="rounded-xl bg-[var(--mist)] p-2.5"
+                                  >
+                                    <div className="flex items-center justify-between text-xs font-bold">
+                                      <span>
+                                        {skMeta?.emoji} {skMeta?.label || req.skill}
+                                      </span>
+                                      <span
+                                        className={
+                                          met
+                                            ? 'font-black text-emerald-600 dark:text-emerald-400'
+                                            : 'font-black text-amber-600 dark:text-amber-400'
+                                        }
+                                      >
+                                        {met ? '✓ ' : ''}Lv.{rawVal.toFixed(1)} / Lv.{req.level}
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                                      <div
+                                        className="h-full rounded-full transition-all"
+                                        style={{
+                                          width: `${pct}%`,
+                                          backgroundColor: met
+                                            ? '#10B981'
+                                            : skMeta?.color || '#007AFF',
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons: Unlock Specialization OR Run Deep-Dive Lab Study */}
+                        <div className="mt-4 space-y-2 border-t border-black/10 pt-3.5 dark:border-white/10">
+                          {isNodeUnlocked ? (
+                            <div className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500/20 py-3 text-xs font-black text-emerald-700 dark:text-emerald-300">
+                              <CheckCircle2 className="size-4" />
+                              <span>Specialization Active in Your Engineering Stack</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => unlockTechNode?.(selectedNode.id)}
+                              className={`btn-press flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-black text-white shadow-md transition-all ${
+                                canUnlockNow
+                                  ? 'bg-gradient-to-r from-emerald-500 via-[#007AFF] to-purple-600 hover:opacity-95'
+                                  : 'bg-slate-600/80 hover:bg-slate-600'
+                              }`}
+                            >
+                              <Sparkles className="size-4" />
+                              <span>
+                                {canUnlockNow
+                                  ? `🔓 Unlock ${selectedNode.codeName} Now (${selectedNode.karmaCost} ⚡ Karma)`
+                                  : `🔒 Unlock ${selectedNode.codeName} (${selectedNode.karmaCost} ⚡ Karma)`}
+                              </span>
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => trainTechNodeSkill?.(selectedNode.id)}
+                            className="btn-press flex w-full items-center justify-between rounded-2xl border border-[#007AFF]/40 bg-[#007AFF]/12 px-3.5 py-2.5 text-xs font-extrabold text-[#007AFF] hover:bg-[#007AFF]/20 dark:text-sky-300"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <span>🔬 Deep-Dive Lab Study ({selectedNode.codeName})</span>
+                            </span>
+                            <span className="rounded-lg bg-[#007AFF] px-2 py-0.5 text-[10px] font-black text-white">
+                              -16⚡ Energy · +0.55 Skill & +6⚡
+                            </span>
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Bottom Section: 4-Branch Full Tech Tree Matrix */}
+              <div>
+                <div className="mb-2.5 flex items-center justify-between px-1">
+                  <div className="text-xs font-black tracking-wider text-[var(--ink-soft)] uppercase">
+                    🧭 ALL 4 SPECIALIZATION BRANCHES · CLICK ANY NODE TO INSPECT OR TRAIN
+                  </div>
+                  <div className="text-xs font-bold text-[var(--ink-soft)]">
+                    Energy: <strong className="text-amber-500">{Math.round(needs.energy)}%</strong>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+                  {SKILL_TREE_BRANCHES.map((branch) => {
+                    const branchNodes = SKILL_TREE_NODES.filter((n) => n.branch === branch.id);
+                    const unlockedInBranch = branchNodes.filter((n) =>
+                      unlockedNodes.includes(n.id)
+                    ).length;
+
+                    return (
+                      <div
+                        key={branch.id}
+                        className="flex flex-col justify-between rounded-3xl border border-black/10 bg-white/70 p-4 shadow-xs dark:border-white/10 dark:bg-white/5"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xl">{branch.emoji}</span>
+                            <span
+                              className="rounded-full px-2.5 py-0.5 text-[10px] font-black text-white"
+                              style={{ backgroundColor: branch.accent }}
+                            >
+                              {unlockedInBranch}/{branchNodes.length} Tier
+                            </span>
+                          </div>
+                          <h4 className="mt-1.5 text-sm font-black">{branch.label}</h4>
+                          <div className="text-[10px] font-extrabold text-[var(--ink-soft)]">
+                            Target: {branch.companyTarget}
+                          </div>
+
+                          <div className="mt-3 space-y-2">
+                            {branchNodes.map((node) => {
+                              const unlocked = unlockedNodes.includes(node.id);
+                              const prereqsOk = node.prereqNodes.every((pid) =>
+                                unlockedNodes.includes(pid)
+                              );
+                              const skillsOk = node.requiredSkills.every(
+                                (req) => Math.floor(skills[req.skill] ?? 0) >= req.level
+                              );
+                              const ready =
+                                !unlocked && prereqsOk && skillsOk && karma >= node.karmaCost;
+                              const isSel = selectedNode.id === node.id;
+
+                              return (
+                                <div
+                                  key={node.id}
+                                  onClick={() => setSelectedNodeId(node.id)}
+                                  className={`cursor-pointer rounded-2xl border p-2.5 transition-all ${
+                                    isSel
+                                      ? 'border-[#007AFF] bg-[#007AFF]/12 ring-1 ring-[#007AFF]/40'
+                                      : unlocked
+                                        ? 'border-emerald-500/35 bg-emerald-500/10'
+                                        : ready
+                                          ? 'border-amber-500/45 bg-amber-500/10'
+                                          : 'border-black/8 bg-[var(--mist)] dark:border-white/10'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[11px] font-black">
+                                      {node.emoji} T{node.tier}: {node.title}
+                                    </span>
+                                    <span className="shrink-0 text-[10px] font-black">
+                                      {unlocked ? '✓' : ready ? '⚡' : '🔒'}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 flex items-center justify-between text-[10px] font-bold text-[var(--ink-soft)]">
+                                    <span>{node.unlocksLevelLabel || node.codeName}</span>
+                                    {!unlocked && <span>{node.karmaCost} ⚡</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* =======================================================
               TAB 3: CAREER TRACK & PROMO COMMITTEE
           ======================================================= */}
           {activeTab === 'ladder' && (
@@ -1347,7 +1921,7 @@ export const WorkCareerModal: React.FC = () => {
                               : 'bg-[var(--mist)] text-[var(--ink)]'
                           }`}
                         >
-                          {gatesPassedCount} / 6 Gates Met
+                          {gatesPassedCount} / 7 Gates Met
                         </span>
                       )}
                     </div>
@@ -1461,7 +2035,41 @@ export const WorkCareerModal: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Gate 5: Shipped Deliverables (Work Exploration) */}
+                        {/* Gate 5: Required Skill Tech Tree Specialization */}
+                        <div className="rounded-2xl bg-[var(--mist)] p-3">
+                          <div className="flex items-center justify-between gap-2 text-xs font-bold">
+                            <span className="flex items-center gap-1.5">
+                              {gateTechNodePass ? (
+                                <CheckCircle2 className="size-4 text-emerald-500" />
+                              ) : (
+                                <AlertCircle className="size-4 text-amber-500" />
+                              )}
+                              <span>
+                                5. Tech Tree Specialization{' '}
+                                {reqTechNodeDef
+                                  ? `(${reqTechNodeDef.emoji} ${reqTechNodeDef.title})`
+                                  : '(Core Stack)'}
+                              </span>
+                            </span>
+                            {gateTechNodePass ? (
+                              <span className="font-black text-emerald-600 dark:text-emerald-400">
+                                Unlocked ✓
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  if (reqTechNodeId) setSelectedNodeId(reqTechNodeId);
+                                  setActiveTab('tree');
+                                }}
+                                className="btn-press rounded-lg bg-amber-500/20 px-2 py-0.5 text-[10px] font-black text-amber-700 hover:bg-amber-500/30 dark:text-amber-300"
+                              >
+                                🔒 Open Tech Tree →
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Gate 6: Shipped Deliverables (Work Exploration) */}
                         <div className="rounded-2xl bg-[var(--mist)] p-3">
                           <div className="flex items-center justify-between text-xs font-bold">
                             <span className="flex items-center gap-1.5">
@@ -1470,7 +2078,7 @@ export const WorkCareerModal: React.FC = () => {
                               ) : (
                                 <AlertCircle className="size-4 text-amber-500" />
                               )}
-                              <span>5. Shipped Deliverables (Work Exploration)</span>
+                              <span>6. Shipped Deliverables (Work Exploration)</span>
                             </span>
                             <span
                               className={
@@ -1484,7 +2092,7 @@ export const WorkCareerModal: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Gate 6: Hybrid RTO Standing */}
+                        {/* Gate 7: Hybrid RTO Standing */}
                         <div className="rounded-2xl bg-[var(--mist)] p-3">
                           <div className="flex items-center justify-between text-xs font-bold">
                             <span className="flex items-center gap-1.5">
@@ -1493,7 +2101,7 @@ export const WorkCareerModal: React.FC = () => {
                               ) : (
                                 <AlertCircle className="size-4 text-amber-500" />
                               )}
-                              <span>6. Hybrid RTO Standing</span>
+                              <span>7. Hybrid RTO Standing</span>
                             </span>
                             <span
                               className={
@@ -1684,18 +2292,38 @@ export const WorkCareerModal: React.FC = () => {
               </div>
 
               {/* =======================================================
-                  COMPANY TRACK EXPLORER (4 BAY AREA CAREERS)
+                  COMPANY TRACK EXPLORER & ONSITE INTERVIEW LOOP GATES
               ======================================================= */}
               <div>
-                <div className="mb-2.5 px-1 text-xs font-black uppercase tracking-wider text-[var(--ink-soft)]">
-                  🌉 BAY AREA CAREER TRACK EXPLORER · SWITCH TRACK ANYTIME
+                <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 px-1">
+                  <div className="text-xs font-black uppercase tracking-wider text-[var(--ink-soft)]">
+                    🌉 BAY AREA ONSITE INTERVIEW LOOPS · CUSTOM TECH TREE & SKILL GATES
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('tree')}
+                    className="btn-press rounded-full bg-amber-500/15 px-3 py-1 text-[11px] font-black text-amber-700 hover:bg-amber-500/25 dark:text-amber-300"
+                  >
+                    🌳 Open Skill Tech Tree ({unlockedNodes.length}/{SKILL_TREE_NODES.length}) →
+                  </button>
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
                   {CAREERS.map((c) => {
                     const isCurrent = c.id === career.id;
                     const entry = c.levels[0];
                     const top = c.levels[c.levels.length - 1];
                     const cLoc = LOCATION_BY_ID[c.locationId];
+                    const entryReq = c.entryRequirements;
+
+                    const reqNodes = entryReq?.requiredTechNodes ?? [];
+                    const missingNodes = reqNodes.filter((nid) => !unlockedNodes.includes(nid));
+                    const reqSkills = entryReq?.requiredSkills ?? [];
+                    const missingSkills = reqSkills.filter(
+                      (r) => Math.floor(skills[r.skill] ?? 0) < r.level
+                    );
+                    const minDeliv = entryReq?.minDeliverables ?? 0;
+                    const delivOk = deliverablesDone >= minDeliv;
+                    const allGatesMet =
+                      missingNodes.length === 0 && missingSkills.length === 0 && delivOk;
 
                     return (
                       <div
@@ -1703,7 +2331,9 @@ export const WorkCareerModal: React.FC = () => {
                         className={`flex flex-col justify-between rounded-3xl border p-4 transition-all ${
                           isCurrent
                             ? 'border-[#007AFF] bg-[#007AFF]/10 shadow-xs'
-                            : 'border-black/8 bg-white/65 dark:border-white/10 dark:bg-white/5'
+                            : allGatesMet
+                              ? 'border-emerald-500/35 bg-white/75 dark:bg-white/5'
+                              : 'border-black/10 bg-white/60 dark:border-white/10 dark:bg-white/5'
                         }`}
                       >
                         <div>
@@ -1713,31 +2343,126 @@ export const WorkCareerModal: React.FC = () => {
                               {entry.code} → {top.code}
                             </span>
                           </div>
-                          <h4 className="mt-2 text-sm font-black">{c.company}</h4>
+
+                          {entryReq && (
+                            <div
+                              className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[9.5px] font-black ${
+                                entryReq.difficultyTier === 'Ultra-Selective'
+                                  ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300'
+                                  : entryReq.difficultyTier === 'Selective'
+                                    ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                    : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                              }`}
+                            >
+                              {entryReq.selectivityLabel}
+                            </div>
+                          )}
+
+                          <h4 className="mt-1.5 text-sm font-black">{c.company}</h4>
                           <div className="text-[11px] font-bold text-[var(--ink-soft)]">
                             {c.name}
                           </div>
-                          <div className="mt-1.5 text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                          <div className="mt-1 text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
                             {formatCurrency(entry.baseSalary + entry.rsuAnnual)} →{' '}
                             {formatCurrency(top.baseSalary + top.rsuAnnual)}
                           </div>
-                          <div className="mt-1 text-[10px] font-semibold text-[var(--ink-soft)]">
+                          <div className="mt-0.5 text-[10px] font-semibold text-[var(--ink-soft)]">
                             📍 {cLoc?.shortName || c.district} · {c.shiftStartHour}:00–
                             {c.shiftEndHour - 12}:00
                           </div>
+
+                          {/* Custom Tech Tree & Core Skill Gate Checklist */}
+                          {entryReq && (
+                            <div className="mt-3 space-y-1.5 border-t border-black/8 pt-2.5 dark:border-white/10">
+                              <div className="text-[9.5px] font-black tracking-wider text-[var(--ink-soft)] uppercase">
+                                Required Tech Tree & Skills:
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {reqNodes.map((nid) => {
+                                  const nDef = SKILL_TREE_NODE_BY_ID[nid];
+                                  const hasN = unlockedNodes.includes(nid);
+                                  return (
+                                    <button
+                                      key={nid}
+                                      onClick={() => {
+                                        setSelectedNodeId(nid);
+                                        setActiveTab('tree');
+                                      }}
+                                      className={`btn-press rounded-lg px-2 py-0.5 text-[9.5px] font-extrabold ${
+                                        hasN
+                                          ? 'bg-emerald-500/18 text-emerald-700 dark:text-emerald-300'
+                                          : 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                                      }`}
+                                      title="Click to inspect in Skill Tech Tree"
+                                    >
+                                      {hasN ? '✓' : '🔒'} {nDef?.codeName || nid}:{' '}
+                                      {nDef?.title.split(' ')[0]}
+                                    </button>
+                                  );
+                                })}
+                                {reqSkills.map((r) => {
+                                  const sMeta = SKILLS_META.find((m) => m.key === r.skill);
+                                  const hasS = Math.floor(skills[r.skill] ?? 0) >= r.level;
+                                  return (
+                                    <span
+                                      key={r.skill}
+                                      className={`rounded-lg px-2 py-0.5 text-[9.5px] font-extrabold ${
+                                        hasS
+                                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                          : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                      }`}
+                                    >
+                                      {hasS ? '✓' : '🔒'} {sMeta?.emoji} {sMeta?.label} Lv.{r.level}
+                                    </span>
+                                  );
+                                })}
+                                {minDeliv > 0 && (
+                                  <span
+                                    className={`rounded-lg px-2 py-0.5 text-[9.5px] font-extrabold ${
+                                      delivOk
+                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                        : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
+                                    }`}
+                                  >
+                                    {delivOk ? '✓' : '🔒'} 🚀 {deliverablesDone}/{minDeliv} Shipped
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        <button
-                          disabled={isCurrent}
-                          onClick={() => applyJob(c.id)}
-                          className={`btn-press mt-3.5 w-full rounded-xl py-2 text-xs font-extrabold ${
-                            isCurrent
-                              ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-[#007AFF] text-white hover:bg-blue-500'
-                          }`}
-                        >
-                          {isCurrent ? '✓ Active Career Track' : 'Switch Track'}
-                        </button>
+                        {isCurrent ? (
+                          <span className="mt-3.5 block w-full rounded-xl bg-emerald-500/20 py-2 text-center text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                            ✓ Active Career Track
+                          </span>
+                        ) : allGatesMet ? (
+                          <button
+                            onClick={() => applyJob(c.id)}
+                            className="btn-press mt-3.5 w-full rounded-xl bg-gradient-to-r from-[#007AFF] to-indigo-600 py-2 text-xs font-extrabold text-white shadow-sm hover:opacity-95"
+                          >
+                            🎯 Sit for Onsite Loop (-{entryReq?.interviewEnergyCost ?? 15}⚡)
+                          </button>
+                        ) : (
+                          <div className="mt-3.5 flex gap-1.5">
+                            <button
+                              onClick={() => {
+                                if (missingNodes[0]) setSelectedNodeId(missingNodes[0]);
+                                setActiveTab('tree');
+                              }}
+                              className="btn-press flex-1 rounded-xl bg-amber-500/20 py-2 text-[11px] font-extrabold text-amber-700 hover:bg-amber-500/30 dark:text-amber-300"
+                            >
+                              🌳 Train in Tech Tree
+                            </button>
+                            <button
+                              onClick={() => applyJob(c.id)}
+                              className="btn-press rounded-xl bg-black/8 px-2.5 py-2 text-[11px] font-extrabold text-[var(--ink-soft)] hover:bg-black/15 dark:bg-white/10"
+                              title="Check missing requirements"
+                            >
+                              🔒
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
