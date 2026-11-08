@@ -14,6 +14,7 @@ import { HomeComputerModal } from './components/HomeComputerModal';
 import { BackpackModal } from './components/BackpackModal';
 import { CarGarageModal } from './components/CarGarageModal';
 import { AccountSaveModal } from './components/AccountSaveModal';
+import { GoalsGuideModal } from './components/GoalsGuideModal';
 
 function getBaySkyGradient(hour: number, isDarkTheme: boolean): string {
   if (hour >= 7 && hour < 17.5) {
@@ -110,6 +111,7 @@ export const App: React.FC = () => {
       {activeModal === 'backpack' && <BackpackModal />}
       {activeModal === 'garage' && <CarGarageModal />}
       {activeModal === 'account' && <AccountSaveModal onClose={() => setActiveModal(null)} />}
+      {activeModal === 'guide' && <GoalsGuideModal />}
     </div>
   );
 };

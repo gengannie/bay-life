@@ -24,11 +24,49 @@ export interface SimAppearance {
 
 export type OriginId = 'newgrad' | 'ycdropout' | 'nepo' | 'h1bhustler';
 export type AspirationId =
+  | 'fireFreedom'
+  | 'breakHandcuffs'
   | 'seriesAUnicorn'
   | 'staffPrincipal'
   | 'paloAltoHome'
   | 'sfConnector'
   | 'indieLegend';
+
+export type AspirationActionType =
+  | 'wealth'
+  | 'career'
+  | 'startup'
+  | 'map'
+  | 'skills'
+  | 'furnish'
+  | 'resign'
+  | 'bluefin'
+  | 'social';
+
+export interface AspirationStageDef {
+  id: string;
+  stageNumber: 1 | 2 | 3 | 4;
+  title: string;
+  desc: string;
+  emoji: string;
+  rewardCash: number;
+  rewardKarma: number;
+  actionLabel: string;
+  actionType: AspirationActionType;
+}
+
+export interface AspirationDef {
+  id: AspirationId;
+  label: string;
+  shortLabel: string;
+  emoji: string;
+  badge: string;
+  accent: string;
+  desc: string;
+  milestoneText: string;
+  playbookTip: string;
+  stages: AspirationStageDef[];
+}
 
 export type TraitId =
   | 'tenXEngineer'
@@ -87,6 +125,9 @@ export interface ActionDef {
   requiresPower?: boolean;
   requiresPantry?: number;
   moodletGranted?: string;
+  workPerformanceDelta?: number;
+  projectProgressDelta?: number;
+  rsuBonus?: number;
   category: 'care' | 'work' | 'skill' | 'social' | 'fun' | 'hustle';
   speechBubble?: string;
 }
@@ -346,6 +387,8 @@ export interface ActiveTravel {
 export interface VenueStation {
   id: string;
   label: string;
+  subtitle?: string;
+  badge?: string;
   emoji: string;
   x: number;
   y: number;
@@ -353,6 +396,33 @@ export interface VenueStation {
   accent: string;
   kind: 'desk' | 'coffee' | 'stage' | 'gym' | 'park' | 'bar' | 'lounge' | 'food';
   actionIds: string[];
+}
+
+export interface CampusWallFeature {
+  emoji: string;
+  badge: string;
+  title: string;
+  sub: string;
+  needKey: NeedKey;
+  delta: number;
+  perfBonus?: number;
+}
+
+export interface CampusFloorDef {
+  id: string;
+  floorNumber: number;
+  code: string; // e.g., '1F', '2F', '3F', 'ROOF'
+  name: string;
+  subtitle: string;
+  emoji: string;
+  floorStyle: 'wood' | 'concrete' | 'grass' | 'marble' | 'club' | 'campus';
+  accentColor: string;
+  wallLeftGrad?: [string, string];
+  wallRightGrad?: [string, string];
+  rugColor?: string;
+  rugAccent?: string;
+  wallFeature?: CampusWallFeature;
+  stations: VenueStation[];
 }
 
 export interface LocationDef {
@@ -368,6 +438,9 @@ export interface LocationDef {
   floorStyle: 'wood' | 'concrete' | 'grass' | 'marble' | 'club' | 'campus';
   accentColor: string;
   vibes: string[];
+  gridSize?: number;
+  isCampus?: boolean;
+  floors?: CampusFloorDef[];
   stations: VenueStation[];
 }
 
@@ -456,15 +529,137 @@ export type RelationshipStatus =
   | 'Stranger'
   | 'LinkedIn 1st'
   | 'Coffee Buddy'
+  | 'Inner Circle'
   | 'Co-Founder Material'
-  | 'Partner';
+  | 'Partner'
+  | 'Ride-or-Die';
+
+export type NpcInteractionKind =
+  | 'linkedin'
+  | 'coffeeChat'
+  | 'whiteboard'
+  | 'pitch'
+  | 'flirt'
+  | 'deepDive'
+  | 'hangout'
+  | 'referral'
+  | 'cofounderSync';
+
+export interface NpcInteractionDef {
+  id: NpcInteractionKind;
+  label: string;
+  shortLabel: string;
+  emoji: string;
+  category: 'professional' | 'social' | 'venture' | 'romance';
+  minScore: number;
+  energyCost: number;
+  cashCost?: number;
+  baseScoreDelta: number;
+  trustDelta: number;
+  romanceDelta: number;
+  skillBoost?: { skill: SkillKey; amount: number };
+  startupBoost?: number;
+  performanceBoost?: number;
+  karmaBoost?: number;
+  moodletId?: string;
+  accent: string;
+  description: string;
+}
+
+export interface NpcDialogueExchange {
+  playerLine: string;
+  npcReply: string;
+  minScore?: number;
+  contextTag?: string;
+}
+
+export interface NpcDialogueChoice {
+  label: string;
+  emoji: string;
+  playerText: string;
+  npcResponse: string;
+  scoreDelta: number;
+  trustDelta?: number;
+  romanceDelta?: number;
+  skillCheck?: { skill: SkillKey; level: number };
+  failNpcResponse?: string;
+  failScoreDelta?: number;
+  rewardKarma?: number;
+  rewardCash?: number;
+  rewardSkill?: { skill: SkillKey; amount: number };
+  rewardStartup?: number;
+  rewardPerformance?: number;
+  moodletId?: string;
+}
+
+export interface NpcConversationTopic {
+  id: string;
+  npcId: string;
+  title: string;
+  emoji: string;
+  category: 'tech' | 'career' | 'startup' | 'life' | 'romance';
+  minScore: number;
+  promptText: string;
+  choices: NpcDialogueChoice[];
+}
+
+export interface NpcMilestoneDef {
+  id: string;
+  npcId: string;
+  threshold: number;
+  tierStatus: RelationshipStatus;
+  title: string;
+  emoji: string;
+  description: string;
+  unlockMessage: string;
+  perkLabel: string;
+  rewardKarma: number;
+  rewardCash?: number;
+  rewardRsu?: number;
+  rewardSkill?: { skill: SkillKey; amount: number };
+  rewardStartupProgress?: number;
+  rewardJobPerformance?: number;
+  moodletId?: string;
+}
+
+export interface NpcGiftDef {
+  id: string;
+  name: string;
+  emoji: string;
+  price: number;
+  description: string;
+  baseScoreDelta: number;
+  trustDelta?: number;
+  romanceDelta?: number;
+  favoriteOfNpcIds: string[];
+  backpackItemId?: string;
+}
+
+export interface RelationshipMessage {
+  id?: string;
+  from: 'npc' | 'me' | 'milestone';
+  text: string;
+  time: number;
+  tag?: string;
+  emoji?: string;
+}
 
 export interface RelationshipState {
   npcId: string;
   score: number; // 0 to 100
   status: RelationshipStatus;
   lastInteractionDay: number;
-  messages: Array<{ from: 'npc' | 'me'; text: string; time: number }>;
+  messages: RelationshipMessage[];
+  trust?: number; // 0 to 100
+  romance?: number; // 0 to 100
+  interactionCounts?: Partial<Record<NpcInteractionKind, number>>;
+  unlockedMilestones?: string[];
+  claimedMilestones?: string[];
+  completedTopics?: string[];
+  activeTopicId?: string | null;
+  giftsGiven?: number;
+  lastGiftDay?: number;
+  hangoutsCompleted?: number;
 }
 
 export interface WishItem {
@@ -473,6 +668,7 @@ export interface WishItem {
   emoji: string;
   desc: string;
   karmaReward: number;
+  cashReward?: number;
   kind: 'skill' | 'visit' | 'action' | 'social' | 'earn' | 'startup';
   targetKey?: string;
   targetValue: number;
@@ -638,10 +834,12 @@ export interface GameState {
   | 'backpack'
   | 'garage'
   | 'computer'
-  | 'account';
+  | 'account'
+  | 'guide';
   phoneApp: 'messages' | 'levels' | 'wealth' | 'doordash' | 'startup' | 'bluefin' | 'zillow' | 'blind';
   simTab: 'needs' | 'skills' | 'relationships' | 'wishes' | 'perks' | 'backpack';
   computerTab?: 'ide' | 'ai_lab' | 'bounties' | 'bluefin' | 'hardware';
+  guideTab?: 'goals' | 'tutorial' | 'playbook';
   mapHouseHuntMode?: boolean;
   bluefinSelectedHomeId?: string | null;
 
@@ -678,6 +876,7 @@ export interface GameState {
   // Location, Home & Movement
   homeId: string;
   locationId: string; // 'home' or venue id
+  campusFloorIndex?: number; // active floor index on multi-floor campuses
   objects: PlacedObject[];
   pos: { x: number; y: number };
   targetPos: { x: number; y: number } | null;
@@ -712,6 +911,8 @@ export interface GameState {
     aspirationCompleted: boolean;
   };
   goalIndex: number;
+  claimedAspirationStages?: string[];
+  resignedJobOnce?: boolean;
 }
 
 export interface GoogleUserProfile {
@@ -733,6 +934,7 @@ export type SerializableGameState = Omit<
   | 'phoneApp'
   | 'simTab'
   | 'computerTab'
+  | 'guideTab'
   | 'mapHouseHuntMode'
   | 'bluefinSelectedHomeId'
   | 'lastToast'

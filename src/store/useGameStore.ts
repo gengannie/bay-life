@@ -33,6 +33,19 @@ import {
   WORK_TONES,
 } from '../data/worldData';
 import {
+  getAvailableTopicsForNpc,
+  getNpcDialogueExchange,
+  getNpcMilestones,
+  getRelationshipTierInfo,
+  getTopicsForNpc,
+  NPC_GIFT_BY_ID,
+  NPC_GIFT_REACTIONS,
+  NPC_INTERACTION_BY_ID,
+} from '../data/relationshipData';
+import {
+  AspirationDef,
+  AspirationId,
+  AspirationStageDef,
   CashFlowCategory,
   CashFlowEntry,
   CommuteModeId,
@@ -42,7 +55,9 @@ import {
   InventoryEntry,
   MarketTicker,
   NeedKey,
+  NpcInteractionKind,
   PlacedObject,
+  RelationshipMessage,
   RelationshipState,
   RelationshipStatus,
   SaveGameData,
@@ -425,6 +440,301 @@ export function calculateCashFlowMetrics(state: GameState) {
   };
 }
 
+export interface EvaluatedStageProgress {
+  stage: AspirationStageDef;
+  pct: number;
+  progressText: string;
+  met: boolean;
+  claimed: boolean;
+}
+
+export function evaluateAspirationProgress(
+  state: GameState,
+  targetAspiration?: AspirationId
+): {
+  aspDef: AspirationDef;
+  stages: EvaluatedStageProgress[];
+  activeStage: EvaluatedStageProgress;
+  overallPct: number;
+  allCompleted: boolean;
+} {
+  const aspId = targetAspiration || state.sim.aspiration || 'fireFreedom';
+  const aspDef = ASPIRATIONS.find((a) => a.id === aspId) || ASPIRATIONS[0];
+  const claimedSet = new Set(state.claimedAspirationStages || []);
+  const nw = calculateNetWorth(state);
+  const cf = calculateCashFlowMetrics(state);
+  const relValues = Object.values(state.relationships || {});
+  const rels38 = relValues.filter((r) => r.score >= 38).length;
+  const rels65 = relValues.filter((r) => r.score >= 65).length;
+  const rels75 = relValues.filter((r) => r.score >= 75).length;
+  const maxTechSkill = Math.max(
+    state.skills.coding || 0,
+    state.skills.aiResearch || 0,
+    state.skills.systemDesign || 0
+  );
+  const nonSalaryWeekly = cf.weeklyStartupRev + cf.weeklyDividendYield;
+
+  const stages: EvaluatedStageProgress[] = aspDef.stages.map((st) => {
+    let pct = 0;
+    let progressText = '';
+    let met = false;
+
+    switch (st.id) {
+      // 1. F.I.R.E. & Coast Sovereign
+      case 'fire_1': {
+        const cur = state.portfolioValue + state.vestedRsu;
+        pct = clamp(Math.round((cur / 20000) * 100), 0, 100);
+        met = cur >= 20000;
+        progressText = `${formatCurrency(cur)} / $20,000 Invested+Vested`;
+        break;
+      }
+      case 'fire_2': {
+        const cur = state.portfolioValue;
+        pct = clamp(Math.round((cur / 75000) * 100), 0, 100);
+        met = cur >= 75000;
+        progressText = `${formatCurrency(cur)} / $75,000 Portfolio`;
+        break;
+      }
+      case 'fire_3': {
+        const cur = cf.passiveCoveragePct;
+        pct = clamp(cur, 0, 100);
+        met = cur >= 100 && (cf.weeklyPassiveIncome >= 350 || cf.isHomeOwned);
+        progressText = `${cur}% / 100% Passive Burn Coverage`;
+        break;
+      }
+      case 'fire_4': {
+        const nwPct = Math.min(1, nw / 500000);
+        const portPct = Math.min(1, state.portfolioValue / 150000);
+        pct = clamp(Math.round((nwPct * 0.5 + portPct * 0.5) * 100), 0, 100);
+        met = nw >= 500000 && state.portfolioValue >= 150000;
+        progressText = `${formatCurrency(nw)} / $500k NW · ${formatCurrency(state.portfolioValue)} / $150k ETF`;
+        break;
+      }
+
+      // 2. Escape the Golden Handcuffs
+      case 'handcuffs_1': {
+        const cur = state.cash + state.vestedRsu + state.portfolioValue;
+        pct = clamp(Math.round((cur / 25000) * 100), 0, 100);
+        met = cur >= 25000;
+        progressText = `${formatCurrency(cur)} / $25,000 Liquid Capital`;
+        break;
+      }
+      case 'handcuffs_2': {
+        pct = clamp(Math.round((nonSalaryWeekly / 1500) * 100), 0, 100);
+        met = nonSalaryWeekly >= 1500;
+        progressText = `${formatCurrency(nonSalaryWeekly)}/wk / $1,500/wk Indie & Yield`;
+        break;
+      }
+      case 'handcuffs_3': {
+        const debtDone = state.loanOwed <= 0;
+        const nwPct = Math.min(1, nw / 125000);
+        pct = clamp(Math.round((debtDone ? 30 : 0) + nwPct * 70), 0, 100);
+        met = debtDone && nw >= 125000;
+        progressText = `${formatCurrency(nw)} / $125k NW${state.loanOwed > 0 ? ` · ${formatCurrency(state.loanOwed)} Debt` : ' · Debt-Free'}`;
+        break;
+      }
+      case 'handcuffs_4': {
+        const resigned = !state.job || Boolean(state.resignedJobOnce);
+        const nwOk = nw >= 125000;
+        const revOk = nonSalaryWeekly >= 1500;
+        pct = clamp(
+          Math.round(
+            (resigned ? 34 : 0) +
+              Math.min(1, nw / 125000) * 33 +
+              Math.min(1, nonSalaryWeekly / 1500) * 33
+          ),
+          0,
+          100
+        );
+        met = resigned && nwOk && revOk;
+        progressText = resigned
+          ? 'W-2 Resigned · Golden Handcuffs Broken!'
+          : nwOk && revOk
+            ? 'Runway Ready! Click "Resign W-2 Job Now" to Break Free'
+            : `${formatCurrency(nw)}/$125k NW · ${formatCurrency(nonSalaryWeekly)}/$1.5k wk · Then Resign`;
+        break;
+      }
+
+      // 3. Sand Hill Unicorn
+      case 'unicorn_1': {
+        const cur = state.startup.productProgress;
+        met = cur >= 35 || state.startup.stage !== 'Ideation';
+        pct = met ? 100 : clamp(Math.round((cur / 35) * 100), 0, 100);
+        progressText = `${Math.round(cur)}% / 35% MVP (${state.startup.stage})`;
+        break;
+      }
+      case 'unicorn_2': {
+        met =
+          state.startup.ycAccepted ||
+          ['YC Batch', 'Seed Funded', 'Series A Unicorn'].includes(state.startup.stage);
+        pct = met ? 100 : clamp(Math.round((state.startup.productProgress / 50) * 100), 0, 95);
+        progressText = met ? 'YC S26 Batch Accepted!' : `${Math.round(state.startup.productProgress)}/50% MVP to Pitch YC`;
+        break;
+      }
+      case 'unicorn_3': {
+        met = ['Seed Funded', 'Series A Unicorn'].includes(state.startup.stage);
+        pct = met
+          ? 100
+          : state.startup.stage === 'YC Batch'
+            ? clamp(50 + Math.round((state.startup.productProgress / 50) * 45), 50, 95)
+            : clamp(Math.round((state.startup.productProgress / 100) * 45), 0, 45);
+        progressText = met ? `${state.startup.stage} (${formatCurrency(state.startup.valuation)})` : `Current Stage: ${state.startup.stage}`;
+        break;
+      }
+      case 'unicorn_4': {
+        met = state.startup.stage === 'Series A Unicorn';
+        pct = met
+          ? 100
+          : state.startup.stage === 'Seed Funded'
+            ? 70
+            : state.startup.stage === 'YC Batch'
+              ? 40
+              : 15;
+        progressText = `${state.startup.stage} · Valued at ${formatCurrency(state.startup.valuation)}`;
+        break;
+      }
+
+      // 4. L8 Principal Fellow
+      case 'principal_1': {
+        const shifts = state.job?.shiftsCompleted ?? 0;
+        const deliv = state.job?.deliverablesCompleted ?? 0;
+        met = shifts >= 2 || deliv >= 1;
+        pct = met ? 100 : clamp(Math.max(shifts * 50, deliv * 100), 0, 100);
+        progressText = `${shifts}/2 Shifts · ${deliv}/1 Deliverable`;
+        break;
+      }
+      case 'principal_2': {
+        const lvlIdx = state.job?.levelIndex ?? 0;
+        met = lvlIdx >= 1;
+        pct = met ? 100 : clamp(Math.round((state.job?.performance ?? 0)), 0, 95);
+        progressText = met ? `Promoted to Level ${lvlIdx + 1}` : `Calibration ${Math.round(state.job?.performance ?? 0)}% toward Promo`;
+        break;
+      }
+      case 'principal_3': {
+        const lvlIdx = state.job?.levelIndex ?? 0;
+        met = lvlIdx >= 3;
+        pct = met ? 100 : clamp(Math.round((lvlIdx / 3) * 100), 0, 95);
+        progressText = `Career Level ${lvlIdx + 1} / 4 (Staff Track)`;
+        break;
+      }
+      case 'principal_4': {
+        const lvlIdx = state.job?.levelIndex ?? 0;
+        met = lvlIdx >= 5;
+        pct = met ? 100 : clamp(Math.round((lvlIdx / 5) * 100), 0, 95);
+        progressText = `Career Level ${lvlIdx + 1} / 6 (L8 Principal)`;
+        break;
+      }
+
+      // 5. Silicon Valley Land Baron
+      case 'baron_1': {
+        pct = clamp(Math.round((nw / 100000) * 100), 0, 100);
+        met = nw >= 100000;
+        progressText = `${formatCurrency(nw)} / $100,000 Net Worth`;
+        break;
+      }
+      case 'baron_2': {
+        met =
+          ['soma_loft', 'pac_heights_victorian'].includes(state.homeId) ||
+          state.ownedCars.length > 0 ||
+          state.ownedHomes.length > 0;
+        pct = met ? 100 : clamp(Math.round((nw / 40000) * 100), 0, 90);
+        progressText = met ? 'Luxury Loft or EV Unlocked!' : 'Lease SoMa Loft / Pac Heights or Buy an EV';
+        break;
+      }
+      case 'baron_3': {
+        met = nw >= 500000 || state.ownedHomes.length > 0;
+        pct = met ? 100 : clamp(Math.round((nw / 500000) * 100), 0, 95);
+        progressText =
+          state.ownedHomes.length > 0
+            ? `Property Owner (${state.ownedHomes.length} Home)`
+            : `${formatCurrency(nw)} / $500,000 Net Worth`;
+        break;
+      }
+      case 'baron_4': {
+        pct = clamp(Math.round((nw / 1500000) * 100), 0, 100);
+        met = nw >= 1500000;
+        progressText = `${formatCurrency(nw)} / $1,500,000 Net Worth`;
+        break;
+      }
+
+      // 6. Cerebral Valley Super-Connector
+      case 'conn_1': {
+        pct = clamp(rels38 * 100, 0, 100);
+        met = rels38 >= 1;
+        progressText = `${rels38} / 1 Coffee Buddy (38+ Score)`;
+        break;
+      }
+      case 'conn_2': {
+        pct = clamp(Math.round((rels38 / 3) * 100), 0, 100);
+        met = rels38 >= 3;
+        progressText = `${rels38} / 3 Coffee Buddies (38+ Score)`;
+        break;
+      }
+      case 'conn_3': {
+        pct = clamp(Math.round((rels65 / 2) * 100), 0, 100);
+        met = rels65 >= 2;
+        progressText = `${rels65} / 2 Co-Founder Ties (65+ Score)`;
+        break;
+      }
+      case 'conn_4': {
+        pct = clamp(Math.round((rels75 / 4) * 100), 0, 100);
+        met = rels75 >= 4;
+        progressText = `${rels75} / 4 Icons at 75+ Score`;
+        break;
+      }
+
+      // 7. 100x Polymath Architect
+      case 'poly_1': {
+        pct = clamp(Math.round((maxTechSkill / 4) * 100), 0, 100);
+        met = maxTechSkill >= 4;
+        progressText = `Lv.${maxTechSkill.toFixed(1)} / Lv.4 Tech Skill`;
+        break;
+      }
+      case 'poly_2': {
+        const nodesCount = state.unlockedTechNodes?.length ?? 1;
+        pct = clamp(Math.round((nodesCount / 3) * 100), 0, 100);
+        met = nodesCount >= 3;
+        progressText = `${nodesCount} / 3 Tech Tree Nodes Unlocked`;
+        break;
+      }
+      case 'poly_3': {
+        pct = clamp(Math.round((maxTechSkill / 7) * 100), 0, 100);
+        met = maxTechSkill >= 7;
+        progressText = `Lv.${maxTechSkill.toFixed(1)} / Lv.7 Tech Skill`;
+        break;
+      }
+      case 'poly_4': {
+        const best = Math.max(state.skills.coding || 0, state.skills.aiResearch || 0);
+        pct = clamp(Math.round((best / 10) * 100), 0, 100);
+        met = best >= 10;
+        progressText = `Lv.${best.toFixed(1)} / Lv.10 Mastery`;
+        break;
+      }
+    }
+
+    const claimed = claimedSet.has(st.id);
+    return {
+      stage: st,
+      pct: met || claimed ? 100 : pct,
+      progressText,
+      met: met || claimed,
+      claimed,
+    };
+  });
+
+  const activeStage = stages.find((s) => !s.met) || stages[stages.length - 1];
+  const overallPct = Math.round(stages.reduce((acc, s) => acc + s.pct, 0) / stages.length);
+  const allCompleted = stages.every((s) => s.met);
+
+  return {
+    aspDef,
+    stages,
+    activeStage,
+    overallPct,
+    allCompleted,
+  };
+}
+
 export function calculateOverallMood(state: GameState): {
   score: number;
   label: 'Flow State' | 'Dialed In' | 'Stable' | 'Drained' | 'Burnout Risk';
@@ -541,8 +851,10 @@ function logShiftAttendance(
 }
 
 function getRelStatus(score: number): RelationshipStatus {
+  if (score >= 95) return 'Ride-or-Die';
   if (score >= 85) return 'Partner';
-  if (score >= 65) return 'Co-Founder Material';
+  if (score >= 68) return 'Co-Founder Material';
+  if (score >= 52) return 'Inner Circle';
   if (score >= 38) return 'Coffee Buddy';
   if (score >= 15) return 'LinkedIn 1st';
   return 'Stranger';
@@ -551,21 +863,77 @@ function getRelStatus(score: number): RelationshipStatus {
 function buildInitialRelationships(): Record<string, RelationshipState> {
   const rels: Record<string, RelationshipState> = {};
   for (const npc of NPCS) {
+    const initialTopics = getAvailableTopicsForNpc(npc.id, 12, []);
+    const fallbackTopics = getTopicsForNpc(npc.id);
     rels[npc.id] = {
       npcId: npc.id,
       score: 12,
       status: 'Stranger',
       lastInteractionDay: 0,
+      trust: 10,
+      romance: 5,
+      interactionCounts: {},
+      unlockedMilestones: [],
+      claimedMilestones: [],
+      completedTopics: [],
+      activeTopicId: initialTopics[0]?.id ?? fallbackTopics[0]?.id ?? null,
+      giftsGiven: 0,
+      lastGiftDay: 0,
+      hangoutsCompleted: 0,
       messages: [
         {
+          id: uid(),
           from: 'npc',
           text: npc.greeting,
           time: 450,
+          tag: 'Intro',
         },
       ],
     };
   }
   return rels;
+}
+
+function ensureRelationshipState(npcId: string, rel?: RelationshipState): RelationshipState {
+  const npc = NPCS.find((n) => n.id === npcId);
+  const score = typeof rel?.score === 'number' ? clamp(rel.score, 0, 100) : 12;
+  const status = getRelStatus(score);
+  const completedTopics = Array.isArray(rel?.completedTopics) ? rel.completedTopics : [];
+  const availableTopics = getAvailableTopicsForNpc(npcId, score, completedTopics);
+  const allTopics = getTopicsForNpc(npcId);
+  const defaultUnlocked = getNpcMilestones(npcId)
+    .filter((m) => score >= m.threshold)
+    .map((m) => m.id);
+  const existingUnlocked = Array.isArray(rel?.unlockedMilestones) ? rel.unlockedMilestones : [];
+  const mergedUnlocked = Array.from(new Set([...existingUnlocked, ...defaultUnlocked]));
+
+  const defaultMessages: RelationshipMessage[] = npc
+    ? [{ id: uid(), from: 'npc', text: npc.greeting, time: 450, tag: 'Intro' }]
+    : [];
+
+  return {
+    npcId,
+    score,
+    status,
+    lastInteractionDay: rel?.lastInteractionDay ?? 0,
+    trust: typeof rel?.trust === 'number' ? clamp(rel.trust, 0, 100) : 10,
+    romance: typeof rel?.romance === 'number' ? clamp(rel.romance, 0, 100) : 5,
+    interactionCounts: rel?.interactionCounts ? { ...rel.interactionCounts } : {},
+    unlockedMilestones: mergedUnlocked,
+    claimedMilestones: Array.isArray(rel?.claimedMilestones) ? [...rel.claimedMilestones] : [],
+    completedTopics: [...completedTopics],
+    activeTopicId:
+      rel?.activeTopicId && !completedTopics.includes(rel.activeTopicId)
+        ? rel.activeTopicId
+        : (availableTopics[0]?.id ?? allTopics.find((t) => !completedTopics.includes(t.id))?.id ?? null),
+    giftsGiven: rel?.giftsGiven ?? 0,
+    lastGiftDay: rel?.lastGiftDay ?? 0,
+    hangoutsCompleted: rel?.hangoutsCompleted ?? 0,
+    messages:
+      Array.isArray(rel?.messages) && rel.messages.length > 0
+        ? rel.messages.map((m) => (m.id ? m : { ...m, id: uid() }))
+        : defaultMessages,
+  };
 }
 
 export const DEFAULT_PROFILE: SimProfile = {
@@ -619,6 +987,7 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
     phoneApp: 'levels',
     simTab: 'needs',
     computerTab: 'ide',
+    guideTab: 'goals',
     mapHouseHuntMode: false,
     bluefinSelectedHomeId: null,
 
@@ -739,6 +1108,8 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
       aspirationCompleted: false,
     },
     goalIndex: 0,
+    claimedAspirationStages: [],
+    resignedJobOnce: false,
   };
 }
 
@@ -749,8 +1120,15 @@ interface GameActions {
   setMapHouseHuntMode: (enabled: boolean, homeIdToInspect?: string) => void;
   setActiveModal: (
     modal: GameState['activeModal'],
-    sub?: GameState['phoneApp'] | GameState['simTab'] | GameState['computerTab']
+    sub?:
+      | GameState['phoneApp']
+      | GameState['simTab']
+      | GameState['computerTab']
+      | GameState['guideTab']
   ) => void;
+  selectAspiration: (aspirationId: AspirationId) => void;
+  resignJob: () => void;
+  skipTutorial: () => void;
   setSpeed: (speed: 0 | 1 | 2 | 3) => void;
   toggleNightMode: () => void;
   toggleSound: () => void;
@@ -802,10 +1180,11 @@ interface GameActions {
   storeFurnitureInBackpack: (placedUid: string) => void;
   placeFurnitureFromBackpack: (furnitureId: string) => void;
   sellBackpackItem: (itemId: string, kind: 'item' | 'furniture') => void;
-  interactWithNpc: (
-    npcId: string,
-    kind: 'linkedin' | 'coffeeChat' | 'whiteboard' | 'pitch' | 'flirt'
-  ) => void;
+  interactWithNpc: (npcId: string, kind: NpcInteractionKind) => void;
+  answerNpcTopic: (npcId: string, topicId: string, choiceIndex: number) => void;
+  giftNpc: (npcId: string, giftId: string) => void;
+  claimRelationshipMilestone: (npcId: string, milestoneId: string) => void;
+  inviteNpcHangout: (npcId: string) => void;
   orderDoorDash: (itemId: string) => void;
   pitchStartupVC: () => void;
   renameStartup: (name: string, tagline: string) => void;
@@ -880,6 +1259,7 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       setActiveModal: (modal, sub) => {
+        const s = get();
         sfx.play(modal ? 'open' : 'tap');
         const patch: Partial<GameState> = { activeModal: modal };
         if (modal === 'phone' && sub) {
@@ -888,8 +1268,207 @@ export const useGameStore = create<GameState & GameActions>()(
           patch.simTab = sub as GameState['simTab'];
         } else if (modal === 'computer' && sub) {
           patch.computerTab = sub as GameState['computerTab'];
+        } else if (modal === 'guide' && sub) {
+          patch.guideTab = sub as GameState['guideTab'];
+        }
+        // If on tutorial step 0 (Land or Inspect Your Engineering Role) and opening Career Hub
+        if (s.goalIndex === 0 && modal === 'career') {
+          patch.goalIndex = 1;
+          patch.cash = s.cash + GOALS[0].rewardCash;
+          patch.karma = s.karma + GOALS[0].rewardKarma;
+          const notice = {
+            id: uid(),
+            text: `Starter Goal Complete: ${GOALS[0].title} (+${formatCurrency(GOALS[0].rewardCash)} & +${GOALS[0].rewardKarma} ⚡)!`,
+            emoji: '🎉',
+            tone: 'good' as const,
+            time: s.time,
+          };
+          patch.notices = [notice, ...s.notices.slice(0, 29)];
+          patch.lastToast = notice;
         }
         set(patch);
+      },
+
+      selectAspiration: (aspirationId) => {
+        const s = get();
+        const aspDef = ASPIRATIONS.find((a) => a.id === aspirationId);
+        if (!aspDef) return;
+        sfx.play('levelup');
+
+        const updatedSim: SimProfile = {
+          ...s.sim,
+          aspiration: aspirationId,
+        };
+        const tempState: GameState = {
+          ...s,
+          sim: updatedSim,
+        };
+        const evalRes = evaluateAspirationProgress(tempState, aspirationId);
+        const claimed = new Set(s.claimedAspirationStages || []);
+        let bonusCash = 0;
+        let bonusKarma = 0;
+        for (const st of evalRes.stages) {
+          if (st.met && !claimed.has(st.stage.id)) {
+            claimed.add(st.stage.id);
+            bonusCash += st.stage.rewardCash;
+            bonusKarma += st.stage.rewardKarma;
+          }
+        }
+
+        let fin = ensureFinanceState(s);
+        if (bonusCash > 0) {
+          fin = recordCashFlow(fin, {
+            time: s.time,
+            label: `Goal Milestone Bonus (${aspDef.shortLabel})`,
+            emoji: aspDef.emoji,
+            amount: bonusCash,
+            category: 'bounties',
+          });
+        }
+
+        const notice = {
+          id: uid(),
+          text:
+            bonusCash > 0
+              ? `North Star Goal Selected: ${aspDef.emoji} ${aspDef.label}! Claimed +${formatCurrency(bonusCash)} & +${bonusKarma} ⚡ from completed stages!`
+              : `North Star Goal Selected: ${aspDef.emoji} ${aspDef.label} — "${aspDef.milestoneText}"`,
+          emoji: aspDef.emoji,
+          tone: 'good' as const,
+          time: s.time,
+        };
+
+        set({
+          sim: updatedSim,
+          cash: s.cash + bonusCash,
+          karma: s.karma + bonusKarma,
+          finance: fin,
+          claimedAspirationStages: Array.from(claimed),
+          stats: {
+            ...s.stats,
+            earnedToday: s.stats.earnedToday + bonusCash,
+            earnedTotal: s.stats.earnedTotal + bonusCash,
+            aspirationCompleted: evalRes.allCompleted,
+          },
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      resignJob: () => {
+        const s = get();
+        if (!s.job) {
+          const notice = {
+            id: uid(),
+            text: 'You are already free from corporate W-2 handcuffs! Open Levels.fyi if you ever want to interview again.',
+            emoji: '🔓',
+            tone: 'info' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
+        const career = CAREER_BY_ID[s.job.careerId];
+        const hasParachute =
+          s.unlockedPerks.includes('perk_exec_halo') ||
+          s.unlockedPerks.includes('perk_diamond_hands');
+        const acceleratedRsu =
+          hasParachute && s.unvestedRsu > 0 ? Math.round(s.unvestedRsu * 0.5) : 0;
+        const forfeitedRsu = Math.max(0, s.unvestedRsu - acceleratedRsu);
+
+        const nextVestedRsu = s.vestedRsu + acceleratedRsu;
+        const nextMoodlets = [
+          ...s.moodlets.filter((m) => m.id !== 'golden_free'),
+          { id: 'golden_free', expiresAt: s.time + 2880 },
+        ];
+
+        const tempState: GameState = {
+          ...s,
+          job: null,
+          workShift: null,
+          vestedRsu: nextVestedRsu,
+          unvestedRsu: 0,
+          resignedJobOnce: true,
+        };
+        const evalRes = evaluateAspirationProgress(tempState);
+        const claimed = new Set(s.claimedAspirationStages || []);
+        let bonusCash = 0;
+        let bonusKarma = 5; // Base +5 Karma for the courage to break the handcuffs
+        for (const st of evalRes.stages) {
+          if (st.met && !claimed.has(st.stage.id)) {
+            claimed.add(st.stage.id);
+            bonusCash += st.stage.rewardCash;
+            bonusKarma += st.stage.rewardKarma;
+          }
+        }
+
+        let fin = ensureFinanceState(s);
+        if (bonusCash > 0) {
+          fin = recordCashFlow(fin, {
+            time: s.time,
+            label: `Golden Handcuffs Freedom Bonus (${evalRes.aspDef.shortLabel})`,
+            emoji: '🔓',
+            amount: bonusCash,
+            category: 'bounties',
+          });
+        }
+
+        sfx.play('levelup');
+        const parachuteMsg =
+          acceleratedRsu > 0
+            ? ` Negotiated ${formatCurrency(acceleratedRsu)} RSU acceleration!`
+            : forfeitedRsu > 0
+              ? ` Walked away from ${formatCurrency(forfeitedRsu)} unvested RSUs.`
+              : '';
+        const rewardMsg =
+          bonusCash > 0
+            ? ` Awarded +${formatCurrency(bonusCash)} & +${bonusKarma} ⚡ Karma!`
+            : ` +${bonusKarma} ⚡ Karma & +28 Mood!`;
+        const notice = {
+          id: uid(),
+          text: `GOLDEN HANDCUFFS BROKEN: Resigned from ${career?.company || 'Corporate W-2'}! Zero RTO mandates!${parachuteMsg}${rewardMsg}`,
+          emoji: '🔓',
+          tone: 'good' as const,
+          time: s.time,
+        };
+
+        set({
+          job: null,
+          workShift: null,
+          resignedJobOnce: true,
+          vestedRsu: nextVestedRsu,
+          unvestedRsu: 0,
+          cash: s.cash + bonusCash,
+          karma: s.karma + bonusKarma,
+          finance: fin,
+          moodlets: nextMoodlets,
+          claimedAspirationStages: Array.from(claimed),
+          stats: {
+            ...s.stats,
+            earnedToday: s.stats.earnedToday + bonusCash,
+            earnedTotal: s.stats.earnedTotal + bonusCash,
+            aspirationCompleted: s.stats.aspirationCompleted || evalRes.allCompleted,
+          },
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      skipTutorial: () => {
+        const s = get();
+        sfx.play('tap');
+        const notice = {
+          id: uid(),
+          text: 'Starter tutorial completed! Tracking your North Star Goal milestones on the HUD.',
+          emoji: '🎯',
+          tone: 'info' as const,
+          time: s.time,
+        };
+        set({
+          goalIndex: GOALS.length,
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
       },
 
       setSpeed: (speed) => {
@@ -991,6 +1570,11 @@ export const useGameStore = create<GameState & GameActions>()(
           speed: raw.speed === 2 || raw.speed === 3 ? raw.speed : 1,
         };
 
+        const normalizedRels: Record<string, RelationshipState> = {};
+        for (const npc of NPCS) {
+          normalizedRels[npc.id] = ensureRelationshipState(npc.id, merged.relationships?.[npc.id]);
+        }
+        merged.relationships = normalizedRels;
         merged.finance = ensureFinanceState(merged);
         merged.portfolioValue = computePortfolioValue(merged.finance);
         sfx.enabled = Boolean(merged.soundOn);
@@ -2131,21 +2715,31 @@ export const useGameStore = create<GameState & GameActions>()(
           category: 'rsu',
         });
         sfx.play('cash');
+        let goalIndex = s.goalIndex;
+        let bonusCash = 0;
+        let bonusKarma = 0;
+        if (goalIndex === 5 && GOALS[5]) {
+          goalIndex = 6;
+          bonusCash = GOALS[5].rewardCash;
+          bonusKarma = GOALS[5].rewardKarma;
+        }
         const notice = {
           id: uid(),
-          text: `Sold vested RSUs on Schwaab for ${formatCurrency(payout)} cash!`,
+          text: `Sold vested RSUs on Schwaab for ${formatCurrency(payout)} cash!${bonusCash > 0 ? ` +${formatCurrency(bonusCash)} Starter Goal Bonus!` : ''}`,
           emoji: '💎',
           tone: 'cash' as const,
           time: s.time,
         };
         set({
-          cash: s.cash + payout,
+          cash: s.cash + payout + bonusCash,
+          karma: s.karma + bonusKarma,
+          goalIndex,
           vestedRsu: 0,
           finance: fin,
           stats: {
             ...s.stats,
-            earnedToday: s.stats.earnedToday + payout,
-            earnedTotal: s.stats.earnedTotal + payout,
+            earnedToday: s.stats.earnedToday + payout + bonusCash,
+            earnedTotal: s.stats.earnedTotal + payout + bonusCash,
           },
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
@@ -2253,15 +2847,25 @@ export const useGameStore = create<GameState & GameActions>()(
         };
 
         sfx.play('cash');
+        let goalIndex = s.goalIndex;
+        let bonusCash = 0;
+        let bonusKarma = 0;
+        if (goalIndex === 5 && GOALS[5]) {
+          goalIndex = 6;
+          bonusCash = GOALS[5].rewardCash;
+          bonusKarma = GOALS[5].rewardKarma;
+        }
         const notice = {
           id: uid(),
-          text: `Order Filled: Bought ${boughtShares.toFixed(2)} sh ${ticker} (${formatCurrency(actual)}) @ $${price.toFixed(2)} on Schwaab.`,
+          text: `Order Filled: Bought ${boughtShares.toFixed(2)} sh ${ticker} (${formatCurrency(actual)}) @ $${price.toFixed(2)} on Schwaab.${bonusCash > 0 ? ` +${formatCurrency(bonusCash)} Starter Goal Bonus!` : ''}`,
           emoji: asset.emoji,
           tone: 'info' as const,
           time: s.time,
         };
         set({
-          cash: s.cash - actual,
+          cash: s.cash - actual + bonusCash,
+          karma: s.karma + bonusKarma,
+          goalIndex,
           portfolioValue: nextPortfolioVal,
           finance: nextFin,
           skills: nextSkills,
@@ -3380,62 +3984,780 @@ export const useGameStore = create<GameState & GameActions>()(
       interactWithNpc: (npcId, kind) => {
         const s = get();
         const npc = NPCS.find((n) => n.id === npcId);
-        if (!npc) return;
-        const currentRel = s.relationships[npcId] || {
-          npcId,
-          score: 10,
-          status: 'Stranger' as RelationshipStatus,
-          lastInteractionDay: 0,
-          messages: [],
-        };
+        const interactionDef = NPC_INTERACTION_BY_ID[kind];
+        if (!npc || !interactionDef) return;
 
-        const charismaBonus = s.sim.traits.includes('exFounder') ? 4 : 0;
-        let delta = 8 + charismaBonus;
-        let reply = '';
-        let skillBoost: { skill: SkillKey; amount: number } | null = null;
-        let startupBoost = 0;
+        const currentRel = ensureRelationshipState(npcId, s.relationships[npcId]);
 
-        if (kind === 'linkedin') {
-          delta = 10 + charismaBonus;
-          reply = `Connected! Let’s grab a Blue Bottle cortado in ${npc.favoriteSpot.replace('_', ' ')} sometime.`;
-        } else if (kind === 'coffeeChat') {
-          delta = 14 + charismaBonus;
-          reply = `Loved chatting about ${npc.company} architecture and Bay Area life!`;
-          skillBoost = { skill: 'charisma', amount: 18 };
-        } else if (kind === 'whiteboard') {
-          delta = 15 + charismaBonus;
-          reply = `That system design breakdown was L7-tier. Learned a ton!`;
-          skillBoost = { skill: 'systemDesign', amount: 22 };
-        } else if (kind === 'pitch') {
-          delta = 12 + charismaBonus;
-          startupBoost = 10;
-          reply = `Super sharp wedge for ${s.startup.name}. I’ll intro you to two Sand Hill angels!`;
-          skillBoost = { skill: 'hustle', amount: 20 };
-        } else if (kind === 'flirt') {
-          delta = 16 + charismaBonus;
-          reply = `Sunset walk at Dolores Park or oysters at Ferry Building next Friday? ✨`;
+        if (currentRel.score < interactionDef.minScore) {
+          const reqTier = getRelationshipTierInfo(interactionDef.minScore);
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `Requires ${interactionDef.minScore}% bond (${reqTier.status}) with ${npc.name} to unlock ${interactionDef.label}.`,
+            emoji: '🔒',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
         }
+
+        if (interactionDef.cashCost && s.cash < interactionDef.cashCost) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `Need ${formatCurrency(interactionDef.cashCost)} for ${interactionDef.label} with ${npc.name}.`,
+            emoji: '💳',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
+        const prevCount = currentRel.interactionCounts?.[kind] || 0;
+        const exchange = getNpcDialogueExchange(npcId, kind, currentRel.score, prevCount);
+
+        const exFounderBonus = s.sim.traits.includes('exFounder') ? 4 : 0;
+        const coffeeSnobBonus =
+          s.sim.traits.includes('coffeeSnob') && kind === 'coffeeChat' ? 3 : 0;
+        const tenXBonus =
+          s.sim.traits.includes('tenXEngineer') && (kind === 'whiteboard' || kind === 'deepDive')
+            ? 3
+            : 0;
+        const varietyBonus = prevCount === 0 ? 2 : 0;
 
         const superConnMult = s.unlockedPerks.includes('perk_super_connector') ? 1.4 : 1.0;
         const superConnSkillMult = s.unlockedPerks.includes('perk_super_connector') ? 1.5 : 1.0;
-        const newScore = clamp(currentRel.score + Math.round(delta * superConnMult), 0, 100);
+        const rawDelta =
+          interactionDef.baseScoreDelta +
+          exFounderBonus +
+          coffeeSnobBonus +
+          tenXBonus +
+          varietyBonus;
+        const scoreGain = Math.max(1, Math.round(rawDelta * superConnMult));
+        const newScore = clamp(currentRel.score + scoreGain, 0, 100);
         const newStatus = getRelStatus(newScore);
 
+        const nextTrust = clamp((currentRel.trust ?? 15) + interactionDef.trustDelta, 0, 100);
+        const nextRomance = clamp((currentRel.romance ?? 5) + interactionDef.romanceDelta, 0, 100);
+
+        const msgTag = exchange.contextTag || interactionDef.shortLabel;
+        const nextMessages: RelationshipMessage[] = [
+          ...currentRel.messages.slice(-24),
+          {
+            id: uid(),
+            from: 'me',
+            text: exchange.playerLine,
+            time: s.time,
+            tag: msgTag,
+            emoji: interactionDef.emoji,
+          },
+          {
+            id: uid(),
+            from: 'npc',
+            text: exchange.npcReply,
+            time: s.time,
+            tag: msgTag,
+            emoji: interactionDef.emoji,
+          },
+        ];
+
+        const nextUnlockedMilestones = [...(currentRel.unlockedMilestones || [])];
+        for (const m of getNpcMilestones(npcId)) {
+          if (newScore >= m.threshold && !nextUnlockedMilestones.includes(m.id)) {
+            nextUnlockedMilestones.push(m.id);
+            nextMessages.push({
+              id: uid(),
+              from: 'milestone',
+              text: `🏆 Milestone Unlocked: ${m.title} — "${m.unlockMessage}"`,
+              time: s.time,
+              tag: m.tierStatus,
+              emoji: m.emoji,
+            });
+          }
+        }
+
         const nextSkills = { ...s.skills };
-        if (skillBoost) {
-          nextSkills[skillBoost.skill] = Math.min(
+        if (interactionDef.skillBoost) {
+          const sk = interactionDef.skillBoost.skill;
+          const rawAmt = interactionDef.skillBoost.amount;
+          const baseSkillDelta = rawAmt > 2 ? rawAmt / 100 : rawAmt;
+          nextSkills[sk] = Math.min(
             10,
-            +(
-              nextSkills[skillBoost.skill] +
-              (skillBoost.amount * superConnSkillMult) / 100
-            ).toFixed(2)
+            +(nextSkills[sk] + baseSkillDelta * superConnSkillMult).toFixed(2)
           );
         }
 
+        const startupBoost = interactionDef.startupBoost || 0;
+        const nextStartup =
+          startupBoost > 0
+            ? {
+                ...s.startup,
+                productProgress: clamp(s.startup.productProgress + startupBoost, 0, 100),
+                users: s.startup.users + Math.round(startupBoost * 8),
+              }
+            : s.startup;
+
+        const nextJob =
+          interactionDef.performanceBoost && s.job
+            ? {
+                ...s.job,
+                performance: clamp(s.job.performance + interactionDef.performanceBoost, 0, 100),
+              }
+            : s.job;
+
+        let cash = s.cash;
+        let finance = ensureFinanceState(s);
+        if (interactionDef.cashCost && interactionDef.cashCost > 0) {
+          cash = Math.max(0, cash - interactionDef.cashCost);
+          finance = recordCashFlow(finance, {
+            time: s.time,
+            label: `${interactionDef.label} w/ ${npc.name}`,
+            emoji: interactionDef.emoji,
+            amount: -interactionDef.cashCost,
+            category: 'living',
+          });
+        }
+
+        let karma = s.karma + (interactionDef.karmaBoost || 0);
         let goalIndex = s.goalIndex;
+        if (goalIndex === 3) {
+          goalIndex = 4;
+          cash += GOALS[3].rewardCash;
+          karma += GOALS[3].rewardKarma;
+        }
+
+        let nextMoodlets = [...s.moodlets];
+        if (interactionDef.moodletId && MOODLETS[interactionDef.moodletId]) {
+          const mDef = MOODLETS[interactionDef.moodletId];
+          nextMoodlets = [
+            ...nextMoodlets.filter((m) => m.id !== mDef.id),
+            { id: mDef.id, expiresAt: s.time + mDef.durationMinutes },
+          ];
+        }
+
+        const completedTopics = currentRel.completedTopics || [];
+        const availTopics = getAvailableTopicsForNpc(npcId, newScore, completedTopics);
+        const nextActiveTopicId =
+          currentRel.activeTopicId && !completedTopics.includes(currentRel.activeTopicId)
+            ? currentRel.activeTopicId
+            : (availTopics[0]?.id ?? null);
+
+        const wishes = s.wishes.map((w) => {
+          if (w.kind === 'social') {
+            return { ...w, progress: Math.min(w.targetValue, w.progress + 1) };
+          }
+          return w;
+        });
+
+        sfx.play(newStatus !== currentRel.status ? 'levelup' : 'notice');
+        const notice = {
+          id: uid(),
+          text: `${npc.name} (${newStatus} · ${newScore}%): "${exchange.npcReply}"`,
+          emoji: interactionDef.emoji || '💬',
+          tone: 'good' as const,
+          time: s.time,
+        };
+
+        set({
+          skills: nextSkills,
+          needs: {
+            ...s.needs,
+            energy: clamp(s.needs.energy - Math.max(0, interactionDef.energyCost || 0)),
+            social: clamp(s.needs.social + 22),
+            fun: clamp(s.needs.fun + (kind === 'flirt' || kind === 'hangout' ? 18 : 12)),
+          },
+          startup: nextStartup,
+          job: nextJob,
+          moodlets: nextMoodlets,
+          finance,
+          relationships: {
+            ...s.relationships,
+            [npcId]: {
+              ...currentRel,
+              score: newScore,
+              status: newStatus,
+              lastInteractionDay: getDayNumber(s.time),
+              trust: nextTrust,
+              romance: nextRomance,
+              interactionCounts: {
+                ...(currentRel.interactionCounts || {}),
+                [kind]: prevCount + 1,
+              },
+              unlockedMilestones: nextUnlockedMilestones,
+              activeTopicId: nextActiveTopicId,
+              hangoutsCompleted:
+                kind === 'hangout'
+                  ? (currentRel.hangoutsCompleted || 0) + 1
+                  : (currentRel.hangoutsCompleted || 0),
+              messages: nextMessages.slice(-30),
+            },
+          },
+          wishes,
+          goalIndex,
+          cash,
+          karma,
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      answerNpcTopic: (npcId, topicId, choiceIndex) => {
+        const s = get();
+        const npc = NPCS.find((n) => n.id === npcId);
+        if (!npc) return;
+
+        const topics = getTopicsForNpc(npcId);
+        const topic = topics.find((t) => t.id === topicId);
+        const choice = topic?.choices[choiceIndex];
+        if (!topic || !choice) return;
+
+        const currentRel = ensureRelationshipState(npcId, s.relationships[npcId]);
+        const passedCheck =
+          !choice.skillCheck ||
+          (s.skills[choice.skillCheck.skill] || 0) >= choice.skillCheck.level;
+
+        const superConnMult = s.unlockedPerks.includes('perk_super_connector') ? 1.4 : 1.0;
+        const superConnSkillMult = s.unlockedPerks.includes('perk_super_connector') ? 1.5 : 1.0;
+
+        const rawScoreDelta = passedCheck ? choice.scoreDelta : (choice.failScoreDelta ?? 4);
+        const scoreGain = Math.max(1, Math.round(rawScoreDelta * superConnMult));
+        const newScore = clamp(currentRel.score + scoreGain, 0, 100);
+        const newStatus = getRelStatus(newScore);
+
+        const trustGain = passedCheck
+          ? (choice.trustDelta ?? Math.max(4, Math.round(choice.scoreDelta * 0.6)))
+          : 3;
+        const romanceGain = passedCheck
+          ? (choice.romanceDelta ?? (topic.category === 'romance' ? 10 : 2))
+          : (topic.category === 'romance' ? 2 : 0);
+
+        const nextTrust = clamp((currentRel.trust ?? 15) + trustGain, 0, 100);
+        const nextRomance = clamp((currentRel.romance ?? 5) + romanceGain, 0, 100);
+        const npcReply = passedCheck
+          ? choice.npcResponse
+          : (choice.failNpcResponse || choice.npcResponse);
+
+        const nextMessages: RelationshipMessage[] = [
+          ...currentRel.messages.slice(-24),
+          {
+            id: uid(),
+            from: 'me',
+            text: choice.playerText,
+            time: s.time,
+            tag: topic.title,
+            emoji: choice.emoji || topic.emoji,
+          },
+          {
+            id: uid(),
+            from: 'npc',
+            text: npcReply,
+            time: s.time,
+            tag: topic.title,
+            emoji: topic.emoji,
+          },
+        ];
+
+        const nextUnlockedMilestones = [...(currentRel.unlockedMilestones || [])];
+        for (const m of getNpcMilestones(npcId)) {
+          if (newScore >= m.threshold && !nextUnlockedMilestones.includes(m.id)) {
+            nextUnlockedMilestones.push(m.id);
+            nextMessages.push({
+              id: uid(),
+              from: 'milestone',
+              text: `🏆 Milestone Unlocked: ${m.title} — "${m.unlockMessage}"`,
+              time: s.time,
+              tag: m.tierStatus,
+              emoji: m.emoji,
+            });
+          }
+        }
+
         let cash = s.cash;
         let karma = s.karma;
+        let finance = ensureFinanceState(s);
+        const stats = { ...s.stats };
+        const nextSkills = { ...s.skills };
+        let nextStartup = s.startup;
+        let nextJob = s.job;
+        let nextMoodlets = [...s.moodlets];
+
+        if (passedCheck) {
+          if (choice.rewardKarma) {
+            karma += choice.rewardKarma;
+          }
+          if (choice.rewardCash) {
+            cash += choice.rewardCash;
+            stats.earnedToday += choice.rewardCash;
+            stats.earnedTotal += choice.rewardCash;
+            finance = recordCashFlow(finance, {
+              time: s.time,
+              label: `${npc.name} Topic Bonus: ${topic.title}`,
+              emoji: topic.emoji,
+              amount: choice.rewardCash,
+              category: 'bounties',
+            });
+          }
+          if (choice.rewardSkill) {
+            const sk = choice.rewardSkill.skill;
+            const rawAmt = choice.rewardSkill.amount;
+            const baseSkillDelta = rawAmt > 2 ? rawAmt / 100 : rawAmt;
+            nextSkills[sk] = Math.min(
+              10,
+              +(nextSkills[sk] + baseSkillDelta * superConnSkillMult).toFixed(2)
+            );
+          }
+          if (choice.rewardStartup) {
+            nextStartup = {
+              ...nextStartup,
+              productProgress: clamp(
+                nextStartup.productProgress + choice.rewardStartup,
+                0,
+                100
+              ),
+              users: nextStartup.users + Math.round(choice.rewardStartup * 10),
+            };
+          }
+          if (choice.rewardPerformance && nextJob) {
+            nextJob = {
+              ...nextJob,
+              performance: clamp(nextJob.performance + choice.rewardPerformance, 0, 100),
+            };
+          }
+          if (choice.moodletId && MOODLETS[choice.moodletId]) {
+            const mDef = MOODLETS[choice.moodletId];
+            nextMoodlets = [
+              ...nextMoodlets.filter((m) => m.id !== mDef.id),
+              { id: mDef.id, expiresAt: s.time + mDef.durationMinutes },
+            ];
+          }
+        }
+
+        let goalIndex = s.goalIndex;
         if (goalIndex === 3) {
+          goalIndex = 4;
+          cash += GOALS[3].rewardCash;
+          karma += GOALS[3].rewardKarma;
+        }
+
+        const nextCompletedTopics = Array.from(
+          new Set([...(currentRel.completedTopics || []), topicId])
+        );
+        const nextAvailTopics = getAvailableTopicsForNpc(npcId, newScore, nextCompletedTopics);
+        const nextActiveTopicId = nextAvailTopics[0]?.id ?? null;
+
+        const wishes = s.wishes.map((w) => {
+          if (w.kind === 'social') {
+            return { ...w, progress: Math.min(w.targetValue, w.progress + 1) };
+          }
+          return w;
+        });
+
+        sfx.play(passedCheck ? 'levelup' : 'notice');
+        const notice = {
+          id: uid(),
+          text: `${npc.name} (${topic.title} · +${scoreGain}% Bond): "${npcReply}"`,
+          emoji: topic.emoji || '💡',
+          tone: 'good' as const,
+          time: s.time,
+        };
+
+        set({
+          cash,
+          karma,
+          finance,
+          stats,
+          skills: nextSkills,
+          startup: nextStartup,
+          job: nextJob,
+          moodlets: nextMoodlets,
+          needs: {
+            ...s.needs,
+            social: clamp(s.needs.social + 18),
+            fun: clamp(s.needs.fun + 14),
+          },
+          relationships: {
+            ...s.relationships,
+            [npcId]: {
+              ...currentRel,
+              score: newScore,
+              status: newStatus,
+              lastInteractionDay: getDayNumber(s.time),
+              trust: nextTrust,
+              romance: nextRomance,
+              unlockedMilestones: nextUnlockedMilestones,
+              completedTopics: nextCompletedTopics,
+              activeTopicId: nextActiveTopicId,
+              messages: nextMessages.slice(-30),
+            },
+          },
+          wishes,
+          goalIndex,
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      giftNpc: (npcId, giftId) => {
+        const s = get();
+        const npc = NPCS.find((n) => n.id === npcId);
+        const gift = NPC_GIFT_BY_ID[giftId];
+        if (!npc || !gift) return;
+
+        const currentRel = ensureRelationshipState(npcId, s.relationships[npcId]);
+        const inv = [...(s.inventory || [])];
+        const invIdx = gift.backpackItemId
+          ? inv.findIndex(
+              (entry) => entry.itemId === gift.backpackItemId && entry.quantity > 0
+            )
+          : -1;
+
+        let cash = s.cash;
+        let finance = ensureFinanceState(s);
+
+        if (invIdx >= 0) {
+          if (inv[invIdx].quantity <= 1) {
+            inv.splice(invIdx, 1);
+          } else {
+            inv[invIdx] = { ...inv[invIdx], quantity: inv[invIdx].quantity - 1 };
+          }
+        } else {
+          if (s.cash < gift.price) {
+            sfx.play('error');
+            const notice = {
+              id: uid(),
+              text: `Need ${formatCurrency(gift.price)} to gift ${gift.name} to ${npc.name}.`,
+              emoji: '🎁',
+              tone: 'bad' as const,
+              time: s.time,
+            };
+            set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+            return;
+          }
+          cash -= gift.price;
+          finance = recordCashFlow(finance, {
+            time: s.time,
+            label: `Gift for ${npc.name}: ${gift.name}`,
+            emoji: gift.emoji,
+            amount: -gift.price,
+            category: 'living',
+          });
+        }
+
+        const isFavorite = gift.favoriteOfNpcIds.includes(npcId);
+        const superConnMult = s.unlockedPerks.includes('perk_super_connector') ? 1.4 : 1.0;
+        const scoreGain = Math.max(
+          1,
+          Math.round(gift.baseScoreDelta * (isFavorite ? 1.75 : 1.0) * superConnMult)
+        );
+        const newScore = clamp(currentRel.score + scoreGain, 0, 100);
+        const newStatus = getRelStatus(newScore);
+
+        const trustDelta = isFavorite ? 15 : (gift.trustDelta ?? 8);
+        const romanceDelta = isFavorite ? 12 : (gift.romanceDelta ?? 5);
+        const karmaDelta = isFavorite ? 10 : 4;
+
+        const nextTrust = clamp((currentRel.trust ?? 15) + trustDelta, 0, 100);
+        const nextRomance = clamp((currentRel.romance ?? 5) + romanceDelta, 0, 100);
+
+        const reactionText =
+          (isFavorite
+            ? NPC_GIFT_REACTIONS[npcId]?.favorite
+            : NPC_GIFT_REACTIONS[npcId]?.standard) ||
+          (isFavorite
+            ? `No way!! ${gift.name} is my absolute favorite! You know me too well!`
+            : `Thank you for the ${gift.name}! Super thoughtful.`);
+
+        const nextMessages: RelationshipMessage[] = [
+          ...currentRel.messages.slice(-24),
+          {
+            id: uid(),
+            from: 'me',
+            text: `🎁 Gifted ${gift.emoji} ${gift.name}${isFavorite ? ' (Favorite!)' : ''}`,
+            time: s.time,
+            tag: 'Gift',
+            emoji: gift.emoji,
+          },
+          {
+            id: uid(),
+            from: 'npc',
+            text: reactionText,
+            time: s.time,
+            tag: isFavorite ? 'Loved Gift 💖' : 'Gift',
+            emoji: isFavorite ? '💖' : gift.emoji,
+          },
+        ];
+
+        const nextUnlockedMilestones = [...(currentRel.unlockedMilestones || [])];
+        for (const m of getNpcMilestones(npcId)) {
+          if (newScore >= m.threshold && !nextUnlockedMilestones.includes(m.id)) {
+            nextUnlockedMilestones.push(m.id);
+            nextMessages.push({
+              id: uid(),
+              from: 'milestone',
+              text: `🏆 Milestone Unlocked: ${m.title} — "${m.unlockMessage}"`,
+              time: s.time,
+              tag: m.tierStatus,
+              emoji: m.emoji,
+            });
+          }
+        }
+
+        const completedTopics = currentRel.completedTopics || [];
+        const availTopics = getAvailableTopicsForNpc(npcId, newScore, completedTopics);
+        const nextActiveTopicId =
+          currentRel.activeTopicId && !completedTopics.includes(currentRel.activeTopicId)
+            ? currentRel.activeTopicId
+            : (availTopics[0]?.id ?? null);
+
+        sfx.play(isFavorite ? 'levelup' : 'cash');
+        const notice = {
+          id: uid(),
+          text: `${npc.name} ${isFavorite ? 'LOVED' : 'appreciated'} ${gift.emoji} ${gift.name} (+${scoreGain}% Bond, +${karmaDelta} Karma)!`,
+          emoji: isFavorite ? '💖' : gift.emoji,
+          tone: 'good' as const,
+          time: s.time,
+        };
+
+        set({
+          cash,
+          finance,
+          inventory: inv,
+          karma: s.karma + karmaDelta,
+          needs: {
+            ...s.needs,
+            social: clamp(s.needs.social + 16),
+            fun: clamp(s.needs.fun + 15),
+          },
+          relationships: {
+            ...s.relationships,
+            [npcId]: {
+              ...currentRel,
+              score: newScore,
+              status: newStatus,
+              lastInteractionDay: getDayNumber(s.time),
+              trust: nextTrust,
+              romance: nextRomance,
+              unlockedMilestones: nextUnlockedMilestones,
+              activeTopicId: nextActiveTopicId,
+              giftsGiven: (currentRel.giftsGiven || 0) + 1,
+              lastGiftDay: getDayNumber(s.time),
+              messages: nextMessages.slice(-30),
+            },
+          },
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      claimRelationshipMilestone: (npcId, milestoneId) => {
+        const s = get();
+        const npc = NPCS.find((n) => n.id === npcId);
+        if (!npc) return;
+
+        const milestone = getNpcMilestones(npcId).find((m) => m.id === milestoneId);
+        if (!milestone) return;
+
+        const currentRel = ensureRelationshipState(npcId, s.relationships[npcId]);
+        const isUnlocked =
+          currentRel.score >= milestone.threshold ||
+          (currentRel.unlockedMilestones || []).includes(milestoneId);
+        if (!isUnlocked) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `Reach ${milestone.threshold}% bond (${milestone.tierStatus}) with ${npc.name} to claim ${milestone.title}.`,
+            emoji: '🔒',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
+        if ((currentRel.claimedMilestones || []).includes(milestoneId)) {
+          return;
+        }
+
+        let cash = s.cash;
+        let vestedRsu = s.vestedRsu;
+        let karma = s.karma + (milestone.rewardKarma || 0);
+        let finance = ensureFinanceState(s);
+        const stats = { ...s.stats };
+        const nextSkills = { ...s.skills };
+        let nextStartup = s.startup;
+        let nextJob = s.job;
+        let nextMoodlets = [...s.moodlets];
+
+        if (milestone.rewardCash && milestone.rewardCash > 0) {
+          cash += milestone.rewardCash;
+          stats.earnedToday += milestone.rewardCash;
+          stats.earnedTotal += milestone.rewardCash;
+          finance = recordCashFlow(finance, {
+            time: s.time,
+            label: `${npc.name} Milestone: ${milestone.title}`,
+            emoji: milestone.emoji,
+            amount: milestone.rewardCash,
+            category: 'bounties',
+          });
+        }
+
+        if (milestone.rewardRsu && milestone.rewardRsu > 0) {
+          vestedRsu += milestone.rewardRsu;
+        }
+
+        if (milestone.rewardSkill) {
+          const sk = milestone.rewardSkill.skill;
+          const rawAmt = milestone.rewardSkill.amount;
+          const baseSkillDelta = rawAmt > 2 ? rawAmt / 100 : rawAmt;
+          nextSkills[sk] = Math.min(10, +(nextSkills[sk] + baseSkillDelta).toFixed(2));
+        }
+
+        if (milestone.rewardStartupProgress && milestone.rewardStartupProgress > 0) {
+          const prog = milestone.rewardStartupProgress;
+          nextStartup = {
+            ...nextStartup,
+            productProgress: clamp(nextStartup.productProgress + prog, 0, 100),
+            users: nextStartup.users + Math.round(prog * 25),
+            valuation: nextStartup.valuation + prog * 15000,
+          };
+        }
+
+        if (milestone.rewardJobPerformance && nextJob) {
+          nextJob = {
+            ...nextJob,
+            performance: clamp(nextJob.performance + milestone.rewardJobPerformance, 0, 100),
+          };
+        }
+
+        if (milestone.moodletId && MOODLETS[milestone.moodletId]) {
+          const mDef = MOODLETS[milestone.moodletId];
+          nextMoodlets = [
+            ...nextMoodlets.filter((m) => m.id !== mDef.id),
+            { id: mDef.id, expiresAt: s.time + mDef.durationMinutes },
+          ];
+        }
+
+        const nextUnlocked = Array.from(
+          new Set([...(currentRel.unlockedMilestones || []), milestoneId])
+        );
+        const nextClaimed = Array.from(
+          new Set([...(currentRel.claimedMilestones || []), milestoneId])
+        );
+
+        sfx.play('levelup');
+        const notice = {
+          id: uid(),
+          text: `🏆 Claimed ${npc.name} Milestone: ${milestone.title} (${milestone.perkLabel})!`,
+          emoji: milestone.emoji || '🏆',
+          tone: 'good' as const,
+          time: s.time,
+        };
+
+        set({
+          cash,
+          vestedRsu,
+          karma,
+          finance,
+          stats,
+          skills: nextSkills,
+          startup: nextStartup,
+          job: nextJob,
+          moodlets: nextMoodlets,
+          relationships: {
+            ...s.relationships,
+            [npcId]: {
+              ...currentRel,
+              unlockedMilestones: nextUnlocked,
+              claimedMilestones: nextClaimed,
+            },
+          },
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      inviteNpcHangout: (npcId) => {
+        const s = get();
+        const npc = NPCS.find((n) => n.id === npcId);
+        if (!npc) return;
+
+        const currentRel = ensureRelationshipState(npcId, s.relationships[npcId]);
+        const spotDef = LOCATION_BY_ID[npc.favoriteSpot];
+        const spotName = spotDef?.name || npc.favoriteSpot.replace(/_/g, ' ');
+
+        const superConnMult = s.unlockedPerks.includes('perk_super_connector') ? 1.4 : 1.0;
+        const scoreGain = Math.max(1, Math.round(16 * superConnMult));
+        const newScore = clamp(currentRel.score + scoreGain, 0, 100);
+        const newStatus = getRelStatus(newScore);
+
+        const nextTrust = clamp((currentRel.trust ?? 15) + 12, 0, 100);
+        const nextRomance = clamp((currentRel.romance ?? 5) + 8, 0, 100);
+
+        const nextMessages: RelationshipMessage[] = [
+          ...currentRel.messages.slice(-24),
+          {
+            id: uid(),
+            from: 'me',
+            text: `Let’s link up at ${spotName} for a proper Bay Area hangout!`,
+            time: s.time,
+            tag: 'Hangout',
+            emoji: '🥂',
+          },
+          {
+            id: uid(),
+            from: 'npc',
+            text: `Best hangout all week at ${spotName}! Nothing beats catching up offline away from Slack & PR queues. Let’s do this again soon!`,
+            time: s.time,
+            tag: 'Hangout',
+            emoji: spotDef?.emoji || '🌉',
+          },
+        ];
+
+        const nextUnlockedMilestones = [...(currentRel.unlockedMilestones || [])];
+        for (const m of getNpcMilestones(npcId)) {
+          if (newScore >= m.threshold && !nextUnlockedMilestones.includes(m.id)) {
+            nextUnlockedMilestones.push(m.id);
+            nextMessages.push({
+              id: uid(),
+              from: 'milestone',
+              text: `🏆 Milestone Unlocked: ${m.title} — "${m.unlockMessage}"`,
+              time: s.time,
+              tag: m.tierStatus,
+              emoji: m.emoji,
+            });
+          }
+        }
+
+        const completedTopics = currentRel.completedTopics || [];
+        const availTopics = getAvailableTopicsForNpc(npcId, newScore, completedTopics);
+        const nextActiveTopicId =
+          currentRel.activeTopicId && !completedTopics.includes(currentRel.activeTopicId)
+            ? currentRel.activeTopicId
+            : (availTopics[0]?.id ?? null);
+
+        let nextMoodlets = [...s.moodlets];
+        if (MOODLETS.inner_circle_glow) {
+          const mDef = MOODLETS.inner_circle_glow;
+          nextMoodlets = [
+            ...nextMoodlets.filter((m) => m.id !== mDef.id),
+            { id: mDef.id, expiresAt: s.time + mDef.durationMinutes },
+          ];
+        }
+
+        const canMoveToSpot = Boolean(spotDef && !s.travel && !s.workShift);
+        const nextLocationId = canMoveToSpot ? npc.favoriteSpot : s.locationId;
+
+        let cash = s.cash;
+        let karma = s.karma + 3;
+        let goalIndex = s.goalIndex;
+        if (goalIndex === 2 && canMoveToSpot) {
+          goalIndex = 3;
+          cash += GOALS[2].rewardCash;
+          karma += GOALS[2].rewardKarma;
+        } else if (goalIndex === 3) {
           goalIndex = 4;
           cash += GOALS[3].rewardCash;
           karma += GOALS[3].rewardKarma;
@@ -3445,28 +4767,38 @@ export const useGameStore = create<GameState & GameActions>()(
           if (w.kind === 'social') {
             return { ...w, progress: Math.min(w.targetValue, w.progress + 1) };
           }
+          if (w.kind === 'visit' && w.targetKey === nextLocationId) {
+            return { ...w, progress: Math.min(w.targetValue, w.progress + 1) };
+          }
           return w;
         });
 
-        sfx.play('notice');
+        sfx.play('levelup');
         const notice = {
           id: uid(),
-          text: `${npc.name} (${newStatus}): "${reply}"`,
-          emoji: '💬',
+          text: `Hung out with ${npc.name} at ${spotName} (+${scoreGain}% Bond, +30 Social, +25 Fun)!`,
+          emoji: spotDef?.emoji || '🥂',
           tone: 'good' as const,
           time: s.time,
         };
 
         set({
-          skills: nextSkills,
+          cash,
+          karma,
+          goalIndex,
+          moodlets: nextMoodlets,
+          ...(canMoveToSpot && s.locationId !== npc.favoriteSpot
+            ? {
+                locationId: npc.favoriteSpot,
+                view: 'live' as const,
+                pos: { x: 3, y: 4 },
+                targetPos: null,
+              }
+            : {}),
           needs: {
             ...s.needs,
-            social: clamp(s.needs.social + 22),
-            fun: clamp(s.needs.fun + 12),
-          },
-          startup: {
-            ...s.startup,
-            productProgress: clamp(s.startup.productProgress + startupBoost),
+            social: clamp(s.needs.social + 30),
+            fun: clamp(s.needs.fun + 25),
           },
           relationships: {
             ...s.relationships,
@@ -3475,16 +4807,15 @@ export const useGameStore = create<GameState & GameActions>()(
               score: newScore,
               status: newStatus,
               lastInteractionDay: getDayNumber(s.time),
-              messages: [
-                ...currentRel.messages.slice(-15),
-                { from: 'npc', text: reply, time: s.time },
-              ],
+              trust: nextTrust,
+              romance: nextRomance,
+              unlockedMilestones: nextUnlockedMilestones,
+              activeTopicId: nextActiveTopicId,
+              hangoutsCompleted: (currentRel.hangoutsCompleted || 0) + 1,
+              messages: nextMessages.slice(-30),
             },
           },
           wishes,
-          goalIndex,
-          cash,
-          karma,
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
         });
@@ -4887,9 +6218,15 @@ export const useGameStore = create<GameState & GameActions>()(
         wishes = wishes.map((w) => {
           if (w.progress >= w.targetValue) {
             karma += w.karmaReward;
+            const wishCash = w.cashReward || 0;
+            cash += wishCash;
+            if (wishCash > 0) {
+              stats.earnedToday += wishCash;
+              stats.earnedTotal += wishCash;
+            }
             sfx.play('levelup');
             pushNotice(
-              `Wish Fulfilled: ${w.emoji} ${w.title} (+${w.karmaReward} Karma ⚡)!`,
+              `OKR Fulfilled: ${w.emoji} ${w.title} (+${w.karmaReward} ⚡ Karma${wishCash > 0 ? ` & +${formatCurrency(wishCash)}` : ''})!`,
               '✨',
               'good'
             );
@@ -4903,29 +6240,52 @@ export const useGameStore = create<GameState & GameActions>()(
           return w;
         });
 
-        // 9. Check Aspiration completion
-        if (!stats.aspirationCompleted) {
-          const asp = s.sim.aspiration;
-          const nw = calculateNetWorth(s);
-          const highRels = Object.values(s.relationships).filter((r) => r.score >= 75).length;
-          const done =
-            (asp === 'seriesAUnicorn' && startup.stage === 'Series A Unicorn') ||
-            (asp === 'staffPrincipal' && job && job.levelIndex >= 5) ||
-            (asp === 'paloAltoHome' && nw >= 1500000) ||
-            (asp === 'sfConnector' && highRels >= 4) ||
-            (asp === 'indieLegend' && (skills.coding >= 10 || skills.aiResearch >= 10));
-
-          if (done) {
-            stats.aspirationCompleted = true;
-            karma += 35;
-            cash += 50000;
+        // 9. Check Multi-Stage North Star Goal (Aspiration) Milestones & Capstone
+        const claimedStages = new Set(s.claimedAspirationStages || []);
+        const tempForEval: GameState = {
+          ...s,
+          cash,
+          vestedRsu,
+          unvestedRsu,
+          portfolioValue,
+          finance,
+          karma,
+          job,
+          startup,
+          skills,
+          relationships: s.relationships,
+          claimedAspirationStages: Array.from(claimedStages),
+        };
+        const evalRes = evaluateAspirationProgress(tempForEval);
+        for (const st of evalRes.stages) {
+          if (st.met && !claimedStages.has(st.stage.id)) {
+            claimedStages.add(st.stage.id);
+            cash += st.stage.rewardCash;
+            karma += st.stage.rewardKarma;
+            stats.earnedToday += st.stage.rewardCash;
+            stats.earnedTotal += st.stage.rewardCash;
+            finance = recordCashFlow(finance, {
+              time: newTime,
+              label: `Goal Stage ${st.stage.stageNumber}: ${st.stage.title}`,
+              emoji: st.stage.emoji,
+              amount: st.stage.rewardCash,
+              category: 'bounties',
+            });
             sfx.play('levelup');
-            const aspDef = ASPIRATIONS.find((a) => a.id === asp);
-            pushNotice(
-              `LIFE ASPIRATION ACHIEVED: ${aspDef?.emoji} ${aspDef?.label}! Awarded +$50,000 & +35 Karma ⚡!`,
-              '🏆',
-              'good'
-            );
+            if (st.stage.stageNumber === 4) {
+              stats.aspirationCompleted = true;
+              pushNotice(
+                `NORTH STAR GOAL ACHIEVED: ${evalRes.aspDef.emoji} ${evalRes.aspDef.label}! Awarded +${formatCurrency(st.stage.rewardCash)} & +${st.stage.rewardKarma} ⚡ Karma!`,
+                '🏆',
+                'good'
+              );
+            } else {
+              pushNotice(
+                `Milestone Unlocked (Stage ${st.stage.stageNumber}/4): ${st.stage.emoji} ${st.stage.title} (+${formatCurrency(st.stage.rewardCash)} & +${st.stage.rewardKarma} ⚡)!`,
+                st.stage.emoji,
+                'good'
+              );
+            }
           }
         }
 
@@ -4957,6 +6317,7 @@ export const useGameStore = create<GameState & GameActions>()(
           lastToast,
           activeEvent,
           goalIndex,
+          claimedAspirationStages: Array.from(claimedStages),
           stats,
         });
       },
@@ -5013,6 +6374,8 @@ export const useGameStore = create<GameState & GameActions>()(
         rentOwed: state.rentOwed,
         stats: state.stats,
         goalIndex: state.goalIndex,
+        claimedAspirationStages: state.claimedAspirationStages,
+        resignedJobOnce: state.resignedJobOnce,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -5024,6 +6387,11 @@ export const useGameStore = create<GameState & GameActions>()(
               { itemId: 'snack_soylent', kind: 'item', quantity: 2 },
             ];
           }
+          const normalizedRels: Record<string, RelationshipState> = {};
+          for (const npc of NPCS) {
+            normalizedRels[npc.id] = ensureRelationshipState(npc.id, state.relationships?.[npc.id]);
+          }
+          state.relationships = normalizedRels;
         }
       },
     }

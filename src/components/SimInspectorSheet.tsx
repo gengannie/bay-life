@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ASPIRATIONS,
+  LOCATION_BY_ID,
   MOODLETS,
   NEEDS_META,
   NPCS,
@@ -13,8 +14,22 @@ import {
   SKILLS_META,
   TRAITS,
 } from '../data/worldData';
+import {
+  RELATIONSHIP_TIERS,
+  getRelationshipTierInfo,
+  NPC_INTERACTIONS,
+  getAvailableTopicsForNpc,
+  getNpcMilestones,
+  NPC_GIFTS,
+} from '../data/relationshipData';
 import { RewardPerkBranchId } from '../types/game';
-import { calculateOverallMood, useGameStore } from '../store/useGameStore';
+import {
+  calculateOverallMood,
+  evaluateAspirationProgress,
+  formatCurrency,
+  formatTime,
+  useGameStore,
+} from '../store/useGameStore';
 import { Portrait } from './Portrait';
 import { X, Check, Sparkles, Zap, Lock, ArrowDown, GitBranch } from 'lucide-react';
 
@@ -23,6 +38,8 @@ export const SimInspectorSheet: React.FC = () => {
   const simTab = useGameStore((s) => s.simTab);
   const needs = useGameStore((s) => s.needs);
   const skills = useGameStore((s) => s.skills);
+  const cash = useGameStore((s) => s.cash);
+  const inventory = useGameStore((s) => s.inventory);
   const moodlets = useGameStore((s) => s.moodlets);
   const wishes = useGameStore((s) => s.wishes);
   const karma = useGameStore((s) => s.karma);
@@ -35,6 +52,10 @@ export const SimInspectorSheet: React.FC = () => {
   const unlockTechNode = useGameStore((s) => s.unlockTechNode);
   const trainTechNodeSkill = useGameStore((s) => s.trainTechNodeSkill);
   const interactWithNpc = useGameStore((s) => s.interactWithNpc);
+  const answerNpcTopic = useGameStore((s) => s.answerNpcTopic);
+  const giftNpc = useGameStore((s) => s.giftNpc);
+  const claimRelationshipMilestone = useGameStore((s) => s.claimRelationshipMilestone);
+  const inviteNpcHangout = useGameStore((s) => s.inviteNpcHangout);
   const setActiveModal = useGameStore((s) => s.setActiveModal);
   const autoFixNeed = useGameStore((s) => s.autoFixNeed);
 
@@ -42,6 +63,8 @@ export const SimInspectorSheet: React.FC = () => {
   const moodInfo = calculateOverallMood(state);
   const aspDef = ASPIRATIONS.find((a) => a.id === sim.aspiration);
   const [perkBranch, setPerkBranch] = useState<'all' | RewardPerkBranchId>('all');
+  const [selectedRelNpcId, setSelectedRelNpcId] = useState<string>(NPCS[0]?.id || 'npc_maya');
+  const [relSection, setRelSection] = useState<'all' | 'dialogue' | 'milestones' | 'gifts' | 'dms'>('all');
 
   const TABS: Array<{ id: typeof simTab; label: string; emoji: string }> = [
     { id: 'needs', label: 'Vitals', emoji: '❤️' },
@@ -66,7 +89,7 @@ export const SimInspectorSheet: React.FC = () => {
     >
       <div
         className={`apple-glass-heavy flex max-h-[88dvh] w-full flex-col overflow-hidden rounded-[34px] p-5 transition-all ${
-          simTab === 'perks' ? 'max-w-3xl' : 'max-w-lg'
+          simTab === 'perks' || simTab === 'relationships' ? 'max-w-3xl' : 'max-w-lg'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -546,25 +569,34 @@ export const SimInspectorSheet: React.FC = () => {
           {/* WISHES & OKRs */}
           {simTab === 'wishes' && (
             <div className="space-y-3">
-              {aspDef && (
-                <div className="flex items-center justify-between rounded-2xl border border-[#007AFF]/25 bg-gradient-to-r from-[#007AFF]/15 to-purple-500/15 p-3.5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{aspDef.emoji}</span>
-                    <div>
-                      <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#007AFF]">
-                        North Star OKR
+              {(() => {
+                const evalRes = evaluateAspirationProgress(state, sim.aspiration);
+                return (
+                  <div className="rounded-2xl border border-[#007AFF]/25 bg-gradient-to-r from-[#007AFF]/15 to-purple-500/15 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{evalRes.aspDef.emoji}</span>
+                        <div>
+                          <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#007AFF]">
+                            Active North Star Goal ({evalRes.overallPct}%)
+                          </div>
+                          <div className="text-sm font-extrabold">{evalRes.aspDef.label}</div>
+                          <div className="text-[11px] text-[var(--ink-soft)]">
+                            Stage {evalRes.activeStage.stage.stageNumber}/4:{' '}
+                            {evalRes.activeStage.stage.title} ({evalRes.activeStage.progressText})
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-sm font-extrabold">{aspDef.label}</div>
-                      <div className="text-[11px] text-[var(--ink-soft)]">
-                        {aspDef.milestoneText}
-                      </div>
+                      <button
+                        onClick={() => setActiveModal('guide', 'goals')}
+                        className="btn-press shrink-0 rounded-full bg-[#007AFF] px-3 py-1.5 text-[10.5px] font-extrabold text-white shadow-xs"
+                      >
+                        🎯 Switch Goal / Guide
+                      </button>
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[#007AFF] px-2.5 py-1 text-[10px] font-extrabold text-white">
-                    +$50k 🏆
-                  </span>
-                </div>
-              )}
+                );
+              })()}
 
               <div className="grid gap-2">
                 {wishes.map((w) => {
@@ -591,9 +623,16 @@ export const SimInspectorSheet: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <span className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-extrabold text-amber-600 dark:text-amber-400">
-                        +{w.karmaReward} ⚡
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {w.cashReward && (
+                          <span className="rounded-full bg-emerald-500/15 px-2 py-1 font-mono text-[10.5px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                            +{formatCurrency(w.cashReward)}
+                          </span>
+                        )}
+                        <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-extrabold text-amber-600 dark:text-amber-400">
+                          +{w.karmaReward} ⚡
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
@@ -940,66 +979,855 @@ export const SimInspectorSheet: React.FC = () => {
             </div>
           )}
 
-          {/* BAY AREA RELATIONSHIPS */}
-          {simTab === 'relationships' && (
-            <div className="space-y-2">
-              {NPCS.map((npc) => {
-                const rel = relationships[npc.id];
-                const score = rel?.score || 10;
-                return (
-                  <div
-                    key={npc.id}
-                    className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--mist)] p-2.5"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Portrait appearance={npc.appearance} size={42} />
-                      <div className="min-w-0">
+          {/* BAY AREA RELATIONSHIPS (CIRCLE, DIALOGUE & MILESTONES HUB) */}
+          {simTab === 'relationships' && (() => {
+            const totalBond = NPCS.reduce(
+              (acc, n) => acc + (relationships[n.id]?.score ?? 12),
+              0
+            );
+            const avgBond = Math.round(totalBond / NPCS.length);
+            const innerCircleCount = NPCS.filter(
+              (n) => (relationships[n.id]?.score ?? 12) >= 52
+            ).length;
+            const cofounderCount = NPCS.filter(
+              (n) => (relationships[n.id]?.score ?? 12) >= 68
+            ).length;
+            const partnerCount = NPCS.filter(
+              (n) => (relationships[n.id]?.score ?? 12) >= 85
+            ).length;
+            const totalUnclaimedMilestones = NPCS.reduce((acc, n) => {
+              const r = relationships[n.id];
+              const sc = r?.score ?? 12;
+              const claimed = r?.claimedMilestones || [];
+              const unclaimed = getNpcMilestones(n.id).filter(
+                (m) => (sc >= m.threshold || (r?.unlockedMilestones || []).includes(m.id)) && !claimed.includes(m.id)
+              ).length;
+              return acc + unclaimed;
+            }, 0);
+
+            const selectedNpc = NPCS.find((n) => n.id === selectedRelNpcId) || NPCS[0];
+            const rel = relationships[selectedNpc.id];
+            const score = rel?.score ?? 12;
+            const trust = rel?.trust ?? 10;
+            const romance = rel?.romance ?? 5;
+            const tierInfo = getRelationshipTierInfo(score);
+            const nextTier = RELATIONSHIP_TIERS.find((t) => t.minScore > score);
+            const tierMin = tierInfo.minScore ?? 0;
+            const tierMax = nextTier ? nextTier.minScore : 100;
+            const tierProgressPct = nextTier
+              ? Math.max(0, Math.min(100, Math.round(((score - tierMin) / Math.max(1, tierMax - tierMin)) * 100)))
+              : 100;
+
+            const spotDef = LOCATION_BY_ID[selectedNpc.favoriteSpot];
+            const availTopics = getAvailableTopicsForNpc(
+              selectedNpc.id,
+              score,
+              rel?.completedTopics || []
+            );
+            const activeTopic =
+              availTopics.find((t) => t.id === rel?.activeTopicId) || availTopics[0] || null;
+            const npcMilestones = getNpcMilestones(selectedNpc.id);
+            const npcClaimedMilestones = rel?.claimedMilestones || [];
+            const npcUnclaimedCount = npcMilestones.filter(
+              (m) =>
+                (score >= m.threshold || (rel?.unlockedMilestones || []).includes(m.id)) &&
+                !npcClaimedMilestones.includes(m.id)
+            ).length;
+            const recentMessages = (rel?.messages || []).slice(-8);
+
+            return (
+              <div className="space-y-3.5">
+                {/* 1. Top Circle Synergy Summary Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-3xl border border-[#007AFF]/25 bg-gradient-to-r from-[#007AFF]/12 via-purple-500/10 to-pink-500/12 px-4 py-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-black tracking-tight">
+                        🤝 Bay Area Circle & Deal Flow Hub
+                      </span>
+                      <span className="rounded-full bg-[#007AFF] px-2.5 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
+                        {avgBond}% Avg Synergy
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[10.5px] font-medium text-[var(--ink-soft)]">
+                      Build Founder Trust & Chemistry through deep-dive dialogues, curated gifts, and milestone unlocks.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold">
+                    <span className="rounded-full bg-indigo-500/15 px-2.5 py-1 text-indigo-600 dark:text-indigo-300">
+                      🌟 {innerCircleCount}/6 Inner Circle+
+                    </span>
+                    <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-emerald-600 dark:text-emerald-300">
+                      🦄 {cofounderCount} Co-Founder+ · 💖 {partnerCount} Partner+
+                    </span>
+                    {totalUnclaimedMilestones > 0 ? (
+                      <span className="animate-pulse rounded-full bg-amber-500 px-2.5 py-1 text-white shadow-sm">
+                        🎁 {totalUnclaimedMilestones} Unclaimed Milestone{totalUnclaimedMilestones > 1 ? 's' : ''}!
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-black/5 px-2.5 py-1 text-[var(--ink-soft)] dark:bg-white/10">
+                        🏆 Milestones Synced
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Top Selectable NPC Roster Strip (6 NPCs) */}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                  {NPCS.map((npc) => {
+                    const nRel = relationships[npc.id];
+                    const nScore = nRel?.score ?? 12;
+                    const nTier = getRelationshipTierInfo(nScore);
+                    const isSelected = npc.id === selectedNpc.id;
+                    const nMilestones = getNpcMilestones(npc.id);
+                    const nClaimed = nRel?.claimedMilestones || [];
+                    const hasUnclaimedMilestone = nMilestones.some(
+                      (m) =>
+                        (nScore >= m.threshold || (nRel?.unlockedMilestones || []).includes(m.id)) &&
+                        !nClaimed.includes(m.id)
+                    );
+                    const hasActiveTopic =
+                      getAvailableTopicsForNpc(npc.id, nScore, nRel?.completedTopics || []).length > 0;
+
+                    return (
+                      <button
+                        key={npc.id}
+                        onClick={() => setSelectedRelNpcId(npc.id)}
+                        className={`btn-press relative flex flex-col justify-between gap-1.5 rounded-2xl border p-2.5 text-left transition-all ${
+                          isSelected
+                            ? 'border-[#007AFF] bg-[#007AFF]/12 ring-2 ring-[#007AFF]/30'
+                            : 'border-black/5 bg-[var(--mist)] hover:bg-black/10 dark:border-white/10 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        {(hasUnclaimedMilestone || hasActiveTopic) && (
+                          <span
+                            className={`absolute -top-1.5 -right-1.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm ${
+                              hasUnclaimedMilestone
+                                ? 'animate-bounce bg-amber-500'
+                                : 'animate-pulse bg-[#007AFF]'
+                            }`}
+                            title={
+                              hasUnclaimedMilestone
+                                ? 'Unclaimed Milestone Reward!'
+                                : 'Active Dialogue Topic Ready'
+                            }
+                          >
+                            {hasUnclaimedMilestone ? '🎁' : '💬'}
+                          </span>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          <Portrait
+                            appearance={npc.appearance}
+                            size={34}
+                            ringColor={nTier.color}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[11px] font-extrabold leading-tight">
+                              {npc.name.split(' ')[0]}
+                            </div>
+                            <div className="truncate text-[9px] font-semibold text-[var(--ink-soft)]">
+                              {npc.company}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span
+                              className="truncate rounded-full px-1.5 py-0.2 text-[8.5px] font-extrabold"
+                              style={{
+                                backgroundColor: `${nTier.color}22`,
+                                color: nTier.color,
+                              }}
+                            >
+                              {nTier.status}
+                            </span>
+                            <span className="shrink-0 text-[10px] font-black">{nScore}%</span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${nScore}%`, backgroundColor: nTier.color }}
+                            />
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 3. Selected NPC Deep Profile & Bond Meter Card */}
+                <div className="rounded-3xl border border-black/10 bg-[var(--mist)] p-4 dark:border-white/10">
+                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                    <div className="flex items-start gap-3">
+                      <Portrait
+                        appearance={selectedNpc.appearance}
+                        size={58}
+                        ringColor={tierInfo.color}
+                      />
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-xs font-bold">{npc.name}</span>
-                          <span className="shrink-0 rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[9px] font-extrabold text-[#007AFF]">
-                            {rel?.status || 'Stranger'}
+                          <h4 className="text-base font-black tracking-tight">
+                            {selectedNpc.name}
+                          </h4>
+                          <span className="text-[11px] font-semibold text-[var(--ink-soft)]">
+                            {selectedNpc.handle}
+                          </span>
+                          <span
+                            className="rounded-full px-2.5 py-0.5 text-[10px] font-extrabold text-white shadow-xs"
+                            style={{ backgroundColor: tierInfo.color }}
+                          >
+                            {tierInfo.emoji} {tierInfo.status} · {score}%
                           </span>
                         </div>
-                        <div className="text-[10px] text-[var(--ink-soft)]">
-                          {npc.role} · {npc.company}
+
+                        <div className="mt-0.5 text-xs font-bold text-[var(--ink)]">
+                          {selectedNpc.role} @ {selectedNpc.company}
                         </div>
-                        <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-pink-500 transition-all"
-                            style={{ width: `${score}%` }}
-                          />
+                        <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-soft)]">
+                          {selectedNpc.bio}
+                        </p>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-full bg-[#007AFF]/15 px-2.5 py-0.5 text-[10px] font-extrabold text-[#007AFF]">
+                            📍 Fav Spot: {spotDef?.emoji || '📍'} {spotDef?.name || selectedNpc.favoriteSpot}
+                          </span>
+                          {selectedNpc.traits.map((tr) => (
+                            <span
+                              key={tr}
+                              className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-bold text-[var(--ink-soft)] dark:bg-white/10"
+                            >
+                              ✦ {tr}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        onClick={() => interactWithNpc(npc.id, 'coffeeChat')}
-                        title="Coffee Chat"
-                        className="btn-press rounded-xl bg-[#007AFF]/15 px-2.5 py-1.5 text-xs font-bold text-[#007AFF]"
-                      >
-                        ☕
-                      </button>
-                      <button
-                        onClick={() => interactWithNpc(npc.id, 'whiteboard')}
-                        title="Whiteboard Jam"
-                        className="btn-press rounded-xl bg-purple-500/15 px-2.5 py-1.5 text-xs font-bold text-purple-600 dark:text-purple-400"
-                      >
-                        🧠
-                      </button>
-                      <button
-                        onClick={() => interactWithNpc(npc.id, 'pitch')}
-                        title="Co-Founder Pitch"
-                        className="btn-press rounded-xl bg-emerald-500/15 px-2.5 py-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400"
-                      >
-                        🦄
-                      </button>
+                    {/* Quick Favorite Spot Hangout CTA */}
+                    <button
+                      onClick={() => inviteNpcHangout(selectedNpc.id)}
+                      className="btn-press shrink-0 rounded-2xl bg-gradient-to-r from-[#007AFF] to-indigo-600 px-3.5 py-2 text-left text-white shadow-md"
+                    >
+                      <div className="text-[11px] font-black">
+                        📍 Hangout at {spotDef?.shortName || 'Favorite Spot'}
+                      </div>
+                      <div className="text-[9.5px] font-semibold text-white/85">
+                        +16 Bond · +12 Trust · +8 Vibe · +3⚡
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Bond Progress Bar + Trust & Chemistry Sub-Meters */}
+                  <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                    {/* Overall Tier Progress */}
+                    <div className="rounded-2xl bg-white/70 p-2.5 dark:bg-black/30">
+                      <div className="flex items-center justify-between text-[10px] font-extrabold">
+                        <span>Bond Tier Progress</span>
+                        <span style={{ color: tierInfo.color }}>
+                          {nextTier
+                            ? `Next: ${nextTier.status} (${score}/${nextTier.minScore}%)`
+                            : 'Max Tier (100%)'}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${tierProgressPct}%`,
+                            backgroundColor: tierInfo.color,
+                          }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[9.5px] font-bold text-[var(--ink-soft)]">
+                        ✨ {tierInfo.perkSummary}
+                      </div>
+                    </div>
+
+                    {/* Founder Trust Meter */}
+                    <div className="rounded-2xl bg-white/70 p-2.5 dark:bg-black/30">
+                      <div className="flex items-center justify-between text-[10px] font-extrabold">
+                        <span className="text-indigo-600 dark:text-indigo-400">
+                          🤝 Founder Trust
+                        </span>
+                        <span className="font-black text-indigo-600 dark:text-indigo-400">
+                          {trust}/100
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-indigo-500 transition-all"
+                          style={{ width: `${trust}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[9.5px] font-medium text-[var(--ink-soft)]">
+                        Referrals, VC intros & co-founder conviction
+                      </div>
+                    </div>
+
+                    {/* Chemistry / Vibe Meter */}
+                    <div className="rounded-2xl bg-white/70 p-2.5 dark:bg-black/30">
+                      <div className="flex items-center justify-between text-[10px] font-extrabold">
+                        <span className="text-pink-600 dark:text-pink-400">
+                          💖 Chemistry / Vibe
+                        </span>
+                        <span className="font-black text-pink-600 dark:text-pink-400">
+                          {romance}/100
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-pink-500 transition-all"
+                          style={{ width: `${romance}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[9.5px] font-medium text-[var(--ink-soft)]">
+                        Dates, favorite gifts & partner synergy
+                      </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+
+                {/* Section Filter Pill Bar */}
+                <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-[var(--mist)] p-1.5">
+                  {[
+                    { id: 'all' as const, label: 'All Sections', emoji: '✨' },
+                    {
+                      id: 'dialogue' as const,
+                      label: `Dialogue & 9 Actions${activeTopic ? ' · 1 Topic' : ''}`,
+                      emoji: '💬',
+                    },
+                    {
+                      id: 'milestones' as const,
+                      label: `Milestones (${npcClaimedMilestones.length}/4)${npcUnclaimedCount > 0 ? ` · ${npcUnclaimedCount} Ready!` : ''}`,
+                      emoji: '🏆',
+                    },
+                    { id: 'gifts' as const, label: 'Bay Area Gifts (6)', emoji: '🎁' },
+                    {
+                      id: 'dms' as const,
+                      label: `DM History (${recentMessages.length})`,
+                      emoji: '📱',
+                    },
+                  ].map((sec) => (
+                    <button
+                      key={sec.id}
+                      onClick={() => setRelSection(sec.id)}
+                      className={`btn-press flex items-center gap-1 rounded-xl px-3 py-1.5 text-[10.5px] font-extrabold transition-all ${
+                        relSection === sec.id
+                          ? 'bg-[#007AFF] text-white shadow-xs'
+                          : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                      }`}
+                    >
+                      <span>{sec.emoji}</span>
+                      <span>{sec.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* SECTION A: INTERACTIVE DIALOGUE & 9 ACTIONS */}
+                {(relSection === 'all' || relSection === 'dialogue') && (
+                  <div className="space-y-3">
+                    {/* Active Conversation Topic Card */}
+                    {activeTopic ? (
+                      <div className="rounded-3xl border border-[#007AFF]/35 bg-gradient-to-br from-[#007AFF]/12 via-indigo-500/8 to-purple-500/10 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{activeTopic.emoji}</span>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-black">
+                                  Active Topic: {activeTopic.title}
+                                </span>
+                                <span className="rounded-full bg-[#007AFF] px-2 py-0.5 text-[9px] font-extrabold uppercase text-white">
+                                  {activeTopic.category}
+                                </span>
+                              </div>
+                              <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
+                                Choose your response — skill checks grant bonus Karma, Cash & XP!
+                              </div>
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-300">
+                            💬 Live Prompt
+                          </span>
+                        </div>
+
+                        {/* NPC Prompt Bubble */}
+                        <div className="mt-2.5 rounded-2xl rounded-tl-xs border border-black/5 bg-white/85 p-3 text-xs font-semibold leading-relaxed text-[var(--ink)] shadow-xs dark:border-white/10 dark:bg-black/40">
+                          <span className="mr-1.5 font-black text-[#007AFF]">
+                            {selectedNpc.name.split(' ')[0]}:
+                          </span>
+                          “{activeTopic.promptText}”
+                        </div>
+
+                        {/* 3 Branching Choice Buttons */}
+                        <div className="mt-2.5 grid grid-cols-1 gap-2">
+                          {activeTopic.choices.map((choice, idx) => {
+                            const skCheck = choice.skillCheck;
+                            const skMeta = skCheck
+                              ? SKILLS_META.find((m) => m.key === skCheck.skill)
+                              : null;
+                            const playerSkLvl = skCheck ? skills[skCheck.skill] || 0 : 0;
+                            const meetsSkill = skCheck ? playerSkLvl >= skCheck.level : true;
+
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() =>
+                                  answerNpcTopic(selectedNpc.id, activeTopic.id, idx)
+                                }
+                                className="btn-press flex flex-col justify-between gap-1.5 rounded-2xl border border-black/10 bg-white/80 p-3 text-left transition-all hover:border-[#007AFF] hover:bg-[#007AFF]/8 dark:border-white/10 dark:bg-black/35"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-sm">{choice.emoji}</span>
+                                    <span className="text-xs font-black text-[#007AFF] dark:text-sky-400">
+                                      {choice.label}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-1 text-[9.5px] font-extrabold">
+                                    {skCheck && (
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 ${
+                                          meetsSkill
+                                            ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                            : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                        }`}
+                                      >
+                                        {skMeta?.emoji || '🎯'} {skMeta?.label || skCheck.skill}{' '}
+                                        Lv.{skCheck.level}{' '}
+                                        {meetsSkill
+                                          ? '✓ Pass'
+                                          : `(You: Lv.${Math.floor(playerSkLvl)})`}
+                                      </span>
+                                    )}
+                                    <span className="rounded-full bg-pink-500/15 px-2 py-0.5 text-pink-600 dark:text-pink-300">
+                                      +{choice.scoreDelta} Bond
+                                    </span>
+                                    {choice.rewardKarma && (
+                                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-600 dark:text-amber-300">
+                                        +{choice.rewardKarma}⚡
+                                      </span>
+                                    )}
+                                    {choice.rewardCash && (
+                                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-600 dark:text-emerald-300">
+                                        +{formatCurrency(choice.rewardCash)}
+                                      </span>
+                                    )}
+                                    {choice.rewardSkill && (
+                                      <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-indigo-600 dark:text-indigo-300">
+                                        +{choice.rewardSkill.skill} XP
+                                      </span>
+                                    )}
+                                    {choice.rewardStartup && (
+                                      <span className="rounded-full bg-purple-500/15 px-2 py-0.5 text-purple-600 dark:text-purple-300">
+                                        +{choice.rewardStartup}% MVP
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="text-[11px] font-medium text-[var(--ink)]">
+                                  “{choice.playerText}”
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between rounded-2xl border border-black/5 bg-[var(--mist)] px-3.5 py-2.5 text-xs dark:border-white/10">
+                        <span className="font-bold text-[var(--ink-soft)]">
+                          💬 Completed {(rel?.completedTopics || []).length} dialogue topics with{' '}
+                          {selectedNpc.name}. Increase Bond % to unlock higher-tier discussions!
+                        </span>
+                        <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                          ✓ Up to Date
+                        </span>
+                      </div>
+                    )}
+
+                    {/* 9 Relationship Interactions Grid */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-[var(--ink-soft)]">
+                          ⚡ 9 Relationship Interactions & Networking Moves
+                        </span>
+                        <span className="text-[10px] font-bold text-[var(--ink-soft)]">
+                          {NPC_INTERACTIONS.filter((i) => score >= i.minScore).length} /{' '}
+                          {NPC_INTERACTIONS.length} Unlocked
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {NPC_INTERACTIONS.map((def) => {
+                          const unlocked = score >= def.minScore;
+                          const count = rel?.interactionCounts?.[def.id] || 0;
+
+                          return (
+                            <button
+                              key={def.id}
+                              onClick={() => interactWithNpc(selectedNpc.id, def.id)}
+                              className={`btn-press flex flex-col justify-between gap-2 rounded-2xl border p-3 text-left transition-all ${
+                                unlocked
+                                  ? 'border-black/10 bg-[var(--mist)] hover:border-[#007AFF]/50 dark:border-white/10'
+                                  : 'border-black/5 bg-black/5 opacity-65 dark:border-white/5 dark:bg-white/5'
+                              }`}
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-xs font-extrabold">
+                                    {def.emoji} {def.label}
+                                  </span>
+                                  {unlocked ? (
+                                    <span
+                                      className="shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-extrabold text-white"
+                                      style={{ backgroundColor: def.accent }}
+                                    >
+                                      +{def.baseScoreDelta} Bond
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-black/15 px-2 py-0.5 text-[9px] font-extrabold text-[var(--ink-soft)] dark:bg-white/15">
+                                      <Lock className="size-2.5" /> Req {def.minScore}%
+                                    </span>
+                                  )}
+                                </div>
+
+                                <p className="text-[10px] leading-snug text-[var(--ink-soft)]">
+                                  {def.description}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-1 pt-1 text-[9px] font-extrabold">
+                                <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-amber-700 dark:text-amber-300">
+                                  -{def.energyCost}⚡
+                                </span>
+                                {def.cashCost ? (
+                                  <span className="rounded-md bg-rose-500/15 px-1.5 py-0.5 text-rose-600 dark:text-rose-300">
+                                    {formatCurrency(def.cashCost)}
+                                  </span>
+                                ) : null}
+                                {def.trustDelta > 0 && (
+                                  <span className="rounded-md bg-indigo-500/15 px-1.5 py-0.5 text-indigo-600 dark:text-indigo-300">
+                                    +{def.trustDelta} Trust
+                                  </span>
+                                )}
+                                {def.romanceDelta > 0 && (
+                                  <span className="rounded-md bg-pink-500/15 px-1.5 py-0.5 text-pink-600 dark:text-pink-300">
+                                    +{def.romanceDelta} Vibe
+                                  </span>
+                                )}
+                                {def.skillBoost && (
+                                  <span className="rounded-md bg-[#007AFF]/15 px-1.5 py-0.5 text-[#007AFF]">
+                                    +{def.skillBoost.skill}
+                                  </span>
+                                )}
+                                {def.startupBoost && (
+                                  <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-emerald-600 dark:text-emerald-300">
+                                    +{def.startupBoost}% MVP
+                                  </span>
+                                )}
+                                {def.performanceBoost && (
+                                  <span className="rounded-md bg-purple-500/15 px-1.5 py-0.5 text-purple-600 dark:text-purple-300">
+                                    +{def.performanceBoost}% Perf
+                                  </span>
+                                )}
+                                {def.karmaBoost && (
+                                  <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-amber-600 dark:text-amber-300">
+                                    +{def.karmaBoost}⚡ Karma
+                                  </span>
+                                )}
+                                {count > 0 && (
+                                  <span className="ml-auto text-[8.5px] font-bold text-[var(--ink-soft)]">
+                                    ×{count}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SECTION B: RELATIONSHIP MILESTONES TRACK (4 TIERS: 20%, 45%, 70%, 90%) */}
+                {(relSection === 'all' || relSection === 'milestones') && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-[var(--ink-soft)]">
+                        🏆 {selectedNpc.name}’s 4 Signature Relationship Milestones
+                      </span>
+                      <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                        {npcClaimedMilestones.length} / {npcMilestones.length} Claimed
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      {npcMilestones.map((m) => {
+                        const isClaimed = npcClaimedMilestones.includes(m.id);
+                        const isUnlocked =
+                          score >= m.threshold ||
+                          (rel?.unlockedMilestones || []).includes(m.id);
+                        const mTierInfo = getRelationshipTierInfo(m.threshold);
+
+                        return (
+                          <div
+                            key={m.id}
+                            className={`flex flex-col justify-between gap-2.5 rounded-2xl border p-3.5 transition-all ${
+                              isClaimed
+                                ? 'border-emerald-500/40 bg-emerald-500/10'
+                                : isUnlocked
+                                ? 'border-amber-500 bg-amber-500/15 ring-2 ring-amber-500/30'
+                                : 'border-black/10 bg-[var(--mist)] dark:border-white/10'
+                            }`}
+                          >
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between gap-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-base">{m.emoji}</span>
+                                  <span className="text-xs font-black">{m.title}</span>
+                                </div>
+                                <span
+                                  className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-extrabold text-white"
+                                  style={{ backgroundColor: mTierInfo.color }}
+                                >
+                                  {m.tierStatus} · {m.threshold}%
+                                </span>
+                              </div>
+
+                              <p className="text-[10.5px] leading-snug text-[var(--ink-soft)]">
+                                {m.description}
+                              </p>
+
+                              <div className="inline-block rounded-lg bg-[#007AFF]/15 px-2 py-0.5 text-[10px] font-extrabold text-[#007AFF]">
+                                🎁 Perk: {m.perkLabel}
+                              </div>
+
+                              {/* Reward Pills */}
+                              <div className="flex flex-wrap gap-1 pt-0.5 text-[9.5px] font-extrabold">
+                                {m.rewardKarma > 0 && (
+                                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-amber-700 dark:text-amber-300">
+                                    +{m.rewardKarma}⚡ Karma
+                                  </span>
+                                )}
+                                {m.rewardCash && (
+                                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
+                                    +{formatCurrency(m.rewardCash)} Cash
+                                  </span>
+                                )}
+                                {m.rewardRsu && (
+                                  <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-indigo-700 dark:text-indigo-300">
+                                    +{formatCurrency(m.rewardRsu)} RSU
+                                  </span>
+                                )}
+                                {m.rewardSkill && (
+                                  <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-sky-700 dark:text-sky-300">
+                                    +{m.rewardSkill.skill} XP
+                                  </span>
+                                )}
+                                {m.rewardStartupProgress && (
+                                  <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-purple-700 dark:text-purple-300">
+                                    +{m.rewardStartupProgress}% Startup MVP
+                                  </span>
+                                )}
+                                {m.rewardJobPerformance && (
+                                  <span className="rounded-full bg-pink-500/20 px-2 py-0.5 text-pink-700 dark:text-pink-300">
+                                    +{m.rewardJobPerformance}% Job Perf
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {isClaimed ? (
+                              <div className="space-y-1 rounded-xl bg-emerald-500/15 p-2">
+                                <div className="flex items-center gap-1 text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+                                  <Check className="size-3.5" /> ✓ Claimed Milestone
+                                </div>
+                                <div className="text-[10px] italic text-[var(--ink-soft)]">
+                                  “{m.unlockMessage}”
+                                </div>
+                              </div>
+                            ) : isUnlocked ? (
+                              <button
+                                onClick={() =>
+                                  claimRelationshipMilestone(selectedNpc.id, m.id)
+                                }
+                                className="btn-press w-full animate-pulse rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 py-2 text-xs font-black text-white shadow-md"
+                              >
+                                🎁 Claim Milestone Reward!
+                              </button>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[9.5px] font-bold text-[var(--ink-soft)]">
+                                  <span>🔒 Reach {m.threshold}% Bond to Unlock</span>
+                                  <span>
+                                    {score}/{m.threshold}%
+                                  </span>
+                                </div>
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                                  <div
+                                    className="h-full rounded-full bg-[#007AFF] transition-all"
+                                    style={{
+                                      width: `${Math.min(
+                                        100,
+                                        Math.round((score / m.threshold) * 100)
+                                      )}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* SECTION C: CURATED BAY AREA GIFTS */}
+                {(relSection === 'all' || relSection === 'gifts') && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-[var(--ink-soft)]">
+                        🎁 Curated Bay Area Gifts for {selectedNpc.name}
+                      </span>
+                      <span className="text-[10px] font-bold text-[var(--ink-soft)]">
+                        ⭐ Favorites grant 1.75× Bond, +15 Trust, +12 Vibe & +10⚡ Karma
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {NPC_GIFTS.map((g) => {
+                        const isFav = g.favoriteOfNpcIds.includes(selectedNpc.id);
+                        const inBagEntry = g.backpackItemId
+                          ? (inventory || []).find(
+                              (i) => i.itemId === g.backpackItemId && i.quantity > 0
+                            )
+                          : undefined;
+                        const canAfford = Boolean(inBagEntry) || cash >= g.price;
+                        const estBond = isFav
+                          ? Math.round(g.baseScoreDelta * 1.75)
+                          : g.baseScoreDelta;
+
+                        return (
+                          <button
+                            key={g.id}
+                            onClick={() => giftNpc(selectedNpc.id, g.id)}
+                            disabled={!canAfford}
+                            className={`btn-press flex flex-col justify-between gap-2 rounded-2xl border p-3 text-left transition-all disabled:opacity-50 ${
+                              isFav
+                                ? 'border-pink-500/45 bg-pink-500/10 ring-1 ring-pink-500/25'
+                                : 'border-black/10 bg-[var(--mist)] dark:border-white/10'
+                            }`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-xs font-extrabold">
+                                  {g.emoji} {g.name}
+                                </span>
+                                {isFav && (
+                                  <span className="shrink-0 rounded-full bg-pink-500 px-2 py-0.5 text-[9px] font-black text-white">
+                                    ⭐ Favorite
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] leading-snug text-[var(--ink-soft)]">
+                                {g.description}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-1 pt-1">
+                              <div className="flex flex-wrap items-center gap-1 text-[9px] font-extrabold">
+                                <span className="rounded-md bg-pink-500/15 px-1.5 py-0.5 text-pink-600 dark:text-pink-300">
+                                  +{estBond} Bond
+                                </span>
+                                <span className="rounded-md bg-indigo-500/15 px-1.5 py-0.5 text-indigo-600 dark:text-indigo-300">
+                                  +{isFav ? 15 : g.trustDelta ?? 8} Trust
+                                </span>
+                              </div>
+
+                              {inBagEntry ? (
+                                <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[9.5px] font-black text-white">
+                                  🎒 In Backpack ({inBagEntry.quantity})
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-[#007AFF] px-2.5 py-0.5 text-[9.5px] font-black text-white">
+                                  Gift · {formatCurrency(g.price)}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* SECTION D: RECENT DM HISTORY */}
+                {(relSection === 'all' || relSection === 'dms') && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-[var(--ink-soft)]">
+                        📱 Recent iMessage Thread with {selectedNpc.name}
+                      </span>
+                      <button
+                        onClick={() => setActiveModal('phone', 'messages')}
+                        className="btn-press rounded-full bg-[#007AFF]/15 px-2.5 py-0.5 text-[10px] font-extrabold text-[#007AFF]"
+                      >
+                        💬 Open Full Phone iMessage
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 rounded-3xl border border-black/5 bg-[var(--mist)] p-3.5 dark:border-white/10">
+                      {recentMessages.map((msg, idx) => {
+                        if (msg.from === 'milestone') {
+                          return (
+                            <div
+                              key={msg.id || idx}
+                              className="mx-auto max-w-md rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-emerald-500/15 px-3 py-2 text-center text-[10.5px] font-extrabold text-amber-700 dark:text-amber-300"
+                            >
+                              {msg.text}
+                            </div>
+                          );
+                        }
+                        const isMe = msg.from === 'me';
+                        return (
+                          <div
+                            key={msg.id || idx}
+                            className={`flex flex-col ${
+                              isMe ? 'items-end' : 'items-start'
+                            }`}
+                          >
+                            <div className="mb-0.5 flex items-center gap-1.5 px-1 text-[9px] font-bold text-[var(--ink-soft)]">
+                              <span>{isMe ? 'You' : selectedNpc.name}</span>
+                              {msg.tag && (
+                                <span className="rounded-md bg-black/5 px-1.5 py-0.2 dark:bg-white/10">
+                                  {msg.emoji} {msg.tag}
+                                </span>
+                              )}
+                              <span>· {formatTime(msg.time)}</span>
+                            </div>
+                            <div
+                              className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-[11px] font-medium leading-relaxed shadow-xs ${
+                                isMe
+                                  ? 'rounded-br-xs bg-[#007AFF] text-white'
+                                  : 'rounded-bl-xs bg-white/90 text-[var(--ink)] dark:bg-black/45'
+                              }`}
+                            >
+                              {msg.text}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

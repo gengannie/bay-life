@@ -17,6 +17,13 @@ import {
   calculateCommuteDetails,
 } from '../data/worldData';
 import {
+  getRelationshipTierInfo,
+  NPC_INTERACTIONS,
+  getAvailableTopicsForNpc,
+  getNpcMilestones,
+  NPC_GIFTS,
+} from '../data/relationshipData';
+import {
   calculateCashFlowMetrics,
   calculateNetWorth,
   ensureFinanceState,
@@ -201,7 +208,13 @@ export const BayPhoneModal: React.FC = () => {
   const setView = useGameStore((s) => s.setView);
   const openBluefinMap = useGameStore((s) => s.openBluefinMap);
   const interactWithNpc = useGameStore((s) => s.interactWithNpc);
+  const answerNpcTopic = useGameStore((s) => s.answerNpcTopic);
+  const giftNpc = useGameStore((s) => s.giftNpc);
+  const claimRelationshipMilestone = useGameStore((s) => s.claimRelationshipMilestone);
+  const inviteNpcHangout = useGameStore((s) => s.inviteNpcHangout);
+  const inventory = useGameStore((s) => s.inventory);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
+  const resignJob = useGameStore((s) => s.resignJob);
 
   // Interactive mini-game & UI states
   const [startupNameInput, setStartupNameInput] = useState(startup.name);
@@ -220,6 +233,8 @@ export const BayPhoneModal: React.FC = () => {
   const [phCooldown, setPhCooldown] = useState(0);
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [blindTab, setBlindTab] = useState<'dm' | 'feed'>('dm');
+  const [selectedDmNpcId, setSelectedDmNpcId] = useState<string | null>(null);
+  const [showDmGiftDrawer, setShowDmGiftDrawer] = useState<boolean>(false);
   const [bluefinFilter, setBluefinFilter] = useState<'all' | 'starter' | 'luxury' | 'owned'>('all');
 
   useEffect(() => {
@@ -1164,6 +1179,41 @@ export const BayPhoneModal: React.FC = () => {
                 >
                   {ownedCars.length > 0 ? '🚗 Open CarPlay' : '🚗 EV Showroom'}
                 </button>
+              </div>
+
+              {/* F.I.R.E. & Golden Handcuffs Sovereignty Tracker Card */}
+              <div className="rounded-3xl border border-amber-500/35 bg-gradient-to-br from-amber-500/12 via-orange-500/8 to-emerald-500/10 p-3.5 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                      🔓 F.I.R.E. & Golden Handcuffs Tracker
+                    </div>
+                    <div className="text-xs font-extrabold">
+                      {job
+                        ? unvestedRsu > 0
+                          ? `Golden Handcuffs: ${formatCurrency(unvestedRsu)} Unvested RSU`
+                          : '0 Unvested RSUs · Ready to Walk Away!'
+                        : '🏖️ Sovereign · Post-W2 / Independent Founder'}
+                    </div>
+                    <div className="text-[10px] font-medium text-[var(--ink-soft)]">
+                      Coast F.I.R.E. Target: $500k ({Math.min(100, Math.round((netWorth / 500000) * 100))}%) · Fat F.I.R.E.: $2.5M
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveModal('guide', 'goals')}
+                    className="btn-press shrink-0 rounded-xl bg-amber-500 px-2.5 py-1.5 text-[10px] font-black text-white shadow-xs"
+                  >
+                    🎯 Goals & Rewards
+                  </button>
+                </div>
+                {job && (
+                  <button
+                    onClick={() => resignJob()}
+                    className="btn-press flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-white/75 py-1.5 text-[10.5px] font-extrabold text-amber-700 hover:bg-amber-500/15 dark:bg-black/35 dark:text-amber-300"
+                  >
+                    <span>🔓 Break the Golden Handcuffs (Resign W-2 Job)</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

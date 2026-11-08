@@ -46,6 +46,12 @@ import {
   Lock,
   Compass,
   FileCode2,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  Move,
 } from 'lucide-react';
 
 interface CareerStoreExtensions {
@@ -66,6 +72,11 @@ export const WorkCareerModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<CareerModalTab>('hybrid');
   const [selectedLevelIdx, setSelectedLevelIdx] = useState<number | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<TechNodeId>('node_cuda_triton');
+  const [treeZoom, setTreeZoom] = useState<number>(1.15);
+  const [treePan, setTreePan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDraggingTree, setIsDraggingTree] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [treeExpanded, setTreeExpanded] = useState<boolean>(true);
 
   const sim = useGameStore((s) => s.sim);
   const job = useGameStore((s) => s.job);
@@ -83,6 +94,8 @@ export const WorkCareerModal: React.FC = () => {
 
   const setActiveModal = useGameStore((s) => s.setActiveModal);
   const applyJob = useGameStore((s) => s.applyJob);
+  const resignJob = useGameStore((s) => s.resignJob);
+  const unvestedRsu = useGameStore((s) => s.unvestedRsu);
   const toggleAutoWork = useGameStore((s) => s.toggleAutoWork);
   const setWorkTone = useGameStore((s) => s.setWorkTone);
   const leaveWorkEarly = useGameStore((s) => s.leaveWorkEarly);
@@ -109,7 +122,93 @@ export const WorkCareerModal: React.FC = () => {
     (s) => (s as typeof s & CareerStoreExtensions).trainTechNodeSkill
   );
 
-  if (!job) return null;
+  if (!job) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 backdrop-blur-md"
+        onClick={() => setActiveModal(null)}
+      >
+        <div
+          className="apple-glass-heavy relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-[36px] p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-black/5 pb-4 dark:border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="grid size-12 place-items-center rounded-2xl bg-emerald-500/15 text-2xl">
+                🔓
+              </div>
+              <div>
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Golden Handcuffs Broken · W-2 Free
+                </div>
+                <h2 className="text-lg font-black">Independent Founder / F.I.R.E. Sovereign</h2>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveModal(null)}
+              className="btn-press grid size-8 place-items-center rounded-full bg-[var(--mist)]"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          <div className="my-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs">
+            <p className="font-bold text-[var(--ink)]">
+              You have officially resigned from corporate W-2 life! You have zero Hybrid RTO mandates and 100% control over your schedule.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => setActiveModal('guide', 'goals')}
+                className="btn-press rounded-xl bg-emerald-600 px-3.5 py-2 font-extrabold text-white"
+              >
+                🎯 Open F.I.R.E. & Goals Roadmap
+              </button>
+              <button
+                onClick={() => setActiveModal('phone', 'startup')}
+                className="btn-press rounded-xl bg-orange-500 px-3.5 py-2 font-extrabold text-white"
+              >
+                🦄 Open Startup Studio
+              </button>
+              <button
+                onClick={() => setActiveModal('phone', 'wealth')}
+                className="btn-press rounded-xl bg-[#007AFF] px-3.5 py-2 font-extrabold text-white"
+              >
+                💎 Open Schwaab Wealth
+              </button>
+            </div>
+          </div>
+
+          <h3 className="mb-2 text-xs font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
+            Want to Re-Enter Big Tech? Interview for a W-2 Track Below:
+          </h3>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            {CAREERS.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--mist)] p-3.5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl">{c.emoji}</span>
+                  <div>
+                    <div className="text-xs font-extrabold">{c.company}</div>
+                    <div className="text-[10px] text-[var(--ink-soft)]">
+                      {c.name} · Starts at {formatCurrency(c.levels[0].baseSalary + c.levels[0].rsuAnnual)}/yr
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => applyJob(c.id)}
+                  className="btn-press rounded-xl bg-[#007AFF] px-3 py-1.5 text-[11px] font-extrabold text-white"
+                >
+                  Interview
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const career = CAREER_BY_ID[job.careerId] || CAREERS[0];
   const currentLevel = career.levels[job.levelIndex] || career.levels[0];
@@ -205,7 +304,11 @@ export const WorkCareerModal: React.FC = () => {
       onClick={() => setActiveModal(null)}
     >
       <div
-        className="apple-glass-heavy relative flex h-[90dvh] w-full max-w-5xl flex-col overflow-hidden rounded-[36px] border border-white/50 shadow-[0_32px_100px_rgba(0,0,0,0.55)] dark:border-white/15"
+        className={`apple-glass-heavy relative flex w-full flex-col overflow-hidden rounded-[36px] border border-white/50 shadow-[0_32px_100px_rgba(0,0,0,0.55)] transition-all duration-200 dark:border-white/15 ${
+          activeTab === 'tree' && treeExpanded
+            ? 'h-[94dvh] max-w-7xl'
+            : 'h-[90dvh] max-w-6xl'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* =========================================================
@@ -240,7 +343,27 @@ export const WorkCareerModal: React.FC = () => {
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
                   {formatCurrency(currentLevel.baseSalary + currentLevel.rsuAnnual)}/yr
                 </span>
+                {unvestedRsu > 0 && (
+                  <span className="ml-1.5 rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-300">
+                    🔒 {formatCurrency(unvestedRsu)} Unvested RSU
+                  </span>
+                )}
               </p>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setActiveModal('guide', 'goals')}
+                  className="btn-press rounded-full bg-[#007AFF]/12 px-2.5 py-0.5 text-[10px] font-extrabold text-[#007AFF] hover:bg-[#007AFF]/20"
+                >
+                  🎯 F.I.R.E. & Goals Guide
+                </button>
+                <button
+                  onClick={resignJob}
+                  title="Resign from corporate W-2 to break the Golden Handcuffs and go 100% independent!"
+                  className="btn-press rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-700 hover:bg-amber-500/25 dark:text-amber-300"
+                >
+                  🔓 Break Golden Handcuffs (Quit W-2)
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1323,278 +1446,711 @@ export const WorkCareerModal: React.FC = () => {
           ======================================================= */}
           {activeTab === 'tree' && (
             <div className="space-y-6">
-              {/* Top Row: Interactive SVG Tech Tree Blueprint (7 cols) + Node Lab Inspector (5 cols) */}
+              {/* Top Row: Interactive Zoomable SVG Tech Tree Blueprint + Node Lab Inspector */}
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-                {/* LEFT: Interactive SVG 4-Branch Skill Tech Tree Graph (7 cols) */}
-                <div className="flex flex-col justify-between rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-slate-950 via-indigo-950/95 to-slate-900 p-5 text-white shadow-xl lg:col-span-7">
+                {/* LEFT / FULL: Interactive Zoomable & Pannable SVG 4-Branch Skill Tech Tree Graph */}
+                <div
+                  className={`flex flex-col justify-between rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-slate-950 via-indigo-950/95 to-slate-900 p-5 text-white shadow-xl transition-all ${
+                    treeExpanded ? 'lg:col-span-12' : 'lg:col-span-8'
+                  }`}
+                >
                   <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-0.5 text-[10px] font-black tracking-wider text-amber-300 uppercase">
-                          🌳 SILICON VALLEY SPECIALIZATION DAG
+                          🌳 SILICON VALLEY SPECIALIZATION DAG · INTERACTIVE BLUEPRINT
                         </span>
-                        <h3 className="mt-1.5 text-lg font-black tracking-tight">
+                        <h3 className="mt-1.5 text-lg font-black tracking-tight sm:text-xl">
                           Custom Skill Tech Tree & Career Offer Gates
                         </h3>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-amber-500/20 px-3 py-1 text-xs font-black text-amber-300">
                           ⚡ {karma} Karma Available
                         </span>
                         <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-300">
                           {unlockedNodes.length}/{SKILL_TREE_NODES.length} Unlocked
                         </span>
+                        <button
+                          onClick={() => setTreeExpanded((v) => !v)}
+                          className="btn-press inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black text-white hover:bg-white/20"
+                          title="Toggle between Full-Width Blueprint and Split Inspector View"
+                        >
+                          {treeExpanded ? (
+                            <>
+                              <Minimize2 className="size-3.5 text-sky-300" />
+                              <span>◫ Split View</span>
+                            </>
+                          ) : (
+                            <>
+                              <Maximize2 className="size-3.5 text-sky-300" />
+                              <span>⛶ Full Width</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
                     <p className="mt-1 text-xs font-medium text-white/70">
-                      Click any node in the blueprint to inspect prerequisites, run a{' '}
-                      <strong className="text-sky-300">Deep-Dive Lab Study</strong>, or unlock custom
-                      specializations required for{' '}
+                      Scroll or use the zoom controls to inspect close-up, drag to pan across the blueprint, or double-click any node to zoom right into it. Unlock specializations required for{' '}
                       <strong className="text-purple-300">OpenMind Frontier Lab</strong>,{' '}
                       <strong className="text-amber-300">Fruit Co. Cupertino</strong>, and{' '}
                       <strong className="text-emerald-300">Sand Hill Venture</strong> onsite loops.
                     </p>
 
-                    {/* Interactive SVG Tech Tree Canvas */}
-                    <div className="mt-3.5 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/90 p-3">
-                      <svg viewBox="0 0 560 320" className="h-72 w-full overflow-visible">
-                        <defs>
-                          <pattern
-                            id="treeGrid"
-                            width="28"
-                            height="28"
-                            patternUnits="userSpaceOnUse"
-                          >
-                            <path
-                              d="M 28 0 L 0 0 0 28"
-                              fill="none"
-                              stroke="rgba(148,163,184,0.08)"
-                              strokeWidth="1"
-                            />
-                          </pattern>
-                        </defs>
-                        <rect width="560" height="320" rx="12" fill="url(#treeGrid)" />
+                    {/* Interactive Camera & Zoom Control Bar */}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-slate-900/90 px-3 py-2">
+                      {/* Left: Zoom Controls */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          onClick={() =>
+                            setTreeZoom((z) => Math.max(0.75, Number((z - 0.2).toFixed(2))))
+                          }
+                          className="btn-press inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/10 px-2.5 py-1 text-xs font-black text-white hover:bg-white/20"
+                          title="Zoom Out"
+                        >
+                          <ZoomOut className="size-3.5" />
+                          <span>-</span>
+                        </button>
 
-                        {/* Tier Column Headers */}
-                        {[
-                          { tier: 1, label: 'TIER 1 · FOUNDATION', x: 118 },
-                          { tier: 2, label: 'TIER 2 · OFFER GATE', x: 236 },
-                          { tier: 3, label: 'TIER 3 · SENIOR/STAFF', x: 354 },
-                          { tier: 4, label: 'TIER 4 · APEX FELLOW', x: 472 },
-                        ].map((col) => (
-                          <text
-                            key={col.tier}
-                            x={col.x}
-                            y="18"
-                            textAnchor="middle"
-                            fontSize="8"
-                            fontWeight="bold"
-                            fill="#94A3B8"
-                          >
-                            {col.label}
-                          </text>
-                        ))}
+                        <input
+                          type="range"
+                          min={0.75}
+                          max={2.4}
+                          step={0.05}
+                          value={treeZoom}
+                          onChange={(e) => setTreeZoom( parseFloat(e.target.value) )}
+                          className="h-1.5 w-24 cursor-pointer accent-sky-400 sm:w-28"
+                          title="Zoom Level Slider"
+                        />
 
-                        {/* Branch Row Labels */}
+                        <span className="min-w-[46px] text-center font-mono text-xs font-black text-sky-300">
+                          {Math.round(treeZoom * 100)}%
+                        </span>
+
+                        <button
+                          onClick={() =>
+                            setTreeZoom((z) => Math.min(2.4, Number((z + 0.2).toFixed(2))))
+                          }
+                          className="btn-press inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/10 px-2.5 py-1 text-xs font-black text-white hover:bg-white/20"
+                          title="Zoom In"
+                        >
+                          <ZoomIn className="size-3.5" />
+                          <span>+</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const bIdx = SKILL_TREE_BRANCHES.findIndex(
+                              (b) => b.id === selectedNode.branch
+                            );
+                            const cx = 250 + (selectedNode.tier - 1) * 235;
+                            const cy = 104 + bIdx * 126;
+                            setTreeZoom(1.75);
+                            setTreePan({ x: 1080 / 2 - cx, y: 560 / 2 - cy });
+                          }}
+                          className="btn-press inline-flex items-center gap-1 rounded-xl border border-sky-400/40 bg-sky-500/20 px-2.5 py-1 text-[11px] font-black text-sky-200 hover:bg-sky-500/30"
+                          title="Zoom in 175% on currently selected node"
+                        >
+                          <span>🔍 Focus {selectedNode.codeName}</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setTreeZoom(1.0);
+                            setTreePan({ x: 0, y: 0 });
+                          }}
+                          className="btn-press inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-white/80 hover:bg-white/15"
+                          title="Reset Zoom & Pan to Fit Entire Tree"
+                        >
+                          <RotateCcw className="size-3" />
+                          <span>Fit All</span>
+                        </button>
+                      </div>
+
+                      {/* Right: 1-Click Branch Camera Focus Pills */}
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="mr-1 hidden items-center gap-1 text-[10px] font-bold text-white/50 xl:inline-flex">
+                          <Move className="size-3" /> Jump Branch:
+                        </span>
                         {SKILL_TREE_BRANCHES.map((b, bIdx) => {
-                          const yCenter = 56 + bIdx * 68;
+                          const branchY = 104 + bIdx * 126;
                           return (
-                            <g key={b.id}>
-                              <rect
-                                x="6"
-                                y={yCenter - 20}
-                                width="58"
-                                height="40"
-                                rx="8"
-                                fill="rgba(15,23,42,0.85)"
-                                stroke={b.accent}
-                                strokeWidth="1"
-                              />
-                              <text
-                                x="35"
-                                y={yCenter - 3}
-                                textAnchor="middle"
-                                fontSize="12"
-                              >
-                                {b.emoji}
-                              </text>
-                              <text
-                                x="35"
-                                y={yCenter + 11}
-                                textAnchor="middle"
-                                fontSize="7.5"
-                                fontWeight="bold"
-                                fill="#E2E8F0"
-                              >
-                                {b.shortLabel}
-                              </text>
-                            </g>
-                          );
-                        })}
-
-                        {/* Edges between prereqNodes and child nodes */}
-                        {SKILL_TREE_NODES.map((node) => {
-                          const bIdx = SKILL_TREE_BRANCHES.findIndex((b) => b.id === node.branch);
-                          const x2 = 118 + (node.tier - 1) * 118;
-                          const y2 = 56 + bIdx * 68;
-                          const isUnlocked = unlockedNodes.includes(node.id);
-
-                          return node.prereqNodes.map((prereqId) => {
-                            const parent = SKILL_TREE_NODE_BY_ID[prereqId];
-                            if (!parent) return null;
-                            const pBranchIdx = SKILL_TREE_BRANCHES.findIndex(
-                              (b) => b.id === parent.branch
-                            );
-                            const x1 = 118 + (parent.tier - 1) * 118;
-                            const y1 = 56 + pBranchIdx * 68;
-                            const parentUnlocked = unlockedNodes.includes(prereqId);
-                            const strokeColor = isUnlocked
-                              ? node.accent
-                              : parentUnlocked
-                                ? '#FBBF24'
-                                : 'rgba(148,163,184,0.25)';
-
-                            const midX = (x1 + x2) / 2;
-                            const d = `M ${x1 + 36} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2 - 36} ${y2}`;
-
-                            return (
-                              <path
-                                key={`${prereqId}->${node.id}`}
-                                d={d}
-                                fill="none"
-                                stroke={strokeColor}
-                                strokeWidth={isUnlocked ? '2.5' : parentUnlocked ? '2' : '1.5'}
-                                strokeDasharray={
-                                  isUnlocked ? undefined : parentUnlocked ? '5 3' : '3 3'
-                                }
-                              />
-                            );
-                          });
-                        })}
-
-                        {/* Interactive SVG Nodes */}
-                        {SKILL_TREE_NODES.map((node) => {
-                          const bIdx = SKILL_TREE_BRANCHES.findIndex((b) => b.id === node.branch);
-                          const cx = 118 + (node.tier - 1) * 118;
-                          const cy = 56 + bIdx * 68;
-                          const isUnlocked = unlockedNodes.includes(node.id);
-                          const prereqsOk = node.prereqNodes.every((pid) =>
-                            unlockedNodes.includes(pid)
-                          );
-                          const skillsOk = node.requiredSkills.every(
-                            (req) => Math.floor(skills[req.skill] ?? 0) >= req.level
-                          );
-                          const isReady = !isUnlocked && prereqsOk && skillsOk && karma >= node.karmaCost;
-                          const isSelected = selectedNode.id === node.id;
-
-                          const boxStroke = isSelected
-                            ? '#FFFFFF'
-                            : isUnlocked
-                              ? node.accent
-                              : isReady
-                                ? '#FBBF24'
-                                : prereqsOk
-                                  ? '#64748B'
-                                  : '#334155';
-
-                          return (
-                            <g
-                              key={node.id}
-                              className="cursor-pointer"
-                              onClick={() => setSelectedNodeId(node.id)}
+                            <button
+                              key={b.id}
+                              onClick={() => {
+                                setTreeZoom(1.35);
+                                setTreePan({ x: -35, y: 560 / 2 - branchY });
+                              }}
+                              className="btn-press rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-extrabold text-white/85 hover:border-white/25 hover:bg-white/15"
                             >
-                              {isSelected && (
-                                <rect
-                                  x={cx - 46}
-                                  y={cy - 27}
-                                  width="92"
-                                  height="54"
-                                  rx="13"
-                                  fill="none"
-                                  stroke={node.accent}
-                                  strokeWidth="2"
-                                  strokeDasharray="4 2"
-                                />
-                              )}
-                              <rect
-                                x={cx - 42}
-                                y={cy - 23}
-                                width="84"
-                                height="46"
-                                rx="10"
-                                fill={
-                                  isUnlocked
-                                    ? `${node.accent}2E`
-                                    : isReady
-                                      ? 'rgba(245,158,11,0.18)'
-                                      : 'rgba(15,23,42,0.92)'
-                                }
-                                stroke={boxStroke}
-                                strokeWidth={isSelected ? '2.2' : '1.5'}
-                              />
-                              <text x={cx - 26} y={cy - 3} fontSize="13" textAnchor="middle">
-                                {node.emoji}
-                              </text>
-                              <text
-                                x={cx + 6}
-                                y={cy - 5}
-                                fontSize="8.5"
-                                fontWeight="bold"
-                                fill={isUnlocked ? '#FFFFFF' : '#CBD5E1'}
-                                textAnchor="middle"
-                              >
-                                {node.codeName}
-                              </text>
-                              <text
-                                x={cx}
-                                y={cy + 12}
-                                fontSize="7.2"
-                                fontWeight="bold"
-                                fill={
-                                  isUnlocked
-                                    ? '#34D399'
-                                    : isReady
-                                      ? '#FBBF24'
-                                      : prereqsOk
-                                        ? '#93C5FD'
-                                        : '#64748B'
-                                }
-                                textAnchor="middle"
-                              >
-                                {isUnlocked
-                                  ? '✓ UNLOCKED'
-                                  : isReady
-                                    ? `⚡ READY (${node.karmaCost}⚡)`
-                                    : node.unlocksCareerId
-                                      ? '🔥 OFFER GATE'
-                                      : `🔒 ${node.karmaCost}⚡`}
-                              </text>
-                            </g>
+                              {b.emoji} {b.shortLabel}
+                            </button>
                           );
                         })}
-                      </svg>
+                      </div>
                     </div>
+
+                    {/* Interactive High-Resolution SVG Tech Tree Canvas */}
+                    {(() => {
+                      const baseW = 1080;
+                      const baseH = 560;
+                      const vbW = baseW / treeZoom;
+                      const vbH = baseH / treeZoom;
+                      const vbX = (baseW - vbW) / 2 - treePan.x;
+                      const vbY = (baseH - vbH) / 2 - treePan.y;
+
+                      return (
+                        <div
+                          className={`relative mt-3 overflow-hidden rounded-2xl border border-white/15 bg-slate-950/95 shadow-inner select-none ${
+                            isDraggingTree ? 'cursor-grabbing' : 'cursor-grab'
+                          }`}
+                          onWheel={(e) => {
+                            e.preventDefault();
+                            const delta = e.deltaY < 0 ? 0.14 : -0.14;
+                            setTreeZoom((z) =>
+                              Math.min(2.4, Math.max(0.75, Number((z + delta).toFixed(2))))
+                            );
+                          }}
+                          onMouseDown={(e) => {
+                            if (e.button !== 0) return;
+                            setIsDraggingTree(true);
+                            setDragStart({ x: e.clientX - treePan.x, y: e.clientY - treePan.y });
+                          }}
+                          onMouseMove={(e) => {
+                            if (!isDraggingTree) return;
+                            setTreePan({
+                              x: Math.max(-460, Math.min(460, e.clientX - dragStart.x)),
+                              y: Math.max(-280, Math.min(280, e.clientY - dragStart.y)),
+                            });
+                          }}
+                          onMouseUp={() => setIsDraggingTree(false)}
+                          onMouseLeave={() => setIsDraggingTree(false)}
+                        >
+                          <svg
+                            viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+                            className={`w-full transition-all duration-75 ${
+                              treeExpanded ? 'h-[480px] sm:h-[560px]' : 'h-[420px] sm:h-[460px]'
+                            }`}
+                          >
+                            <defs>
+                              <pattern
+                                id="treeGrid"
+                                width="36"
+                                height="36"
+                                patternUnits="userSpaceOnUse"
+                              >
+                                <path
+                                  d="M 36 0 L 0 0 0 36"
+                                  fill="none"
+                                  stroke="rgba(148,163,184,0.08)"
+                                  strokeWidth="1"
+                                />
+                              </pattern>
+                              <filter id="nodeGlow" x="-15%" y="-15%" width="130%" height="130%">
+                                <feDropShadow
+                                  dx="0"
+                                  dy="4"
+                                  stdDeviation="6"
+                                  floodColor="#38BDF8"
+                                  floodOpacity="0.35"
+                                />
+                              </filter>
+                            </defs>
+                            <rect
+                              x="-400"
+                              y="-300"
+                              width="1880"
+                              height="1160"
+                              fill="url(#treeGrid)"
+                            />
+
+                            {/* Tier Column Headers & Vertical Guides */}
+                            {[
+                              { tier: 1, label: 'TIER 1 · FOUNDATION', sub: 'Core Stack Entry', x: 250 },
+                              {
+                                tier: 2,
+                                label: 'TIER 2 · ONSITE OFFER GATE',
+                                sub: 'Unlocks Selectivity Loops',
+                                x: 485,
+                              },
+                              {
+                                tier: 3,
+                                label: 'TIER 3 · SENIOR / STAFF',
+                                sub: 'L5–L6 Architecture',
+                                x: 720,
+                              },
+                              {
+                                tier: 4,
+                                label: 'TIER 4 · APEX FELLOW',
+                                sub: 'Distinguished / Partner',
+                                x: 955,
+                              },
+                            ].map((col) => (
+                              <g key={col.tier}>
+                                <line
+                                  x1={col.x}
+                                  y1="44"
+                                  x2={col.x}
+                                  y2="540"
+                                  stroke="rgba(148,163,184,0.08)"
+                                  strokeWidth="1.5"
+                                  strokeDasharray="6 6"
+                                />
+                                <rect
+                                  x={col.x - 92}
+                                  y="8"
+                                  width="184"
+                                  height="32"
+                                  rx="9"
+                                  fill="rgba(15,23,42,0.9)"
+                                  stroke="rgba(148,163,184,0.2)"
+                                  strokeWidth="1"
+                                />
+                                <text
+                                  x={col.x}
+                                  y="22"
+                                  textAnchor="middle"
+                                  fontSize="10.5"
+                                  fontWeight="900"
+                                  fill="#E2E8F0"
+                                >
+                                  {col.label}
+                                </text>
+                                <text
+                                  x={col.x}
+                                  y="34"
+                                  textAnchor="middle"
+                                  fontSize="8.5"
+                                  fontWeight="700"
+                                  fill="#94A3B8"
+                                >
+                                  {col.sub}
+                                </text>
+                              </g>
+                            ))}
+
+                            {/* Branch Row Headers (Left Column) */}
+                            {SKILL_TREE_BRANCHES.map((b, bIdx) => {
+                              const yCenter = 104 + bIdx * 126;
+                              const branchNodes = SKILL_TREE_NODES.filter((n) => n.branch === b.id);
+                              const branchUnlockedCount = branchNodes.filter((n) =>
+                                unlockedNodes.includes(n.id)
+                              ).length;
+
+                              return (
+                                <g
+                                  key={b.id}
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTreeZoom(1.35);
+                                    setTreePan({ x: -35, y: baseH / 2 - yCenter });
+                                  }}
+                                >
+                                  {/* Horizontal Branch Lane Highlight */}
+                                  <rect
+                                    x="10"
+                                    y={yCenter - 54}
+                                    width="1055"
+                                    height="108"
+                                    rx="18"
+                                    fill={`${b.accent}09`}
+                                    stroke={`${b.accent}22`}
+                                    strokeWidth="1"
+                                  />
+                                  <rect
+                                    x="16"
+                                    y={yCenter - 46}
+                                    width="118"
+                                    height="92"
+                                    rx="14"
+                                    fill="rgba(15,23,42,0.95)"
+                                    stroke={b.accent}
+                                    strokeWidth="1.8"
+                                  />
+                                  <text
+                                    x="75"
+                                    y={yCenter - 16}
+                                    textAnchor="middle"
+                                    fontSize="24"
+                                  >
+                                    {b.emoji}
+                                  </text>
+                                  <text
+                                    x="75"
+                                    y={yCenter + 6}
+                                    textAnchor="middle"
+                                    fontSize="11.5"
+                                    fontWeight="900"
+                                    fill="#FFFFFF"
+                                  >
+                                    {b.shortLabel}
+                                  </text>
+                                  <text
+                                    x="75"
+                                    y={yCenter + 22}
+                                    textAnchor="middle"
+                                    fontSize="9"
+                                    fontWeight="700"
+                                    fill="#94A3B8"
+                                  >
+                                    {branchUnlockedCount}/{branchNodes.length} Active
+                                  </text>
+                                  <text
+                                    x="75"
+                                    y={yCenter + 36}
+                                    textAnchor="middle"
+                                    fontSize="8"
+                                    fontWeight="800"
+                                    fill={b.accent}
+                                  >
+                                    🔍 Click to Focus
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* Edges between prereqNodes and child nodes */}
+                            {SKILL_TREE_NODES.map((node) => {
+                              const bIdx = SKILL_TREE_BRANCHES.findIndex(
+                                (b) => b.id === node.branch
+                              );
+                              const x2 = 250 + (node.tier - 1) * 235;
+                              const y2 = 104 + bIdx * 126;
+                              const isUnlocked = unlockedNodes.includes(node.id);
+
+                              return node.prereqNodes.map((prereqId) => {
+                                const parent = SKILL_TREE_NODE_BY_ID[prereqId];
+                                if (!parent) return null;
+                                const pBranchIdx = SKILL_TREE_BRANCHES.findIndex(
+                                  (b) => b.id === parent.branch
+                                );
+                                const x1 = 250 + (parent.tier - 1) * 235;
+                                const y1 = 104 + pBranchIdx * 126;
+                                const parentUnlocked = unlockedNodes.includes(prereqId);
+                                const strokeColor = isUnlocked
+                                  ? node.accent
+                                  : parentUnlocked
+                                    ? '#FBBF24'
+                                    : 'rgba(148,163,184,0.32)';
+
+                                const startX = x1 + 98;
+                                const endX = x2 - 98;
+                                const midX = (startX + endX) / 2;
+                                const d = `M ${startX} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${endX} ${y2}`;
+
+                                return (
+                                  <g key={`${prereqId}->${node.id}`}>
+                                    <path
+                                      d={d}
+                                      fill="none"
+                                      stroke={strokeColor}
+                                      strokeWidth={isUnlocked ? '3.5' : parentUnlocked ? '2.5' : '1.8'}
+                                      strokeDasharray={
+                                        isUnlocked ? undefined : parentUnlocked ? '7 4' : '4 4'
+                                      }
+                                    />
+                                    <circle
+                                      cx={endX - 2}
+                                      cy={y2}
+                                      r="4"
+                                      fill={strokeColor}
+                                    />
+                                  </g>
+                                );
+                              });
+                            })}
+
+                            {/* Interactive High-Detail SVG Nodes (196 x 96 Cards) */}
+                            {SKILL_TREE_NODES.map((node) => {
+                              const bIdx = SKILL_TREE_BRANCHES.findIndex(
+                                (b) => b.id === node.branch
+                              );
+                              const cx = 250 + (node.tier - 1) * 235;
+                              const cy = 104 + bIdx * 126;
+                              const isUnlocked = unlockedNodes.includes(node.id);
+                              const prereqsOk = node.prereqNodes.every((pid) =>
+                                unlockedNodes.includes(pid)
+                              );
+                              const skillsOk = node.requiredSkills.every(
+                                (req) => Math.floor(skills[req.skill] ?? 0) >= req.level
+                              );
+                              const isReady =
+                                !isUnlocked && prereqsOk && skillsOk && karma >= node.karmaCost;
+                              const isSelected = selectedNode.id === node.id;
+
+                              const boxStroke = isSelected
+                                ? '#FFFFFF'
+                                : isUnlocked
+                                  ? node.accent
+                                  : isReady
+                                    ? '#FBBF24'
+                                    : prereqsOk
+                                      ? '#64748B'
+                                      : '#334155';
+
+                              const shortTitle =
+                                node.title.length > 23
+                                  ? `${node.title.slice(0, 22)}…`
+                                  : node.title;
+                              const gateOrPerkText = node.unlocksLevelLabel
+                                ? `🔑 ${node.unlocksLevelLabel}`
+                                : node.perkSummary;
+                              const shortSub =
+                                gateOrPerkText.length > 29
+                                  ? `${gateOrPerkText.slice(0, 28)}…`
+                                  : gateOrPerkText;
+
+                              return (
+                                <g
+                                  key={node.id}
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedNodeId(node.id);
+                                  }}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedNodeId(node.id);
+                                    setTreeZoom(1.75);
+                                    setTreePan({ x: baseW / 2 - cx, y: baseH / 2 - cy });
+                                  }}
+                                >
+                                  {isSelected && (
+                                    <rect
+                                      x={cx - 103}
+                                      y={cy - 53}
+                                      width="206"
+                                      height="106"
+                                      rx="18"
+                                      fill="none"
+                                      stroke={node.accent}
+                                      strokeWidth="2.5"
+                                      strokeDasharray="6 3"
+                                      filter="url(#nodeGlow)"
+                                    />
+                                  )}
+                                  <rect
+                                    x={cx - 98}
+                                    y={cy - 48}
+                                    width="196"
+                                    height="96"
+                                    rx="14"
+                                    fill={
+                                      isUnlocked
+                                        ? `${node.accent}30`
+                                        : isReady
+                                          ? 'rgba(245,158,11,0.20)'
+                                          : 'rgba(15,23,42,0.95)'
+                                    }
+                                    stroke={boxStroke}
+                                    strokeWidth={isSelected ? '2.8' : '1.8'}
+                                  />
+
+                                  {/* Top Row: Emoji + CodeName Pill + Status Badge */}
+                                  <text x={cx - 78} y={cy - 23} fontSize="18" textAnchor="middle">
+                                    {node.emoji}
+                                  </text>
+                                  <rect
+                                    x={cx - 62}
+                                    y={cy - 37}
+                                    width="54"
+                                    height="18"
+                                    rx="5"
+                                    fill={node.accent}
+                                  />
+                                  <text
+                                    x={cx - 35}
+                                    y={cy - 25}
+                                    fontSize="9.5"
+                                    fontWeight="900"
+                                    fill="#FFFFFF"
+                                    textAnchor="middle"
+                                  >
+                                    {node.codeName}
+                                  </text>
+
+                                  <text
+                                    x={cx + 88}
+                                    y={cy - 25}
+                                    fontSize="9"
+                                    fontWeight="900"
+                                    fill={
+                                      isUnlocked
+                                        ? '#34D399'
+                                        : isReady
+                                          ? '#FBBF24'
+                                          : node.unlocksCareerId
+                                            ? '#C084FC'
+                                            : '#94A3B8'
+                                    }
+                                    textAnchor="end"
+                                  >
+                                    {isUnlocked
+                                      ? '✓ UNLOCKED'
+                                      : isReady
+                                        ? `⚡ READY (${node.karmaCost}⚡)`
+                                        : node.unlocksCareerId
+                                          ? '🔥 OFFER GATE'
+                                          : `🔒 ${node.karmaCost}⚡`}
+                                  </text>
+
+                                  {/* Middle Row: Full Specialization Title & Gate/Perk Summary */}
+                                  <text
+                                    x={cx - 86}
+                                    y={cy - 2}
+                                    fontSize="12"
+                                    fontWeight="900"
+                                    fill={isUnlocked ? '#FFFFFF' : '#F1F5F9'}
+                                  >
+                                    {shortTitle}
+                                  </text>
+                                  <text
+                                    x={cx - 86}
+                                    y={cy + 14}
+                                    fontSize="9.2"
+                                    fontWeight="700"
+                                    fill={node.unlocksLevelLabel ? '#E9D5FF' : '#94A3B8'}
+                                  >
+                                    {shortSub}
+                                  </text>
+
+                                  {/* Bottom Row: Required Skill Pills Inside Card */}
+                                  {node.requiredSkills.map((req, rIdx) => {
+                                    const skMeta = SKILLS_META.find((m) => m.key === req.skill);
+                                    const curLv = Math.floor(skills[req.skill] ?? 0);
+                                    const met = curLv >= req.level;
+                                    const pillX = cx - 86 + rIdx * 88;
+                                    const pillY = cy + 23;
+                                    const shortSkLabel =
+                                      skMeta?.label.split(' ')[0] || req.skill;
+
+                                    return (
+                                      <g key={req.skill}>
+                                        <rect
+                                          x={pillX}
+                                          y={pillY}
+                                          width="82"
+                                          height="17"
+                                          rx="5"
+                                          fill={
+                                            met
+                                              ? 'rgba(16,185,129,0.22)'
+                                              : 'rgba(148,163,184,0.14)'
+                                          }
+                                          stroke={
+                                            met
+                                              ? 'rgba(52,211,153,0.5)'
+                                              : 'rgba(148,163,184,0.25)'
+                                          }
+                                          strokeWidth="1"
+                                        />
+                                        <text
+                                          x={pillX + 41}
+                                          y={pillY + 11.5}
+                                          fontSize="8.5"
+                                          fontWeight="800"
+                                          fill={met ? '#6EE7B7' : '#CBD5E1'}
+                                          textAnchor="middle"
+                                        >
+                                          {met ? '✓' : '🔒'} {shortSkLabel} Lv.{req.level}
+                                        </text>
+                                      </g>
+                                    );
+                                  })}
+                                </g>
+                              );
+                            })}
+                          </svg>
+
+                          {/* Floating Overlay Hint Badge */}
+                          <div className="pointer-events-none absolute bottom-2.5 right-3 rounded-full border border-white/10 bg-slate-900/85 px-2.5 py-1 text-[10px] font-bold text-white/70 backdrop-blur-xs">
+                            🖱️ Drag to pan · Scroll to zoom · Double-click node to focus
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  {/* Legend Footer */}
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-white/75">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="flex items-center gap-1 text-emerald-400">
-                        ● Unlocked Specialization
-                      </span>
-                      <span className="flex items-center gap-1 text-amber-300">
-                        ● Ready to Unlock
-                      </span>
-                      <span className="flex items-center gap-1 text-purple-300">
-                        🔥 Tier 2 = Company Onsite Offer Gate
-                      </span>
-                    </div>
-                    <span>Click any node to inspect or study →</span>
-                  </div>
+                  {/* Quick Selected-Node Action Bar right below the SVG Blueprint */}
+                  {(() => {
+                    const isNodeUnlocked = unlockedNodes.includes(selectedNode.id);
+                    const missingPrereqs = selectedNode.prereqNodes.filter(
+                      (pid) => !unlockedNodes.includes(pid)
+                    );
+                    const skillsMet = selectedNode.requiredSkills.every(
+                      (req) => Math.floor(skills[req.skill] ?? 0) >= req.level
+                    );
+                    const canUnlockNow =
+                      !isNodeUnlocked &&
+                      missingPrereqs.length === 0 &&
+                      skillsMet &&
+                      karma >= selectedNode.karmaCost;
+
+                    return (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xl">{selectedNode.emoji}</span>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="rounded-md px-1.5 py-0.5 font-mono text-[10px] font-black text-white"
+                                style={{ backgroundColor: selectedNode.accent }}
+                              >
+                                {selectedNode.codeName}
+                              </span>
+                              <span className="text-xs font-black text-white">
+                                {selectedNode.title}
+                              </span>
+                              {selectedNode.unlocksLevelLabel && (
+                                <span className="rounded-md bg-purple-500/25 px-2 py-0.5 text-[10px] font-black text-purple-200">
+                                  🔑 {selectedNode.unlocksLevelLabel}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] font-medium text-white/70">
+                              {selectedNode.perkSummary}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => trainTechNodeSkill?.(selectedNode.id)}
+                            className="btn-press rounded-xl border border-sky-400/40 bg-sky-500/20 px-3 py-1.5 text-xs font-black text-sky-200 hover:bg-sky-500/30"
+                          >
+                            🔬 Lab Study {selectedNode.codeName} (-16⚡ · +0.55 Skill)
+                          </button>
+                          {!isNodeUnlocked ? (
+                            <button
+                              onClick={() => unlockTechNode?.(selectedNode.id)}
+                              className={`btn-press rounded-xl px-3.5 py-1.5 text-xs font-black text-white shadow-xs ${
+                                canUnlockNow
+                                  ? 'bg-gradient-to-r from-emerald-500 to-sky-500 hover:opacity-95'
+                                  : 'bg-white/15 text-white/80 hover:bg-white/25'
+                              }`}
+                            >
+                              {canUnlockNow
+                                ? `🔓 Unlock Now (${selectedNode.karmaCost}⚡)`
+                                : `🔒 Unlock (${selectedNode.karmaCost}⚡ Karma)`}
+                            </button>
+                          ) : (
+                            <span className="rounded-xl bg-emerald-500/20 px-3 py-1.5 text-xs font-black text-emerald-300">
+                              ✓ Unlocked in Stack
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                {/* RIGHT: Selected Node Blueprint & Deep-Dive Lab Inspector (5 cols) */}
-                <div className="flex flex-col justify-between rounded-3xl border border-black/10 bg-white/80 p-5 shadow-xs lg:col-span-5 dark:border-white/10 dark:bg-white/5">
+                {/* RIGHT / BOTTOM: Selected Node Blueprint & Deep-Dive Lab Inspector */}
+                <div
+                  className={`flex flex-col justify-between rounded-3xl border border-black/10 bg-white/80 p-5 shadow-xs dark:border-white/10 dark:bg-white/5 ${
+                    treeExpanded ? 'lg:col-span-12' : 'lg:col-span-4'
+                  }`}
+                >
                   {(() => {
                     const isNodeUnlocked = unlockedNodes.includes(selectedNode.id);
                     const missingPrereqs = selectedNode.prereqNodes.filter(

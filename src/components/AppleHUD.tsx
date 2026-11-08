@@ -14,6 +14,7 @@ import {
 } from '../data/worldData';
 import {
   calculateOverallMood,
+  evaluateAspirationProgress,
   formatCurrency,
   formatTime,
   getActiveVehicle,
@@ -24,7 +25,7 @@ import {
   isHomePowered,
   useGameStore,
 } from '../store/useGameStore';
-import { NeedKey, SkillKey, WorkToneId } from '../types/game';
+import { AspirationActionType, NeedKey, SkillKey, WorkToneId } from '../types/game';
 import { useAuthSaveStore } from '../store/useAuthSaveStore';
 import { GoogleLogoSvg } from './AccountSaveModal';
 import { Portrait } from './Portrait';
@@ -52,6 +53,8 @@ import {
   Backpack,
   Car,
   Save,
+  Target,
+  ArrowRight,
 } from 'lucide-react';
 
 interface SprintTarget {
@@ -210,6 +213,7 @@ export const AppleHUD: React.FC = () => {
   const setScreen = useGameStore((s) => s.setScreen);
   const autoFixNeed = useGameStore((s) => s.autoFixNeed);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
+  const resignJob = useGameStore((s) => s.resignJob);
 
   const authUser = useAuthSaveStore((s) => s.user);
   const quickSaveNow = useAuthSaveStore((s) => s.quickSaveNow);
@@ -217,6 +221,7 @@ export const AppleHUD: React.FC = () => {
   const state = useGameStore.getState();
   const moodInfo = calculateOverallMood(state);
   const powered = isHomePowered(state);
+  const activeEval = evaluateAspirationProgress(state, sim.aspiration);
 
   // Interactive Work Shift Mini-Game State
   const [sprintTargets, setSprintTargets] = useState<SprintTarget[]>([]);
@@ -224,6 +229,67 @@ export const AppleHUD: React.FC = () => {
   const [sprintCombo, setSprintCombo] = useState(0);
   const [shiftBonusEarned, setShiftBonusEarned] = useState(0);
   const [isWorkCardCollapsed, setIsWorkCardCollapsed] = useState(false);
+  const [isGoalCardCollapsed, setIsGoalCardCollapsed] = useState(false);
+
+  const handleGoalAction = useCallback(
+    (actionType: AspirationActionType) => {
+      switch (actionType) {
+        case 'wealth':
+          setActiveModal('phone', 'wealth');
+          break;
+        case 'career':
+          setActiveModal(job ? 'career' : 'phone', 'levels');
+          break;
+        case 'startup':
+          setActiveModal('phone', 'startup');
+          break;
+        case 'map':
+          setView('map');
+          break;
+        case 'skills': {
+          if (locationId === 'home') {
+            const codeActions = [
+              'train_local_llm',
+              'build_startup_mvp',
+              'vibe_code_ai',
+              'grind_leetcode',
+            ];
+            for (const actId of codeActions) {
+              const matching = objects.find((o) =>
+                FURNITURE_BY_ID[o.objectId]?.actions.includes(actId)
+              );
+              if (matching && powered) {
+                enqueueAction(actId, {
+                  objectUid: matching.uid,
+                  pos: { x: matching.x, y: matching.y },
+                });
+                return;
+              }
+            }
+          }
+          setActiveModal('sim', 'skills');
+          break;
+        }
+        case 'furnish':
+          if (locationId === 'home') {
+            setView('buy');
+          } else {
+            setActiveModal('phone', 'bluefin');
+          }
+          break;
+        case 'bluefin':
+          setActiveModal('phone', 'bluefin');
+          break;
+        case 'social':
+          setActiveModal('sim', 'relationships');
+          break;
+        case 'resign':
+          resignJob();
+          break;
+      }
+    },
+    [enqueueAction, job, locationId, objects, powered, resignJob, setActiveModal, setView]
+  );
 
   // Spawn interactive targets during an active workShift
   useEffect(() => {
@@ -505,6 +571,9 @@ export const AppleHUD: React.FC = () => {
       } else if (key === 's') {
         e.preventDefault();
         setActiveModal(s.activeModal === 'account' ? null : 'account');
+      } else if (key === 'q' || key === 'h') {
+        e.preventDefault();
+        setActiveModal(s.activeModal === 'guide' ? null : 'guide', 'goals');
       } else if (key === 'a') {
         e.preventDefault();
         handleSmartNext();
@@ -639,6 +708,15 @@ export const AppleHUD: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveModal(activeModal === 'guide' ? null : 'guide', 'goals')}
+            className="btn-press inline-flex items-center gap-1 rounded-full bg-[#007AFF]/15 px-2.5 py-1 text-[11px] font-extrabold text-[#007AFF] hover:bg-[#007AFF]/25"
+            title="Open Goals, F.I.R.E. Roadmap & How to Play Guide (Shortcut: Q)"
+          >
+            <Target className="size-3.5" />
+            <span>Goals & Guide</span>
+          </button>
+
+          <button
             onClick={() => setActiveModal(activeModal === 'account' ? null : 'account')}
             className="btn-press inline-flex items-center gap-1 rounded-full bg-[var(--mist)] px-2.5 py-1 text-[11px] font-bold text-[var(--ink)] hover:bg-black/10 dark:hover:bg-white/15"
             title="Cloud Saves & Account (Shortcut: S · Quick Save: Cmd/Ctrl+S)"
@@ -685,24 +763,126 @@ export const AppleHUD: React.FC = () => {
         </div>
       )}
 
-      {/* SUB-HEADER: COMPACT LEFT RAIL FOR MILESTONE & LIVE ACTION QUEUE */}
+      {/* SUB-HEADER: COMPACT LEFT RAIL FOR NORTH STAR GOAL, STARTER TUTORIAL & LIVE ACTION QUEUE */}
       {view === 'live' && (
-        <div className="pointer-events-none fixed top-15 left-3 z-20 flex w-68 flex-col items-start gap-2 sm:left-5 sm:w-72">
-          {currentGoal && (
-            <button
-              onClick={() => setActiveModal('sim', 'wishes')}
-              className="apple-pill btn-press pointer-events-auto flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-left text-xs text-[var(--ink)]"
-              title={`${currentGoal.title} — ${currentGoal.desc}`}
-            >
-              <span className="shrink-0 text-sm">{currentGoal.emoji}</span>
-              <span className="truncate font-semibold text-[var(--ink)]">
-                {currentGoal.title}
-              </span>
-              <span className="shrink-0 font-mono text-[10.5px] font-bold text-[#007AFF]">
-                +{formatCurrency(currentGoal.rewardCash)}
-              </span>
-            </button>
-          )}
+        <div className="pointer-events-none fixed top-15 left-3 z-20 flex w-72 flex-col items-start gap-2 sm:left-5 sm:w-80">
+          {/* Interactive North Star Goal & Guided Starter Quest Card */}
+          <div className="apple-glass-heavy pointer-events-auto flex w-full flex-col gap-2 rounded-2xl p-3 text-[var(--ink)] shadow-md">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={() => setActiveModal('guide', 'goals')}
+                className="btn-press flex min-w-0 items-center gap-2 text-left"
+                title="Click to switch your North Star Goal or open the Playbook (Shortcut: Q)"
+              >
+                <span
+                  className="grid size-7 shrink-0 place-items-center rounded-xl text-sm text-white shadow-xs"
+                  style={{ backgroundColor: activeEval.aspDef.accent }}
+                >
+                  {activeEval.aspDef.emoji}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-xs font-extrabold">
+                      {activeEval.aspDef.shortLabel}
+                    </span>
+                    <span className="rounded-full bg-[#007AFF]/15 px-1.5 py-0.2 font-mono text-[9.5px] font-extrabold text-[#007AFF]">
+                      S{activeEval.activeStage.stage.stageNumber}/4 · {activeEval.overallPct}%
+                    </span>
+                  </div>
+                  <div className="truncate text-[10px] font-semibold text-[var(--ink-soft)]">
+                    {activeEval.activeStage.stage.emoji} {activeEval.activeStage.stage.title}
+                  </div>
+                </div>
+              </button>
+
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  onClick={() => setActiveModal('guide', 'goals')}
+                  className="btn-press rounded-full bg-[#007AFF]/12 px-2 py-0.5 text-[10px] font-extrabold text-[#007AFF] hover:bg-[#007AFF]/20"
+                  title="Switch Goal / View 4-Stage Roadmap & Playbook (Shortcut: Q)"
+                >
+                  Switch
+                </button>
+                <button
+                  onClick={() => setIsGoalCardCollapsed((c) => !c)}
+                  className="btn-press grid size-6 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                  title={isGoalCardCollapsed ? 'Expand Goal & Tutorial Tracker' : 'Minimize Goal Tracker'}
+                >
+                  {isGoalCardCollapsed ? (
+                    <ChevronDown className="size-3.5" />
+                  ) : (
+                    <ChevronUp className="size-3.5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {!isGoalCardCollapsed && (
+              <>
+                {/* Active Stage Progress Bar & 1-Tap Action */}
+                <div className="rounded-xl bg-[var(--mist)] p-2">
+                  <div className="flex items-center justify-between gap-1 text-[10px] font-bold">
+                    <span className="truncate text-[var(--ink-soft)]">
+                      {activeEval.activeStage.progressText}
+                    </span>
+                    <span className="shrink-0 font-mono text-emerald-600 dark:text-emerald-400">
+                      +{formatCurrency(activeEval.activeStage.stage.rewardCash)} · +
+                      {activeEval.activeStage.stage.rewardKarma}⚡
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-[#007AFF] transition-all"
+                      style={{ width: `${activeEval.activeStage.pct}%` }}
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-1.5">
+                    <button
+                      onClick={() => setActiveModal('guide', 'playbook')}
+                      className="text-[10px] font-bold text-[var(--ink-soft)] hover:text-[#007AFF] hover:underline"
+                    >
+                      📖 How to Play
+                    </button>
+                    <button
+                      onClick={() => handleGoalAction(activeEval.activeStage.stage.actionType)}
+                      className="btn-press inline-flex items-center gap-1 rounded-lg bg-[#007AFF] px-2.5 py-1 text-[10px] font-extrabold text-white shadow-2xs hover:bg-[#0066CC]"
+                    >
+                      <span>{activeEval.activeStage.stage.actionLabel}</span>
+                      <ArrowRight className="size-2.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Guided Starter Tutorial Step (if still in onboarding) */}
+                {currentGoal && (
+                  <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5">
+                    <button
+                      onClick={() => setActiveModal('guide', 'tutorial')}
+                      className="min-w-0 flex-1 text-left"
+                      title={currentGoal.howTo}
+                    >
+                      <div className="flex items-center gap-1 text-[9.5px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                        <span>🎓 Starter Step {goalIndex + 1}/{GOALS.length}</span>
+                        <span>·</span>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                          +{formatCurrency(currentGoal.rewardCash)}
+                        </span>
+                      </div>
+                      <div className="truncate text-[11px] font-extrabold text-[var(--ink)]">
+                        {currentGoal.emoji} {currentGoal.title}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleGoalAction(currentGoal.actionType)}
+                      className="btn-press shrink-0 rounded-lg bg-amber-500 px-2 py-1 text-[10px] font-extrabold text-white shadow-2xs hover:bg-amber-600"
+                    >
+                      Do Step →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Crystal-Clear Active Action Status Card & Contained Up-Next Stack */}
           {queue.length > 0 && (
@@ -1543,7 +1723,11 @@ export const AppleHUD: React.FC = () => {
                   : 'bg-[#007AFF]/15 text-[#007AFF]'
               }`}
             >
-              {workShift ? 'Working' : `${job?.officeDaysThisWeek || 0}/3🏢`}
+              {workShift
+                ? 'Working'
+                : job
+                  ? `${job.officeDaysThisWeek || 0}/3🏢`
+                  : '🔓 Free'}
             </span>
             <div className="flex items-center gap-1">
               <Briefcase className={`size-3.5 ${activeModal === 'career' ? 'text-white' : 'text-[#007AFF]'}`} />

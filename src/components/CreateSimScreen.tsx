@@ -58,6 +58,8 @@ const TRAIT_BENTO: Record<TraitId, { tag: string; badge: string }> = {
 };
 
 const ASPIRATION_BENTO: Record<AspirationId, { tag: string; badge: string }> = {
+  fireFreedom: { tag: 'Compound ETFs to 100%+ burn coverage', badge: '🔥 $500k F.I.R.E.' },
+  breakHandcuffs: { tag: 'Vest RSUs, build MRR & quit corporate W-2', badge: '🔓 Quit W-2 Free' },
   seriesAUnicorn: { tag: 'Bootstrap to Sequoia unicorn', badge: '🦄 $1B Valuation' },
   staffPrincipal: { tag: 'Climb the IC ladder', badge: '👑 L8 Principal' },
   paloAltoHome: { tag: 'Acquire luxury Bay estate', badge: '💎 $1.5M Worth' },

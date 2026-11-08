@@ -113,6 +113,40 @@ const QUICK_ARCHETYPES: QuickArchetype[] = [
     },
   },
   {
+    id: 'golden_handcuffs',
+    badge: 'ESCAPE GOLDEN HANDCUFFS',
+    emoji: '🔓',
+    title: 'Burned-Out SWE → F.I.R.E.',
+    subtitle: 'Sunnyvale Bunk · $14k + RSUs · Goal: Quit W-2 Free',
+    chips: ['🔓 Break Handcuffs', '💎 RSU Stack', '🔥 F.I.R.E. Path'],
+    accent: '#10B981',
+    homeId: 'sunnyvale_hacker',
+    careerId: 'bigtech_swe',
+    profile: {
+      name: 'Rohan Sharma',
+      handle: '@rohan_fire',
+      appearance: {
+        body: 'm',
+        skin: '#D49B72',
+        hair: 'lowcut',
+        hairColor: '#18181B',
+        outfit: 'arcteryx',
+        topColor: '#0D9488',
+        accessory: 'glasses',
+      },
+      traits: ['leetcodeGrinder', 'coffeeSnob'],
+      aspiration: 'breakHandcuffs',
+      origin: 'h1bhustler',
+    },
+    rewardPatch: {
+      cashDelta: 7500,
+      skill: 'investing',
+      skillDelta: 1.5,
+      startupDelta: 15,
+      toastText: '1-Click Launch: Escape the Golden Handcuffs & Hit F.I.R.E.!',
+    },
+  },
+  {
     id: 'nepo_angel',
     badge: 'SANDBOX LUXURY',
     emoji: '💎',
@@ -263,18 +297,18 @@ export const TitleScreen: React.FC = () => {
       </div>
 
       {/* Center: 1-Click Instant Play Archetype Bento Grid */}
-      <div className="relative z-10 mx-auto my-4 w-full max-w-4xl">
+      <div className="relative z-10 mx-auto my-4 w-full max-w-5xl">
         <div className="mb-2.5 flex items-center justify-between px-1">
           <div className="inline-flex items-center gap-1.5 text-xs font-extrabold tracking-wider text-slate-700 uppercase dark:text-slate-200">
             <Zap className="size-3.5 fill-amber-400 text-amber-500" />
-            <span>⚡ Quick Start · 1-Click Instant Play</span>
+            <span>⚡ Quick Start · Pick a Life Goal & Jump Straight In</span>
           </div>
           <span className="text-[11px] font-semibold text-[var(--ink-soft)]">
-            Zero forms — jump straight in
+            Switch goals anytime in-game (Shortcut: Q)
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {QUICK_ARCHETYPES.map((arch) => (
             <button
               key={arch.id}
