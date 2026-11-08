@@ -452,8 +452,8 @@ export function hasHomeBackupPower(state: GameState): boolean {
   );
   return Boolean(
     homeDef?.bonuses?.builtInPowerBackup ||
-      hasPortableBank ||
-      state.objects.some((o) => FURNITURE_BY_ID[o.objectId]?.powerBackup)
+    hasPortableBank ||
+    state.objects.some((o) => FURNITURE_BY_ID[o.objectId]?.powerBackup)
   );
 }
 
@@ -653,10 +653,10 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
       ...(profile.origin === 'nepo'
         ? [{ itemId: 'edc_airpods_max', kind: 'item' as const, quantity: 1 }]
         : profile.origin === 'ycdropout'
-        ? [{ itemId: 'edc_field_notes', kind: 'item' as const, quantity: 1 }]
-        : profile.origin === 'h1bhustler'
-        ? [{ itemId: 'edc_anker_bank', kind: 'item' as const, quantity: 1 }]
-        : [{ itemId: 'snack_tartine', kind: 'item' as const, quantity: 1 }]),
+          ? [{ itemId: 'edc_field_notes', kind: 'item' as const, quantity: 1 }]
+          : profile.origin === 'h1bhustler'
+            ? [{ itemId: 'edc_anker_bank', kind: 'item' as const, quantity: 1 }]
+            : [{ itemId: 'snack_tartine', kind: 'item' as const, quantity: 1 }]),
     ],
 
     time: startTime,
@@ -940,19 +940,19 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const validObjects = Array.isArray(raw.objects)
           ? raw.objects
-              .filter((o) => o && FURNITURE_BY_ID[o.objectId])
-              .map((o) => ({
-                ...o,
-                x: clamp(o.x, 0, Math.max(0, homeDef.gridSize - 1)),
-                y: clamp(o.y, 0, Math.max(0, homeDef.gridSize - 1)),
-              }))
+            .filter((o) => o && FURNITURE_BY_ID[o.objectId])
+            .map((o) => ({
+              ...o,
+              x: clamp(o.x, 0, Math.max(0, homeDef.gridSize - 1)),
+              y: clamp(o.y, 0, Math.max(0, homeDef.gridSize - 1)),
+            }))
           : fallback.objects;
 
         const validPos = raw.pos
           ? {
-              x: clamp(raw.pos.x, 0, Math.max(0, gridSize - 1)),
-              y: clamp(raw.pos.y, 0, Math.max(0, gridSize - 1)),
-            }
+            x: clamp(raw.pos.x, 0, Math.max(0, gridSize - 1)),
+            y: clamp(raw.pos.y, 0, Math.max(0, gridSize - 1)),
+          }
           : fallback.pos;
 
         const safeTime = typeof raw.time === 'number' && raw.time >= 0 ? raw.time : fallback.time;
@@ -1084,7 +1084,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const overclockMult =
           s.unlockedPerks.includes('perk_h100_overclock') &&
-          (def.category === 'skill' || def.category === 'hustle' || def.category === 'work')
+            (def.category === 'skill' || def.category === 'hustle' || def.category === 'work')
             ? 0.8
             : 1.0;
 
@@ -1254,11 +1254,10 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const notice = {
           id: uid(),
-          text: `Arrived at ${locName} via ${
-            s.travel.mode === 'tesla' && activeVehicle
+          text: `Arrived at ${locName} via ${s.travel.mode === 'tesla' && activeVehicle
               ? activeVehicle.name
               : modeDef?.name || 'transit'
-          }.`,
+            }.`,
           emoji:
             (s.travel.mode === 'tesla' && activeVehicle ? activeVehicle.emoji : modeDef?.emoji) ||
             '📍',
@@ -1415,8 +1414,8 @@ export const useGameStore = create<GameState & GameActions>()(
           resolvedMode === 'office'
             ? `${career.company} Campus (${updatedJob.officeDaysThisWeek || 1}/3 Office Days)`
             : resolvedMode === 'wfh'
-            ? `Remote WFH Studio (${updatedJob.wfhDaysThisWeek || 1}/2 WFH Days)`
-            : `WFA at ${LOCATION_BY_ID[nextLocationId]?.shortName || 'Home Studio'} (${updatedJob.wfaDaysRemaining ?? 3}/4 WFA Left)`;
+              ? `Remote WFH Studio (${updatedJob.wfhDaysThisWeek || 1}/2 WFH Days)`
+              : `WFA at ${LOCATION_BY_ID[nextLocationId]?.shortName || 'Home Studio'} (${updatedJob.wfaDaysRemaining ?? 3}/4 WFA Left)`;
 
         const notice = {
           id: uid(),
@@ -1564,7 +1563,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const overclockBonus = s.unlockedPerks.includes('perk_h100_overclock') ? 1.25 : 1.0;
         const flowPerkMult =
           s.unlockedPerks.includes('perk_flow_state') &&
-          (task.skill === 'coding' || task.skill === 'systemDesign' || task.skill === 'aiResearch')
+            (task.skill === 'coding' || task.skill === 'systemDesign' || task.skill === 'aiResearch')
             ? 1.3
             : 1.0;
         const principalPerkMult = s.unlockedPerks.includes('perk_principal_architect') ? 1.35 : 1.0;
@@ -1842,9 +1841,9 @@ export const useGameStore = create<GameState & GameActions>()(
           unlockedTechNodes: nextUnlocked,
           job: s.job
             ? {
-                ...s.job,
-                performance: clamp(s.job.performance + 5, 0, 100),
-              }
+              ...s.job,
+              performance: clamp(s.job.performance + 5, 0, 100),
+            }
             : null,
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
@@ -2338,10 +2337,10 @@ export const useGameStore = create<GameState & GameActions>()(
           stats:
             realizedPnl > 0
               ? {
-                  ...s.stats,
-                  earnedToday: s.stats.earnedToday + realizedPnl,
-                  earnedTotal: s.stats.earnedTotal + realizedPnl,
-                }
+                ...s.stats,
+                earnedToday: s.stats.earnedToday + realizedPnl,
+                earnedTotal: s.stats.earnedTotal + realizedPnl,
+              }
               : s.stats,
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
@@ -2367,17 +2366,17 @@ export const useGameStore = create<GameState & GameActions>()(
         const weights: Array<{ ticker: MarketTicker; weight: number }> =
           preset === 'boglehead'
             ? [
-                { ticker: 'QQQX', weight: 0.5 },
-                { ticker: 'FRUT', weight: 0.25 },
-                { ticker: 'SGOV', weight: 0.25 },
-              ]
+              { ticker: 'QQQX', weight: 0.5 },
+              { ticker: 'FRUT', weight: 0.25 },
+              { ticker: 'SGOV', weight: 0.25 },
+            ]
             : preset === 'ai_supercycle'
-            ? [
+              ? [
                 { ticker: 'NVDAX', weight: 0.45 },
                 { ticker: 'GOGL', weight: 0.35 },
                 { ticker: 'AI3X', weight: 0.2 },
               ]
-            : [
+              : [
                 { ticker: 'SGOV', weight: 0.7 },
                 { ticker: 'QQQX', weight: 0.3 },
               ];
@@ -2399,8 +2398,8 @@ export const useGameStore = create<GameState & GameActions>()(
           preset === 'boglehead'
             ? '3-Fund Tech & Treasury Basket'
             : preset === 'ai_supercycle'
-            ? 'AI Supercycle Basket'
-            : 'T-Bill Yield Barbell';
+              ? 'AI Supercycle Basket'
+              : 'T-Bill Yield Barbell';
 
         let nextFin: FinanceState = { ...fin, holdings: nextHoldings };
         nextFin = recordCashFlow(nextFin, {
@@ -2469,7 +2468,7 @@ export const useGameStore = create<GameState & GameActions>()(
           const quantOptMult = s.unlockedPerks.includes('perk_renaissance_quant') ? 1.25 : 1.0;
           const premium = Math.round(
             Math.min(2800, Math.max(220, portVal * 0.025 + (s.skills.investing || 0) * 75)) *
-              quantOptMult
+            quantOptMult
           );
           const nextFin = recordCashFlow(fin, {
             time: s.time,
@@ -2515,7 +2514,7 @@ export const useGameStore = create<GameState & GameActions>()(
         if (win) {
           const gain = Math.round(
             (440 + (s.skills.investing || 0) * 110 + Math.min(1200, portVal * 0.015)) *
-              quantOptMult
+            quantOptMult
           );
           const nextFin = recordCashFlow(fin, {
             time: s.time,
@@ -2747,19 +2746,19 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const nextObjects = existing
           ? s.objects.map((o) =>
-              o.uid === existing.placed.uid
-                ? { ...o, objectId: def.id, x: targetX, y: targetY }
-                : o
-            )
+            o.uid === existing.placed.uid
+              ? { ...o, objectId: def.id, x: targetX, y: targetY }
+              : o
+          )
           : [
-              ...s.objects,
-              {
-                uid: uid(),
-                objectId: def.id,
-                x: targetX,
-                y: targetY,
-              },
-            ];
+            ...s.objects,
+            {
+              uid: uid(),
+              objectId: def.id,
+              x: targetX,
+              y: targetY,
+            },
+          ];
 
         const fin = recordCashFlow(ensureFinanceState(s), {
           time: s.time,
@@ -2997,9 +2996,9 @@ export const useGameStore = create<GameState & GameActions>()(
         const moodDef = MOODLETS[veh.moodletId];
         const nextMoodlets = moodDef
           ? [
-              ...s.moodlets.filter((m) => m.id !== moodDef.id),
-              { id: moodDef.id, expiresAt: s.time + moodDef.durationMinutes },
-            ]
+            ...s.moodlets.filter((m) => m.id !== moodDef.id),
+            { id: moodDef.id, expiresAt: s.time + moodDef.durationMinutes },
+          ]
           : s.moodlets;
         const notice = {
           id: uid(),
@@ -3063,9 +3062,9 @@ export const useGameStore = create<GameState & GameActions>()(
         const moodDef = MOODLETS[veh.moodletId];
         const nextMoodlets = moodDef
           ? [
-              ...s.moodlets.filter((m) => m.id !== moodDef.id),
-              { id: moodDef.id, expiresAt: s.time + moodDef.durationMinutes },
-            ]
+            ...s.moodlets.filter((m) => m.id !== moodDef.id),
+            { id: moodDef.id, expiresAt: s.time + moodDef.durationMinutes },
+          ]
           : s.moodlets;
         const joyLabel = veh.joyrideLabel || veh.joyrideReward.label;
         const notice = {
@@ -3120,9 +3119,9 @@ export const useGameStore = create<GameState & GameActions>()(
         sfx.play('cash');
         const nextSim = def.equipAccessory
           ? {
-              ...s.sim,
-              appearance: { ...s.sim.appearance, accessory: def.equipAccessory },
-            }
+            ...s.sim,
+            appearance: { ...s.sim.appearance, accessory: def.equipAccessory },
+          }
           : s.sim;
         const passiveTxt = def.passiveBoost || def.passiveBadge;
         const notice = {
@@ -3195,10 +3194,10 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const nextStartup = def.startupDelta
           ? {
-              ...s.startup,
-              productProgress: clamp(s.startup.productProgress + def.startupDelta, 0, 100),
-              users: s.startup.users + Math.round(def.startupDelta * 15),
-            }
+            ...s.startup,
+            productProgress: clamp(s.startup.productProgress + def.startupDelta, 0, 100),
+            users: s.startup.users + Math.round(def.startupDelta * 15),
+          }
           : s.startup;
 
         const cashAdd = def.cashBonus || 0;
@@ -3213,9 +3212,9 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const nextSim = def.equipAccessory
           ? {
-              ...s.sim,
-              appearance: { ...s.sim.appearance, accessory: def.equipAccessory },
-            }
+            ...s.sim,
+            appearance: { ...s.sim.appearance, accessory: def.equipAccessory },
+          }
           : s.sim;
 
         sfx.play(cashAdd > 0 ? 'cash' : def.skillGain ? 'levelup' : 'tap');
@@ -3578,30 +3577,30 @@ export const useGameStore = create<GameState & GameActions>()(
           (nextStage === 'Weekend Prototype'
             ? 25000
             : nextStage === 'YC Batch'
-            ? 125000
-            : nextStage === 'Seed Funded'
-            ? 450000
-            : 1500000) * vcMult
+              ? 125000
+              : nextStage === 'Seed Funded'
+                ? 450000
+                : 1500000) * vcMult
         );
 
         const newVal = Math.round(
           (nextStage === 'Weekend Prototype'
             ? 3500000
             : nextStage === 'YC Batch'
-            ? 12000000
-            : nextStage === 'Seed Funded'
-            ? 42000000
-            : 1000000000) * vcMult
+              ? 12000000
+              : nextStage === 'Seed Funded'
+                ? 42000000
+                : 1000000000) * vcMult
         );
 
         const newMrr = Math.round(
           (nextStage === 'Weekend Prototype'
             ? 3500
             : nextStage === 'YC Batch'
-            ? 18000
-            : nextStage === 'Seed Funded'
-            ? 85000
-            : 320000) * vcMult
+              ? 18000
+              : nextStage === 'Seed Funded'
+                ? 85000
+                : 320000) * vcMult
         );
 
         const fin = recordCashFlow(ensureFinanceState(s), {
@@ -3874,22 +3873,22 @@ export const useGameStore = create<GameState & GameActions>()(
             : s.job;
         const nextStartup = opts.startupDelta
           ? {
-              ...s.startup,
-              productProgress: clamp(s.startup.productProgress + opts.startupDelta, 0, 100),
-              users: s.startup.users + Math.max(0, Math.round(opts.startupDelta * 18)),
-            }
+            ...s.startup,
+            productProgress: clamp(s.startup.productProgress + opts.startupDelta, 0, 100),
+            users: s.startup.users + Math.max(0, Math.round(opts.startupDelta * 18)),
+          }
           : s.startup;
 
         sfx.play(cashAdd > 0 ? 'cash' : opts.skillDelta || opts.karmaDelta ? 'levelup' : 'tap');
 
         const notice = opts.toastText
           ? {
-              id: uid(),
-              text: opts.toastText,
-              emoji: opts.emoji || '⚡',
-              tone: (cashAdd > 0 ? 'cash' : 'good') as 'cash' | 'good',
-              time: s.time,
-            }
+            id: uid(),
+            text: opts.toastText,
+            emoji: opts.emoji || '⚡',
+            tone: (cashAdd > 0 ? 'cash' : 'good') as 'cash' | 'good',
+            time: s.time,
+          }
           : null;
 
         let fin = ensureFinanceState(s);
@@ -3984,10 +3983,10 @@ export const useGameStore = create<GameState & GameActions>()(
             finance.marketRegime === 'AI Supercycle'
               ? 0.0022
               : finance.marketRegime === 'Rate Cut Rally'
-              ? 0.0014
-              : finance.marketRegime === 'Sector Rotation'
-              ? 0.0008
-              : -0.0011;
+                ? 0.0014
+                : finance.marketRegime === 'Sector Rotation'
+                  ? 0.0008
+                  : -0.0011;
           const nextPrices = { ...finance.marketPrices };
           const nextHist = { ...finance.marketHistory };
           for (const asset of MARKET_ASSETS) {
@@ -3996,7 +3995,7 @@ export const useGameStore = create<GameState & GameActions>()(
               asset.drift / 10 +
               (asset.sector === 'Treasury Yield' ? 0.0001 : regimeBias) +
               (Math.sin(newHourBucket * 1.37 + asset.basePrice) * 0.45 + (Math.random() - 0.48) * 0.55) *
-                (asset.volatility / 4);
+              (asset.volatility / 4);
             const updatedP = Math.max(
               asset.basePrice * 0.35,
               +(curP * (1 + hourlyStep)).toFixed(2)
@@ -4030,10 +4029,10 @@ export const useGameStore = create<GameState & GameActions>()(
             headlineItem.regime === 'AI Supercycle'
               ? 1.35
               : headlineItem.regime === 'Rate Cut Rally'
-              ? 1.15
-              : headlineItem.regime === 'Sector Rotation'
-              ? 1.05
-              : 0.65;
+                ? 1.15
+                : headlineItem.regime === 'Sector Rotation'
+                  ? 1.05
+                  : 0.65;
 
           for (const asset of MARKET_ASSETS) {
             const curP = nextPrices[asset.ticker] || asset.basePrice;
@@ -4637,8 +4636,8 @@ export const useGameStore = create<GameState & GameActions>()(
                 const scaledDelta =
                   rawDelta > 0
                     ? rawDelta *
-                      circadianRecoveryMult *
-                      (k === 'energy' || k === 'hygiene' || k === 'fun' ? homeCareMult : 1.0)
+                    circadianRecoveryMult *
+                    (k === 'energy' || k === 'hygiene' || k === 'fun' ? homeCareMult : 1.0)
                     : rawDelta;
                 const delta = scaledDelta * progressStep;
                 needs[k] = clamp(needs[k] + delta);
@@ -4651,22 +4650,22 @@ export const useGameStore = create<GameState & GameActions>()(
                   locationId === 'home' ? currentHomeDef.bonuses?.skillXpMult ?? 1.0 : 1.0;
                 const tenXMult =
                   s.sim.traits.includes('tenXEngineer') &&
-                  (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
+                    (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
                     ? 1.3
                     : 1.0;
                 const rubberDuckMult =
                   s.unlockedPerks.includes('perk_rubber_duck') &&
-                  (sk === 'coding' || sk === 'systemDesign')
+                    (sk === 'coding' || sk === 'systemDesign')
                     ? 1.15
                     : 1.0;
                 const perkMult =
                   s.unlockedPerks.includes('perk_flow_state') &&
-                  (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
+                    (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
                     ? 1.3
                     : 1.0;
                 const superConnSkillMult =
                   s.unlockedPerks.includes('perk_super_connector') &&
-                  (sk === 'charisma' || sk === 'hustle')
+                    (sk === 'charisma' || sk === 'hustle')
                     ? 1.5
                     : 1.0;
                 const principalMult = s.unlockedPerks.includes('perk_principal_architect')
@@ -4674,7 +4673,7 @@ export const useGameStore = create<GameState & GameActions>()(
                   : 1.0;
                 const edcMacbookMult =
                   (s.inventory || []).some((i) => i.itemId === 'edc_macbook' && i.quantity > 0) &&
-                  (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
+                    (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
                     ? 1.05
                     : 1.0;
                 const prevFloor = Math.floor(skills[sk]);
@@ -4683,14 +4682,14 @@ export const useGameStore = create<GameState & GameActions>()(
                   +(
                     skills[sk] +
                     (def.skillGain.amount / 100) *
-                      progressStep *
-                      tenXMult *
-                      rubberDuckMult *
-                      perkMult *
-                      superConnSkillMult *
-                      principalMult *
-                      edcMacbookMult *
-                      homeSkillMult
+                    progressStep *
+                    tenXMult *
+                    rubberDuckMult *
+                    perkMult *
+                    superConnSkillMult *
+                    principalMult *
+                    edcMacbookMult *
+                    homeSkillMult
                   ).toFixed(3)
                 );
                 const newFloor = Math.floor(skills[sk]);

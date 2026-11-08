@@ -297,8 +297,8 @@ export const WorldMapModal: React.FC = () => {
     selectedTarget.kind === 'venue'
       ? selectedTarget.loc.id
       : selectedTarget.home.id === homeId
-      ? 'home'
-      : selectedTarget.home.id;
+        ? 'home'
+        : selectedTarget.home.id;
 
   const isAlreadyHere =
     (selectedTarget.kind === 'venue' && selectedTarget.loc.id === locationId) ||
@@ -327,10 +327,10 @@ export const WorldMapModal: React.FC = () => {
   const venueActions =
     selectedTarget.kind === 'venue'
       ? Array.from(
-          new Set(selectedTarget.loc.stations.flatMap((st) => st.actionIds))
-        )
-          .map((id) => ACTIONS[id])
-          .filter(Boolean)
+        new Set(selectedTarget.loc.stations.flatMap((st) => st.actionIds))
+      )
+        .map((id) => ACTIONS[id])
+        .filter(Boolean)
       : [];
 
   const handleReturnHomeNow = () => {
@@ -348,10 +348,10 @@ export const WorldMapModal: React.FC = () => {
       hasCar
         ? 'tesla'
         : cash >= selEst.fare && !activeModeDef.requiresCar
-        ? selectedMode
-        : cash >= gbusEst.fare
-        ? 'gbus'
-        : 'caltrain';
+          ? selectedMode
+          : cash >= gbusEst.fare
+            ? 'gbus'
+            : 'caltrain';
     travelTo('home', modeToUse);
   };
 
@@ -441,11 +441,10 @@ export const WorldMapModal: React.FC = () => {
                 setPinLayerFilter('all');
               }
             }}
-            className={`btn-press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold shadow-sm transition-all ${
-              mapHouseHuntMode
+            className={`btn-press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold shadow-sm transition-all ${mapHouseHuntMode
                 ? 'bg-[#0284C7] text-white ring-2 ring-sky-300'
                 : 'border border-sky-400/50 bg-white/90 text-[#0284C7] hover:bg-sky-50 dark:bg-slate-900/90 dark:text-sky-300'
-            }`}
+              }`}
             title="Show all 5 Bay Area residences on the map when house hunting via Bluefin"
           >
             <span>🐟</span>
@@ -470,11 +469,10 @@ export const WorldMapModal: React.FC = () => {
             <button
               key={d}
               onClick={() => setDistrictFilter(d)}
-              className={`btn-press rounded-full px-3 py-1.5 text-xs font-semibold ${
-                districtFilter === d
+              className={`btn-press rounded-full px-3 py-1.5 text-xs font-semibold ${districtFilter === d
                   ? 'bg-[#007AFF] text-white shadow-sm'
                   : 'apple-pill text-[var(--ink)]'
-              }`}
+                }`}
             >
               {d}
             </button>
@@ -535,32 +533,30 @@ export const WorldMapModal: React.FC = () => {
                     setDistrictFilter('All');
                     setSelectedTarget({ kind: 'home', home: h });
                   }}
-                  className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${
-                    isSelected
+                  className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${isSelected
                       ? 'border-[#0284C7] bg-[#0284C7] text-white shadow-sm'
                       : isCurrent
-                      ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
-                      : 'border-white/50 bg-white/85 text-slate-800 hover:bg-white dark:border-white/10 dark:bg-slate-900/85 dark:text-slate-200'
-                  }`}
+                        ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+                        : 'border-white/50 bg-white/85 text-slate-800 hover:bg-white dark:border-white/10 dark:bg-slate-900/85 dark:text-slate-200'
+                    }`}
                 >
                   <span>{h.emoji}</span>
                   <span>{h.shortName}</span>
                   <span
-                    className={`rounded-full px-1.5 py-0.2 text-[9px] font-extrabold ${
-                      isSelected
+                    className={`rounded-full px-1.5 py-0.2 text-[9px] font-extrabold ${isSelected
                         ? 'bg-white/25 text-white'
                         : isCurrent
-                        ? 'bg-emerald-600 text-white'
-                        : isOwned
-                        ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                        : 'bg-sky-500/15 text-[#0284C7] dark:text-sky-300'
-                    }`}
+                          ? 'bg-emerald-600 text-white'
+                          : isOwned
+                            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                            : 'bg-sky-500/15 text-[#0284C7] dark:text-sky-300'
+                      }`}
                   >
                     {isCurrent
                       ? 'YOUR HOME'
                       : isOwned
-                      ? '🔑 OWNED'
-                      : `T${h.tier} · $${(h.weeklyRent / 1000).toFixed(1)}k/wk`}
+                        ? '🔑 OWNED'
+                        : `T${h.tier} · $${(h.weeklyRent / 1000).toFixed(1)}k/wk`}
                   </span>
                 </button>
               );
@@ -572,11 +568,10 @@ export const WorldMapModal: React.FC = () => {
               setDistrictFilter('All');
               setSelectedTarget({ kind: 'home', home: homeDef });
             }}
-            className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${
-              selectedTarget.kind === 'home' && selectedTarget.home.id === homeId
+            className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${selectedTarget.kind === 'home' && selectedTarget.home.id === homeId
                 ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
                 : 'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
-            }`}
+              }`}
           >
             <span>🏠</span>
             <span>Your Home: {homeDef.shortName}</span>
@@ -606,22 +601,20 @@ export const WorldMapModal: React.FC = () => {
                   setSelectedTarget({ kind: 'venue', loc: spot });
                 }
               }}
-              className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${
-                isSpotSelected
+              className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${isSpotSelected
                   ? 'border-[#007AFF] bg-[#007AFF] text-white shadow-sm'
                   : isPlayerAtSpot
-                  ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
-                  : 'border-white/50 bg-white/85 text-slate-800 hover:bg-white dark:border-white/10 dark:bg-slate-900/85 dark:text-slate-200'
-              }`}
+                    ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+                    : 'border-white/50 bg-white/85 text-slate-800 hover:bg-white dark:border-white/10 dark:bg-slate-900/85 dark:text-slate-200'
+                }`}
             >
               <Portrait appearance={npc.appearance} size={18} />
               <span>{npc.name}</span>
               <span
-                className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
-                  isSpotSelected
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${isSpotSelected
                     ? 'bg-white/20 text-white'
                     : 'bg-black/5 text-slate-600 dark:bg-white/10 dark:text-slate-300'
-                }`}
+                  }`}
               >
                 {spot?.emoji} {spot?.shortName}
               </span>
@@ -634,9 +627,8 @@ export const WorldMapModal: React.FC = () => {
       <div className="relative z-10 grid flex-1 grid-cols-1 gap-4 overflow-hidden px-4 lg:grid-cols-12">
         {/* Stylized Zoom-Inable San Francisco Bay Area SVG Map */}
         <div
-          className={`apple-glass relative min-h-[320px] overflow-hidden rounded-3xl border border-white/50 shadow-inner select-none lg:col-span-7 dark:border-white/10 ${
-            isDraggingMap ? 'cursor-grabbing' : 'cursor-grab'
-          }`}
+          className={`apple-glass relative min-h-[320px] overflow-hidden rounded-3xl border border-white/50 shadow-inner select-none lg:col-span-7 dark:border-white/10 ${isDraggingMap ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
           onWheel={handleMapWheel}
           onMouseDown={handleMapMouseDown}
           onMouseMove={handleMapMouseMove}
@@ -717,11 +709,10 @@ export const WorldMapModal: React.FC = () => {
                     !ownedHomes.includes(selectedTarget.home.id) &&
                     cash < selectedTarget.home.weeklyRent
                   }
-                  className={`btn-press rounded-full px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs disabled:opacity-45 ${
-                    isInspectingOtherHome
+                  className={`btn-press rounded-full px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs disabled:opacity-45 ${isInspectingOtherHome
                       ? 'bg-amber-500 hover:bg-amber-600'
                       : 'bg-[#007AFF] hover:bg-[#0066CC]'
-                  }`}
+                    }`}
                 >
                   {isInspectingOtherHome ? '🏡 Lease' : `🚀 Go (${selectedFareLabel})`}
                 </button>
@@ -796,9 +787,8 @@ export const WorldMapModal: React.FC = () => {
 
           {/* Zoomable & Pannable Inner Map Stage */}
           <div
-            className={`relative h-full w-full ${
-              isDraggingMap ? '' : 'transition-transform duration-150 ease-out'
-            }`}
+            className={`relative h-full w-full ${isDraggingMap ? '' : 'transition-transform duration-150 ease-out'
+              }`}
             style={{
               transform: `translate(${mapPan.x}px, ${mapPan.y}px) scale(${mapZoom})`,
               transformOrigin: 'center center',
@@ -1115,17 +1105,16 @@ export const WorldMapModal: React.FC = () => {
                       top: `${h.mapCoords.y}%`,
                       transform: `translate(-50%, -50%) scale(${pinScale})`,
                     }}
-                    className={`absolute flex flex-col items-center transition-opacity ${
-                      isHomeHere
+                    className={`absolute flex flex-col items-center transition-opacity ${isHomeHere
                         ? 'z-40'
                         : isSelected
-                        ? 'z-35'
-                        : isCurrentHome
-                        ? 'z-30'
-                        : matchesDistrict
-                        ? 'z-20'
-                        : 'z-10 opacity-35'
-                    }`}
+                          ? 'z-35'
+                          : isCurrentHome
+                            ? 'z-30'
+                            : matchesDistrict
+                              ? 'z-20'
+                              : 'z-10 opacity-35'
+                      }`}
                   >
                     {/* Top Status Badge */}
                     {isHomeHere ? (
@@ -1149,15 +1138,14 @@ export const WorldMapModal: React.FC = () => {
                         if (mapDragRef.current.moved) return;
                         setSelectedTarget({ kind: 'home', home: h });
                       }}
-                      className={`btn-press relative flex items-center justify-center rounded-full transition-all ${
-                        isHomeHere
+                      className={`btn-press relative flex items-center justify-center rounded-full transition-all ${isHomeHere
                           ? 'bg-emerald-500 p-1 text-white shadow-xl ring-4 ring-emerald-300'
                           : isSelected
-                          ? 'scale-110 bg-[#0284C7] px-2.5 py-1.5 text-white shadow-lg ring-4 ring-sky-400/50'
-                          : isCurrentHome
-                          ? 'bg-emerald-600 px-2.5 py-1 text-white shadow-md ring-2 ring-white'
-                          : 'bg-sky-50/95 px-2 py-1 text-sky-950 shadow-md ring-2 ring-[#0284C7]/80 hover:scale-105 dark:bg-slate-900/95 dark:text-sky-200'
-                      }`}
+                            ? 'scale-110 bg-[#0284C7] px-2.5 py-1.5 text-white shadow-lg ring-4 ring-sky-400/50'
+                            : isCurrentHome
+                              ? 'bg-emerald-600 px-2.5 py-1 text-white shadow-md ring-2 ring-white'
+                              : 'bg-sky-50/95 px-2 py-1 text-sky-950 shadow-md ring-2 ring-[#0284C7]/80 hover:scale-105 dark:bg-slate-900/95 dark:text-sky-200'
+                        }`}
                     >
                       {isHomeHere && (
                         <span className="pointer-events-none absolute -inset-1.5 animate-ping rounded-full bg-emerald-400/50" />
@@ -1183,29 +1171,27 @@ export const WorldMapModal: React.FC = () => {
                         if (mapDragRef.current.moved) return;
                         setSelectedTarget({ kind: 'home', home: h });
                       }}
-                      className={`mt-1 flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${
-                        isHomeHere
+                      className={`mt-1 flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${isHomeHere
                           ? 'bg-emerald-700 text-white ring-1 ring-emerald-300'
                           : isSelected
-                          ? 'bg-[#0284C7] text-white ring-1 ring-white/80'
-                          : isCurrentHome
-                          ? 'bg-emerald-700 text-white ring-1 ring-white/80'
-                          : 'bg-sky-50/95 text-sky-950 ring-1 ring-[#0284C7]/60 dark:bg-slate-900/95 dark:text-sky-100'
-                      }`}
+                            ? 'bg-[#0284C7] text-white ring-1 ring-white/80'
+                            : isCurrentHome
+                              ? 'bg-emerald-700 text-white ring-1 ring-white/80'
+                              : 'bg-sky-50/95 text-sky-950 ring-1 ring-[#0284C7]/60 dark:bg-slate-900/95 dark:text-sky-100'
+                        }`}
                     >
                       <span>{isCurrentHome ? `🏠 ${h.shortName}` : `🐟 ${h.shortName}`}</span>
                       <span
-                        className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-black ${
-                          isHomeHere || isSelected || isCurrentHome
+                        className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-black ${isHomeHere || isSelected || isCurrentHome
                             ? 'bg-white/25 text-white'
                             : 'bg-[#0284C7]/15 text-[#0284C7] dark:text-sky-300'
-                        }`}
+                          }`}
                       >
                         {isCurrentHome
                           ? `T${h.tier}`
                           : isOwned
-                          ? '🔑 OWNED'
-                          : `T${h.tier} · $${(h.weeklyRent / 1000).toFixed(1)}k`}
+                            ? '🔑 OWNED'
+                            : `T${h.tier} · $${(h.weeklyRent / 1000).toFixed(1)}k`}
                       </span>
                     </button>
                   </div>
@@ -1232,17 +1218,16 @@ export const WorldMapModal: React.FC = () => {
                       top: `${coords.y}%`,
                       transform: `translate(-50%, -50%) scale(${pinScale})`,
                     }}
-                    className={`absolute flex flex-col items-center transition-opacity ${
-                      isHere
+                    className={`absolute flex flex-col items-center transition-opacity ${isHere
                         ? 'z-40'
                         : isSelected
-                        ? 'z-35'
-                        : isCompanyHq
-                        ? 'z-25'
-                        : matchesDistrict
-                        ? 'z-20'
-                        : 'z-10 opacity-35'
-                    }`}
+                          ? 'z-35'
+                          : isCompanyHq
+                            ? 'z-25'
+                            : matchesDistrict
+                              ? 'z-20'
+                              : 'z-10 opacity-35'
+                      }`}
                   >
                     {/* Floating "🏢 YOUR HQ" Badge */}
                     {isCompanyHq && job && (
@@ -1269,13 +1254,12 @@ export const WorldMapModal: React.FC = () => {
                         if (mapDragRef.current.moved) return;
                         setSelectedTarget({ kind: 'venue', loc });
                       }}
-                      className={`btn-press relative flex items-center justify-center rounded-full transition-all ${
-                        isHere
+                      className={`btn-press relative flex items-center justify-center rounded-full transition-all ${isHere
                           ? 'bg-emerald-500 p-1 text-white shadow-xl ring-4 ring-emerald-300'
                           : isSelected
-                          ? 'scale-110 bg-[#007AFF] px-2.5 py-1.5 text-white shadow-lg ring-4 ring-[#007AFF]/40'
-                          : 'bg-white/95 px-2.5 py-1 text-slate-900 shadow-md ring-1 ring-slate-300 hover:scale-105 dark:bg-slate-900/95 dark:text-white dark:ring-slate-700'
-                      }`}
+                            ? 'scale-110 bg-[#007AFF] px-2.5 py-1.5 text-white shadow-lg ring-4 ring-[#007AFF]/40'
+                            : 'bg-white/95 px-2.5 py-1 text-slate-900 shadow-md ring-1 ring-slate-300 hover:scale-105 dark:bg-slate-900/95 dark:text-white dark:ring-slate-700'
+                        }`}
                     >
                       {isHere && (
                         <span className="pointer-events-none absolute -inset-1.5 animate-ping rounded-full bg-emerald-400/50" />
@@ -1301,21 +1285,19 @@ export const WorldMapModal: React.FC = () => {
                         if (mapDragRef.current.moved) return;
                         setSelectedTarget({ kind: 'venue', loc });
                       }}
-                      className={`mt-1 flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${
-                        isHere
+                      className={`mt-1 flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${isHere
                           ? 'bg-emerald-700 text-white ring-1 ring-emerald-300'
                           : isSelected
-                          ? 'bg-[#007AFF] text-white ring-1 ring-white/80'
-                          : 'bg-white/95 text-slate-900 ring-1 ring-slate-200 hover:bg-white dark:bg-slate-900/95 dark:text-slate-100 dark:ring-slate-700'
-                      }`}
+                            ? 'bg-[#007AFF] text-white ring-1 ring-white/80'
+                            : 'bg-white/95 text-slate-900 ring-1 ring-slate-200 hover:bg-white dark:bg-slate-900/95 dark:text-slate-100 dark:ring-slate-700'
+                        }`}
                     >
                       <span>{loc.shortName}</span>
                       <span
-                        className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-black ${
-                          isHere || isSelected
+                        className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-black ${isHere || isSelected
                             ? 'bg-white/25 text-white'
                             : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
-                        }`}
+                          }`}
                       >
                         👥 {npcsAtLoc.length}
                       </span>
@@ -1355,19 +1337,17 @@ export const WorldMapModal: React.FC = () => {
               </div>
             ) : (
               <div
-                className={`rounded-2xl border px-3.5 py-2.5 ${
-                  isInspectingOtherHome
+                className={`rounded-2xl border px-3.5 py-2.5 ${isInspectingOtherHome
                     ? 'border-amber-500/40 bg-amber-500/12'
                     : 'border-[#007AFF]/35 bg-[#007AFF]/10'
-                }`}
+                  }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <div
-                    className={`flex items-center gap-1.5 text-[10px] font-extrabold tracking-wider uppercase ${
-                      isInspectingOtherHome
+                    className={`flex items-center gap-1.5 text-[10px] font-extrabold tracking-wider uppercase ${isInspectingOtherHome
                         ? 'text-amber-700 dark:text-amber-300'
                         : 'text-[#007AFF]'
-                    }`}
+                      }`}
                   >
                     <Navigation className="size-3" />
                     <span>
@@ -1392,9 +1372,8 @@ export const WorldMapModal: React.FC = () => {
                   </span>
                   <ArrowRight className="size-3.5 shrink-0 text-[#007AFF]" />
                   <span
-                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-white ${
-                      isInspectingOtherHome ? 'bg-amber-600' : 'bg-[#007AFF]'
-                    }`}
+                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-white ${isInspectingOtherHome ? 'bg-amber-600' : 'bg-[#007AFF]'
+                      }`}
                   >
                     <span>
                       To{' '}
@@ -1435,8 +1414,8 @@ export const WorldMapModal: React.FC = () => {
                             {isCurrent
                               ? 'Your Active Residence'
                               : isOwned
-                              ? '🔑 Deed Owned'
-                              : `${formatCurrency(h.weeklyRent)}/wk Lease`}
+                                ? '🔑 Deed Owned'
+                                : `${formatCurrency(h.weeklyRent)}/wk Lease`}
                           </span>
                         </div>
                         <h2 className="mt-0.5 text-base font-extrabold leading-snug sm:text-lg">
@@ -1530,11 +1509,10 @@ export const WorldMapModal: React.FC = () => {
                                 </span>
                                 {!isCurrent && timeDiff !== 0 && (
                                   <span
-                                    className={`rounded-md px-1.5 py-0.5 text-[10px] ${
-                                      timeDiff < 0
+                                    className={`rounded-md px-1.5 py-0.5 text-[10px] ${timeDiff < 0
                                         ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                                         : 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
-                                    }`}
+                                      }`}
                                   >
                                     {timeDiff < 0 ? `${timeDiff}m faster` : `+${timeDiff}m`}
                                   </span>
@@ -1791,9 +1769,9 @@ export const WorldMapModal: React.FC = () => {
                     const display =
                       isPersonalCarMode && activeVehicle
                         ? {
-                            shortTitle: activeVehicle.name,
-                            subtitle: `${activeVehicle.tierLabel} · $0 Fare`,
-                          }
+                          shortTitle: activeVehicle.name,
+                          subtitle: `${activeVehicle.tierLabel} · $0 Fare`,
+                        }
                         : COMMUTE_DISPLAY_LABELS[m.id];
                     const cardEmoji =
                       isPersonalCarMode && activeVehicle ? activeVehicle.emoji : m.emoji;
@@ -1816,25 +1794,23 @@ export const WorldMapModal: React.FC = () => {
                           }
                           setSelectedMode(m.id);
                         }}
-                        className={`btn-press flex flex-col justify-between rounded-2xl border p-2.5 text-left transition-all ${
-                          active
+                        className={`btn-press flex flex-col justify-between rounded-2xl border p-2.5 text-left transition-all ${active
                             ? 'border-[#007AFF] bg-[#007AFF]/15 ring-2 ring-[#007AFF]/30 shadow-sm'
                             : lockedCar
-                            ? 'border-[#007AFF]/35 bg-[#007AFF]/8 hover:border-[#007AFF]'
-                            : isLocked
-                            ? 'cursor-not-allowed border-rose-500/25 bg-[var(--mist)] opacity-75'
-                            : 'border-transparent bg-[var(--mist)] hover:border-[#007AFF]/40'
-                        }`}
+                              ? 'border-[#007AFF]/35 bg-[#007AFF]/8 hover:border-[#007AFF]'
+                              : isLocked
+                                ? 'cursor-not-allowed border-rose-500/25 bg-[var(--mist)] opacity-75'
+                                : 'border-transparent bg-[var(--mist)] hover:border-[#007AFF]/40'
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-base">{cardEmoji}</span>
                           <div className="flex items-center gap-1">
                             <span
-                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${
-                                modeEst.fare === 0
+                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${modeEst.fare === 0
                                   ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                                   : 'bg-white/80 text-slate-800 dark:bg-white/10 dark:text-slate-100'
-                              }`}
+                                }`}
                             >
                               {modeEst.fare === 0
                                 ? 'FREE'
@@ -1910,8 +1886,8 @@ export const WorldMapModal: React.FC = () => {
                   {ownedHomes.includes(selectedTarget.home.id)
                     ? `🔑 Move Into ${selectedTarget.home.name} ($0)`
                     : `🏡 Lease & Move Into ${selectedTarget.home.name} (${formatCurrency(
-                        selectedTarget.home.weeklyRent
-                      )}/wk)`}
+                      selectedTarget.home.weeklyRent
+                    )}/wk)`}
                 </span>
               </button>
             ) : (

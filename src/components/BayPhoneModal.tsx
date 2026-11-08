@@ -22,7 +22,7 @@ import {
   ensureFinanceState,
   formatCurrency,
   formatTime,
-   getDayNumber,
+  getDayNumber,
   useGameStore,
 } from '../store/useGameStore';
 import { CommuteModeId, MarketTicker, WorkMode } from '../types/game';
@@ -136,8 +136,8 @@ export const BayPhoneModal: React.FC = () => {
     rawPhoneApp === 'messages'
       ? 'blind'
       : rawPhoneApp === 'zillow'
-      ? 'bluefin'
-      : rawPhoneApp;
+        ? 'bluefin'
+        : rawPhoneApp;
   const setActiveModal = useGameStore((s) => s.setActiveModal);
   const cash = useGameStore((s) => s.cash);
   const vestedRsu = useGameStore((s) => s.vestedRsu);
@@ -246,48 +246,48 @@ export const BayPhoneModal: React.FC = () => {
     gradient: string;
     badge?: number | string;
   }> = [
-    {
-      id: 'levels',
-      label: 'Levels',
-      icon: <Briefcase className="size-4" />,
-      gradient: 'from-[#007AFF] to-[#5856D6]',
-      badge: job && job.performance >= 90 ? '!' : undefined,
-    },
-    {
-      id: 'wealth',
-      label: 'Schwaab',
-      icon: <TrendingUp className="size-4" />,
-      gradient: 'from-[#34C759] to-[#0D9488]',
-      badge: vestedRsu >= 500 ? '1' : undefined,
-    },
-    {
-      id: 'startup',
-      label: 'YC Studio',
-      icon: <Rocket className="size-4" />,
-      gradient: 'from-[#FF9500] to-[#FF3B30]',
-      badge: startup.productProgress >= 50 ? '1' : undefined,
-    },
-    {
-      id: 'doordash',
-      label: 'DoorDash',
-      icon: <ShoppingBag className="size-4" />,
-      gradient: 'from-[#FF3B30] to-[#E11D48]',
-      badge: pantryMeals <= 1 ? '!' : undefined,
-    },
-    {
-      id: 'bluefin',
-      label: 'Bluefin',
-      icon: <Home className="size-4" />,
-      gradient: 'from-[#0284C7] to-[#2563EB]',
-    },
-    {
-      id: 'blind',
-      label: 'Blind',
-      icon: <MessageSquare className="size-4" />,
-      gradient: 'from-[#AF52DE] to-[#EC4899]',
-      badge: '3',
-    },
-  ];
+      {
+        id: 'levels',
+        label: 'Levels',
+        icon: <Briefcase className="size-4" />,
+        gradient: 'from-[#007AFF] to-[#5856D6]',
+        badge: job && job.performance >= 90 ? '!' : undefined,
+      },
+      {
+        id: 'wealth',
+        label: 'Schwaab',
+        icon: <TrendingUp className="size-4" />,
+        gradient: 'from-[#34C759] to-[#0D9488]',
+        badge: vestedRsu >= 500 ? '1' : undefined,
+      },
+      {
+        id: 'startup',
+        label: 'YC Studio',
+        icon: <Rocket className="size-4" />,
+        gradient: 'from-[#FF9500] to-[#FF3B30]',
+        badge: startup.productProgress >= 50 ? '1' : undefined,
+      },
+      {
+        id: 'doordash',
+        label: 'DoorDash',
+        icon: <ShoppingBag className="size-4" />,
+        gradient: 'from-[#FF3B30] to-[#E11D48]',
+        badge: pantryMeals <= 1 ? '!' : undefined,
+      },
+      {
+        id: 'bluefin',
+        label: 'Bluefin',
+        icon: <Home className="size-4" />,
+        gradient: 'from-[#0284C7] to-[#2563EB]',
+      },
+      {
+        id: 'blind',
+        label: 'Blind',
+        icon: <MessageSquare className="size-4" />,
+        gradient: 'from-[#AF52DE] to-[#EC4899]',
+        badge: '3',
+      },
+    ];
 
   const currentBlitz = LEETCODE_BLITZ_PROBLEMS[blitzIdx % LEETCODE_BLITZ_PROBLEMS.length];
 
@@ -578,7 +578,7 @@ export const BayPhoneModal: React.FC = () => {
                                 <span
                                   className={
                                     Math.floor(skills[nextLevel.requiredSkill.skill]) >=
-                                    nextLevel.requiredSkill.level
+                                      nextLevel.requiredSkill.level
                                       ? 'text-emerald-600 dark:text-emerald-400'
                                       : 'text-amber-600 dark:text-amber-400'
                                   }
@@ -620,7 +620,7 @@ export const BayPhoneModal: React.FC = () => {
                                 <span
                                   className={
                                     Math.floor(skills[nextLevel.secondarySkill.skill]) >=
-                                    nextLevel.secondarySkill.level
+                                      nextLevel.secondarySkill.level
                                       ? 'text-emerald-600 dark:text-emerald-400'
                                       : 'text-amber-600 dark:text-amber-400'
                                   }
@@ -675,11 +675,10 @@ export const BayPhoneModal: React.FC = () => {
                           <span>QUICK WORK SHIFT DISPATCH</span>
                           <button
                             onClick={toggleAutoWork}
-                            className={`rounded-md px-2 py-0.5 text-[9px] font-black ${
-                              job.autoWork
+                            className={`rounded-md px-2 py-0.5 text-[9px] font-black ${job.autoWork
                                 ? 'bg-emerald-500 text-white'
                                 : 'bg-black/5 text-[var(--ink)] dark:bg-white/10'
-                            }`}
+                              }`}
                           >
                             Auto: {job.autoWork ? 'ON' : 'OFF'}
                           </button>
@@ -691,10 +690,10 @@ export const BayPhoneModal: React.FC = () => {
                               isAtCampus
                                 ? startWorkShift('office')
                                 : commuteToOfficeAndWork
-                                ? commuteToOfficeAndWork(
+                                  ? commuteToOfficeAndWork(
                                     ownedCars.length > 0 ? 'tesla' : job.preferredCommute
                                   )
-                                : startWorkShift('office')
+                                  : startWorkShift('office')
                             }
                             className="btn-press rounded-xl bg-emerald-600 py-2 text-[11px] font-extrabold text-white shadow-xs disabled:opacity-50"
                           >
@@ -797,11 +796,10 @@ export const BayPhoneModal: React.FC = () => {
                     <button
                       key={idx}
                       onClick={() => handleBlitzAnswer(opt.optimal)}
-                      className={`btn-press flex flex-wrap items-center justify-between gap-1.5 rounded-xl px-3 py-2 text-left text-xs font-bold transition-all ${
-                        blitzFeedback === 'win' && opt.optimal
+                      className={`btn-press flex flex-wrap items-center justify-between gap-1.5 rounded-xl px-3 py-2 text-left text-xs font-bold transition-all ${blitzFeedback === 'win' && opt.optimal
                           ? 'bg-emerald-500 text-white shadow-sm'
                           : 'bg-white/75 hover:bg-white dark:bg-white/10 dark:hover:bg-white/15'
-                      }`}
+                        }`}
                     >
                       <span>{opt.label}</span>
                       <span className="shrink-0 rounded-md bg-black/5 px-2 py-0.5 font-mono text-[10px] text-[var(--ink-soft)] dark:bg-white/10">
@@ -848,13 +846,12 @@ export const BayPhoneModal: React.FC = () => {
                     return (
                       <div
                         key={c.id}
-                        className={`flex flex-col justify-between rounded-2xl p-3 border transition-all space-y-2 ${
-                          isCurrent
+                        className={`flex flex-col justify-between rounded-2xl p-3 border transition-all space-y-2 ${isCurrent
                             ? 'bg-[#007AFF]/10 border-[#007AFF]/40'
                             : canPassGate
-                            ? 'bg-[var(--mist)] border-emerald-500/35'
-                            : 'bg-[var(--mist)] border-transparent'
-                        }`}
+                              ? 'bg-[var(--mist)] border-emerald-500/35'
+                              : 'bg-[var(--mist)] border-transparent'
+                          }`}
                       >
                         <div className="space-y-1.5">
                           <div className="flex items-start justify-between gap-2">
@@ -898,11 +895,10 @@ export const BayPhoneModal: React.FC = () => {
                                   return (
                                     <span
                                       key={nid}
-                                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${
-                                        hasNode
+                                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${hasNode
                                           ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                           : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
-                                      }`}
+                                        }`}
                                     >
                                       {hasNode ? '✓' : '🔒'} {nodeDef?.emoji} {nodeDef?.title || nid}
                                     </span>
@@ -916,11 +912,10 @@ export const BayPhoneModal: React.FC = () => {
                                   return (
                                     <span
                                       key={req.skill}
-                                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
-                                        met
+                                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${met
                                           ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                           : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                                      }`}
+                                        }`}
                                     >
                                       {met ? '✓' : '🔒'} {skMeta?.emoji} {req.skill} Lv.{req.level} (at Lv.{curLvl})
                                     </span>
@@ -929,11 +924,10 @@ export const BayPhoneModal: React.FC = () => {
 
                                 {minDeliv > 0 && (
                                   <span
-                                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
-                                      delivMet
+                                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${delivMet
                                         ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                         : 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
-                                    }`}
+                                      }`}
                                   >
                                     {delivMet ? '✓' : '🔒'} 📦 {curDeliv}/{minDeliv} Deliverable
                                   </span>
@@ -947,19 +941,18 @@ export const BayPhoneModal: React.FC = () => {
                           <button
                             disabled={isCurrent}
                             onClick={() => applyJob(c.id)}
-                            className={`btn-press flex-1 rounded-xl py-1.5 text-[11px] font-extrabold ${
-                              isCurrent
+                            className={`btn-press flex-1 rounded-xl py-1.5 text-[11px] font-extrabold ${isCurrent
                                 ? 'bg-emerald-500/20 text-emerald-600'
                                 : canPassGate
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-[#007AFF] text-white'
-                            }`}
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-[#007AFF] text-white'
+                              }`}
                           >
                             {isCurrent
                               ? '✓ Current Track'
                               : canPassGate
-                              ? `🎯 Sit Onsite Loop (-${entryReq?.interviewEnergyCost ?? 15} ⚡)`
-                              : '🔒 Attempt Onsite Loop'}
+                                ? `🎯 Sit Onsite Loop (-${entryReq?.interviewEnergyCost ?? 15} ⚡)`
+                                : '🔒 Attempt Onsite Loop'}
                           </button>
                           {!isCurrent && !canPassGate && (
                             <button
@@ -1004,11 +997,10 @@ export const BayPhoneModal: React.FC = () => {
                         <button
                           key={tf}
                           onClick={() => setChartRange(tf)}
-                          className={`rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${
-                            chartRange === tf
+                          className={`rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${chartRange === tf
                               ? 'bg-emerald-600 text-white'
                               : 'bg-black/5 text-[var(--ink-soft)] dark:bg-white/10'
-                          }`}
+                            }`}
                         >
                           {tf}
                         </button>
@@ -1271,11 +1263,10 @@ export const BayPhoneModal: React.FC = () => {
                   <button
                     disabled={startup.productProgress < 50}
                     onClick={pitchStartupVC}
-                    className={`btn-press flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-extrabold text-white shadow-sm ${
-                      startup.productProgress >= 50
+                    className={`btn-press flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-extrabold text-white shadow-sm ${startup.productProgress >= 50
                         ? 'bg-emerald-600 animate-pulse'
                         : 'bg-orange-500/70 opacity-75 cursor-not-allowed'
-                    }`}
+                      }`}
                   >
                     <Sparkles className="size-4 shrink-0" />
                     <span>
@@ -1428,11 +1419,10 @@ export const BayPhoneModal: React.FC = () => {
                     <button
                       key={f.id}
                       onClick={() => setBluefinFilter(f.id)}
-                      className={`rounded-xl py-1 text-[10px] font-extrabold transition-all ${
-                        bluefinFilter === f.id
+                      className={`rounded-xl py-1 text-[10px] font-extrabold transition-all ${bluefinFilter === f.id
                           ? 'bg-[#0284C7] text-white shadow-xs'
                           : 'text-[var(--ink-soft)]'
-                      }`}
+                        }`}
                     >
                       {f.label}
                     </button>
@@ -1470,11 +1460,10 @@ export const BayPhoneModal: React.FC = () => {
                 return (
                   <div
                     key={h.id}
-                    className={`rounded-3xl border p-3.5 transition-all ${
-                      isCurrent
+                    className={`rounded-3xl border p-3.5 transition-all ${isCurrent
                         ? 'border-[#0284C7]/60 bg-[#0284C7]/12 ring-1 ring-[#0284C7]/30'
                         : 'border-black/5 bg-[var(--mist)] dark:border-white/5'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2.5">
@@ -1484,15 +1473,14 @@ export const BayPhoneModal: React.FC = () => {
                         <div>
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
-                              className={`rounded-full px-2 py-0.5 text-[9.5px] font-extrabold ${
-                                h.tier >= 5
+                              className={`rounded-full px-2 py-0.5 text-[9.5px] font-extrabold ${h.tier >= 5
                                   ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
                                   : h.tier >= 4
-                                  ? 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
-                                  : h.tier >= 3
-                                  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                              }`}
+                                    ? 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
+                                    : h.tier >= 3
+                                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                      : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                                }`}
                             >
                               {h.tierLabel}
                             </span>
@@ -1576,10 +1564,10 @@ export const BayPhoneModal: React.FC = () => {
                         {isCurrent
                           ? '🏠 Current'
                           : isOwned
-                          ? '🔑 Move In'
-                          : canAffordRent
-                          ? `Lease ${formatCurrency(h.weeklyRent)}`
-                          : `Need ${formatCurrency(h.weeklyRent)}`}
+                            ? '🔑 Move In'
+                            : canAffordRent
+                              ? `Lease ${formatCurrency(h.weeklyRent)}`
+                              : `Need ${formatCurrency(h.weeklyRent)}`}
                       </button>
                       <button
                         disabled={isOwned || !canAffordBuy}
@@ -1589,8 +1577,8 @@ export const BayPhoneModal: React.FC = () => {
                         {isOwned
                           ? '✓ Owned'
                           : canAffordBuy
-                          ? `Buy ${formatCurrency(h.buyPrice)}`
-                          : `Deed ${formatCurrency(h.buyPrice)}`}
+                            ? `Buy ${formatCurrency(h.buyPrice)}`
+                            : `Deed ${formatCurrency(h.buyPrice)}`}
                       </button>
                       <button
                         onClick={() => openBluefinMap(h.id)}
@@ -1614,17 +1602,15 @@ export const BayPhoneModal: React.FC = () => {
               <div className="grid grid-cols-2 rounded-2xl bg-[var(--mist)] p-1">
                 <button
                   onClick={() => setBlindTab('dm')}
-                  className={`rounded-xl py-1.5 text-xs font-extrabold transition-all ${
-                    blindTab === 'dm' ? 'bg-[#007AFF] text-white shadow-sm' : 'text-[var(--ink-soft)]'
-                  }`}
+                  className={`rounded-xl py-1.5 text-xs font-extrabold transition-all ${blindTab === 'dm' ? 'bg-[#007AFF] text-white shadow-sm' : 'text-[var(--ink-soft)]'
+                    }`}
                 >
                   💬 iMessage Network
                 </button>
                 <button
                   onClick={() => setBlindTab('feed')}
-                  className={`rounded-xl py-1.5 text-xs font-extrabold transition-all ${
-                    blindTab === 'feed' ? 'bg-[#AF52DE] text-white shadow-sm' : 'text-[var(--ink-soft)]'
-                  }`}
+                  className={`rounded-xl py-1.5 text-xs font-extrabold transition-all ${blindTab === 'feed' ? 'bg-[#AF52DE] text-white shadow-sm' : 'text-[var(--ink-soft)]'
+                    }`}
                 >
                   🔥 Verified Blind
                 </button>
@@ -1709,11 +1695,10 @@ export const BayPhoneModal: React.FC = () => {
                         <div className="flex items-center justify-between pt-1">
                           <button
                             onClick={() => handleLikeBlindPost(post.id)}
-                            className={`btn-press inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${
-                              liked
+                            className={`btn-press inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${liked
                                 ? 'bg-rose-500 text-white'
                                 : 'bg-black/5 text-[var(--ink-soft)] dark:bg-white/10'
-                            }`}
+                              }`}
                           >
                             <Heart className="size-3" /> {post.likes + (liked ? 1 : 0)}
                           </button>
@@ -1742,9 +1727,8 @@ export const BayPhoneModal: React.FC = () => {
                   className="btn-press group relative flex flex-col items-center gap-0.5"
                 >
                   <div
-                    className={`relative grid size-10 place-items-center rounded-2xl bg-gradient-to-br ${app.gradient} text-white shadow-md transition-transform ${
-                      active ? 'scale-110 ring-2 ring-white' : 'opacity-85 hover:opacity-100'
-                    }`}
+                    className={`relative grid size-10 place-items-center rounded-2xl bg-gradient-to-br ${app.gradient} text-white shadow-md transition-transform ${active ? 'scale-110 ring-2 ring-white' : 'opacity-85 hover:opacity-100'
+                      }`}
                   >
                     {app.icon}
                     {app.badge && (
@@ -1754,9 +1738,8 @@ export const BayPhoneModal: React.FC = () => {
                     )}
                   </div>
                   <span
-                    className={`text-[9px] font-extrabold tracking-tight ${
-                      active ? 'text-[#007AFF]' : 'text-[var(--ink-soft)]'
-                    }`}
+                    className={`text-[9px] font-extrabold tracking-tight ${active ? 'text-[#007AFF]' : 'text-[var(--ink-soft)]'
+                      }`}
                   >
                     {app.label}
                   </span>

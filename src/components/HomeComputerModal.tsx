@@ -561,9 +561,8 @@ export const HomeComputerModal: React.FC = () => {
             </span>
 
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
-                powered ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/30 text-rose-300'
-              }`}
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${powered ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/30 text-rose-300'
+                }`}
             >
               {powered ? <Zap className="size-3" /> : <ZapOff className="size-3" />}
               <span>{powered ? 'AC Power' : 'Outage'}</span>
@@ -592,11 +591,10 @@ export const HomeComputerModal: React.FC = () => {
               <>
                 <button
                   onClick={() => setActiveTab('ide')}
-                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                    activeTab === 'ide'
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${activeTab === 'ide'
                       ? 'bg-[#007AFF] text-white shadow-xs'
                       : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                  }`}
+                    }`}
                 >
                   <Terminal className="size-3.5" />
                   <span>💻 Cursor IDE & Terminal</span>
@@ -604,11 +602,10 @@ export const HomeComputerModal: React.FC = () => {
 
                 <button
                   onClick={() => setActiveTab('ai_lab')}
-                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                    activeTab === 'ai_lab'
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${activeTab === 'ai_lab'
                       ? 'bg-purple-600 text-white shadow-xs'
                       : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                  }`}
+                    }`}
                 >
                   <Cpu className="size-3.5" />
                   <span>🧠 Local AI & GPU Lab</span>
@@ -616,11 +613,10 @@ export const HomeComputerModal: React.FC = () => {
 
                 <button
                   onClick={() => setActiveTab('bounties')}
-                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                    activeTab === 'bounties'
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${activeTab === 'bounties'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                  }`}
+                    }`}
                 >
                   <Rocket className="size-3.5" />
                   <span>🚀 Bounties & Startup</span>
@@ -628,11 +624,10 @@ export const HomeComputerModal: React.FC = () => {
 
                 <button
                   onClick={() => setActiveTab('bluefin')}
-                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                    activeTab === 'bluefin'
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${activeTab === 'bluefin'
                       ? 'bg-[#0284C7] text-white shadow-xs'
                       : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                  }`}
+                    }`}
                 >
                   <Home className="size-3.5" />
                   <span>🐟 Bluefin Real Estate</span>
@@ -640,11 +635,10 @@ export const HomeComputerModal: React.FC = () => {
 
                 <button
                   onClick={() => setActiveTab('hardware')}
-                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                    activeTab === 'hardware'
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${activeTab === 'hardware'
                       ? 'bg-amber-500 text-white shadow-xs'
                       : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                  }`}
+                    }`}
                 >
                   <HardDrive className="size-3.5" />
                   <span>⚙️ WFH, Queue & Upgrade Rig</span>
@@ -654,11 +648,10 @@ export const HomeComputerModal: React.FC = () => {
               <>
                 <button
                   onClick={() => setActiveTab('hardware')}
-                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                    activeTab !== 'bluefin'
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${activeTab !== 'bluefin'
                       ? 'bg-[#007AFF] text-white shadow-xs'
                       : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                  }`}
+                    }`}
                 >
                   <HardDrive className="size-3.5" />
                   <span>🖥️ Hardware Showroom</span>
@@ -666,11 +659,10 @@ export const HomeComputerModal: React.FC = () => {
 
                 <button
                   onClick={() => setActiveTab('bluefin')}
-                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                    activeTab === 'bluefin'
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${activeTab === 'bluefin'
                       ? 'bg-[#0284C7] text-white shadow-xs'
                       : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                  }`}
+                    }`}
                 >
                   <Home className="size-3.5" />
                   <span>🐟 Bluefin Real Estate</span>
@@ -817,13 +809,12 @@ export const HomeComputerModal: React.FC = () => {
                                 top: `${h.mapCoords.y}%`,
                                 transform: 'translate(-50%, -50%)',
                               }}
-                              className={`btn-press absolute flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${
-                                active
+                              className={`btn-press absolute flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${active
                                   ? 'z-30 scale-110 bg-[#0284C7] text-white ring-2 ring-white'
                                   : current
-                                  ? 'z-20 bg-emerald-600 text-white ring-1 ring-white'
-                                  : 'z-15 bg-white/95 text-slate-900 ring-1 ring-[#0284C7]/50 hover:scale-105 dark:bg-slate-900/95 dark:text-white'
-                              }`}
+                                    ? 'z-20 bg-emerald-600 text-white ring-1 ring-white'
+                                    : 'z-15 bg-white/95 text-slate-900 ring-1 ring-[#0284C7]/50 hover:scale-105 dark:bg-slate-900/95 dark:text-white'
+                                }`}
                             >
                               <span>{h.emoji}</span>
                               <span>${(h.weeklyRent / 1000).toFixed(1)}k</span>
@@ -842,11 +833,10 @@ export const HomeComputerModal: React.FC = () => {
                             <button
                               key={h.id}
                               onClick={() => setSelectedBluefinHomeId(h.id)}
-                              className={`btn-press flex w-full items-center justify-between gap-2.5 rounded-2xl border p-3 text-left transition-all ${
-                                active
+                              className={`btn-press flex w-full items-center justify-between gap-2.5 rounded-2xl border p-3 text-left transition-all ${active
                                   ? 'border-[#0284C7] bg-[#0284C7]/12 shadow-xs'
                                   : 'border-black/8 bg-[var(--mist)] hover:border-[#0284C7]/40 dark:border-white/10'
-                              }`}
+                                }`}
                             >
                               <div className="flex min-w-0 items-center gap-2.5">
                                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/80 text-xl shadow-2xs dark:bg-white/10">
@@ -1008,11 +998,10 @@ export const HomeComputerModal: React.FC = () => {
                                     </span>
                                     {!isCurrent && diff !== 0 && (
                                       <span
-                                        className={`rounded px-1 py-0.2 text-[9.5px] ${
-                                          diff < 0
+                                        className={`rounded px-1 py-0.2 text-[9.5px] ${diff < 0
                                             ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                                             : 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
-                                        }`}
+                                          }`}
                                       >
                                         {diff < 0 ? `${diff}m` : `+${diff}m`}
                                       </span>
@@ -1037,10 +1026,10 @@ export const HomeComputerModal: React.FC = () => {
                             {isCurrent
                               ? '🏠 Current Home'
                               : isOwned
-                              ? '🔑 Move In ($0/wk)'
-                              : canAffordRent
-                              ? `Sign Lease (${formatCurrency(selectedHome.weeklyRent)}/wk)`
-                              : `Need ${formatCurrency(selectedHome.weeklyRent)}/wk`}
+                                ? '🔑 Move In ($0/wk)'
+                                : canAffordRent
+                                  ? `Sign Lease (${formatCurrency(selectedHome.weeklyRent)}/wk)`
+                                  : `Need ${formatCurrency(selectedHome.weeklyRent)}/wk`}
                           </span>
                         </button>
 
@@ -1054,8 +1043,8 @@ export const HomeComputerModal: React.FC = () => {
                             {isOwned
                               ? '✓ Deed Owned ($0 Rent)'
                               : canAffordBuy
-                              ? `Buy Deed (${formatCurrency(selectedHome.buyPrice)})`
-                              : `Deed ${formatCurrency(selectedHome.buyPrice)}`}
+                                ? `Buy Deed (${formatCurrency(selectedHome.buyPrice)})`
+                                : `Deed ${formatCurrency(selectedHome.buyPrice)}`}
                           </span>
                         </button>
 
@@ -1178,11 +1167,10 @@ export const HomeComputerModal: React.FC = () => {
                           installOrUpgradeHomeComputer(item.id);
                           setActiveTab('ide');
                         }}
-                        className={`btn-press mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-extrabold shadow-sm ${
-                          canAfford
+                        className={`btn-press mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-extrabold shadow-sm ${canAfford
                             ? 'bg-[#007AFF] text-white hover:bg-[#0066CC]'
                             : 'cursor-not-allowed bg-black/10 text-[var(--ink-soft)] opacity-60 dark:bg-white/10'
-                        }`}
+                          }`}
                       >
                         <Sparkles className="size-4" />
                         <span>
@@ -1255,11 +1243,10 @@ export const HomeComputerModal: React.FC = () => {
                               setSelectedTicketIdx(idx);
                               setIdeStage(0);
                             }}
-                            className={`btn-press rounded-xl px-2.5 py-1 text-[11px] font-bold ${
-                              selectedTicketIdx === idx
+                            className={`btn-press rounded-xl px-2.5 py-1 text-[11px] font-bold ${selectedTicketIdx === idx
                                 ? 'bg-sky-500 text-white'
                                 : 'bg-white/10 text-slate-300 hover:bg-white/15'
-                            }`}
+                              }`}
                           >
                             {t.title}
                           </button>
@@ -1271,9 +1258,8 @@ export const HomeComputerModal: React.FC = () => {
                         {activeTicket.codeSnippet.map((line, i) => (
                           <div
                             key={i}
-                            className={`flex gap-3 ${
-                              ideStage >= 1 ? 'text-emerald-300' : 'text-slate-300'
-                            }`}
+                            className={`flex gap-3 ${ideStage >= 1 ? 'text-emerald-300' : 'text-slate-300'
+                              }`}
                           >
                             <span className="select-none text-slate-600">{i + 1}</span>
                             <span className="break-all">{line}</span>
@@ -1285,33 +1271,30 @@ export const HomeComputerModal: React.FC = () => {
                       <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 text-[11px] font-bold">
                           <span
-                            className={`rounded-lg px-2 py-1 ${
-                              ideStage === 0
+                            className={`rounded-lg px-2 py-1 ${ideStage === 0
                                 ? 'bg-sky-500/25 text-sky-300 ring-1 ring-sky-400'
                                 : 'bg-emerald-500/20 text-emerald-300'
-                            }`}
+                              }`}
                           >
                             1. Write Code
                           </span>
                           <span className="text-slate-600">→</span>
                           <span
-                            className={`rounded-lg px-2 py-1 ${
-                              ideStage === 1
+                            className={`rounded-lg px-2 py-1 ${ideStage === 1
                                 ? 'bg-sky-500/25 text-sky-300 ring-1 ring-sky-400'
                                 : ideStage > 1
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : 'bg-white/5 text-slate-500'
-                            }`}
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : 'bg-white/5 text-slate-500'
+                              }`}
                           >
                             2. Run Benchmark
                           </span>
                           <span className="text-slate-600">→</span>
                           <span
-                            className={`rounded-lg px-2 py-1 ${
-                              ideStage === 2
+                            className={`rounded-lg px-2 py-1 ${ideStage === 2
                                 ? 'bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-400'
                                 : 'bg-white/5 text-slate-500'
-                            }`}
+                              }`}
                           >
                             3. Merge & Ship
                           </span>
@@ -1326,8 +1309,8 @@ export const HomeComputerModal: React.FC = () => {
                             {ideStage === 0
                               ? '✍️ Step 1: Write Implementation'
                               : ideStage === 1
-                              ? '🧪 Step 2: Run Unit & Load Tests'
-                              : `🚀 Step 3: Merge & Ship (+${formatCurrency(Math.round(activeTicket.baseCash * yieldMult))})`}
+                                ? '🧪 Step 2: Run Unit & Load Tests'
+                                : `🚀 Step 3: Merge & Ship (+${formatCurrency(Math.round(activeTicket.baseCash * yieldMult))})`}
                           </span>
                         </button>
                       </div>
@@ -1430,17 +1413,16 @@ export const HomeComputerModal: React.FC = () => {
                               <button
                                 key={m}
                                 onClick={() => setSelectedModel(m)}
-                                className={`btn-press rounded-xl px-2.5 py-1.5 text-left text-xs font-extrabold ${
-                                  selectedModel === m
+                                className={`btn-press rounded-xl px-2.5 py-1.5 text-left text-xs font-extrabold ${selectedModel === m
                                     ? 'bg-purple-600 text-white'
                                     : 'bg-white/5 text-slate-300'
-                                }`}
+                                  }`}
                               >
                                 {m === '8b'
                                   ? 'Llama-4-8B-Fast'
                                   : m === '32b'
-                                  ? 'DeepSeek-MoE-32B'
-                                  : 'Cortex-70B-Reasoning'}
+                                    ? 'DeepSeek-MoE-32B'
+                                    : 'Cortex-70B-Reasoning'}
                               </button>
                             ))}
                           </div>
@@ -1455,11 +1437,10 @@ export const HomeComputerModal: React.FC = () => {
                               <button
                                 key={q}
                                 onClick={() => setQuantMode(q)}
-                                className={`btn-press rounded-xl px-2.5 py-1.5 text-left text-xs font-extrabold ${
-                                  quantMode === q
+                                className={`btn-press rounded-xl px-2.5 py-1.5 text-left text-xs font-extrabold ${quantMode === q
                                     ? 'bg-sky-600 text-white'
                                     : 'bg-white/5 text-slate-300'
-                                }`}
+                                  }`}
                               >
                                 {q} Quantization
                               </button>
@@ -1476,11 +1457,10 @@ export const HomeComputerModal: React.FC = () => {
                               <button
                                 key={r}
                                 onClick={() => setLoraRank(r)}
-                                className={`btn-press rounded-xl px-2.5 py-1.5 text-left text-xs font-extrabold ${
-                                  loraRank === r
+                                className={`btn-press rounded-xl px-2.5 py-1.5 text-left text-xs font-extrabold ${loraRank === r
                                     ? 'bg-emerald-600 text-white'
                                     : 'bg-white/5 text-slate-300'
-                                }`}
+                                  }`}
                               >
                                 Rank r={r}
                               </button>
@@ -1766,11 +1746,10 @@ export const HomeComputerModal: React.FC = () => {
                         return (
                           <div
                             key={item.id}
-                            className={`flex flex-col justify-between rounded-2xl border p-3.5 ${
-                              isCurrent
+                            className={`flex flex-col justify-between rounded-2xl border p-3.5 ${isCurrent
                                 ? 'border-emerald-500 bg-emerald-500/10'
                                 : 'border-black/8 bg-[var(--mist)] dark:border-white/10'
-                            }`}
+                              }`}
                           >
                             <div>
                               <div className="flex items-center justify-between">

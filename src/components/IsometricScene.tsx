@@ -380,11 +380,11 @@ export const IsometricScene: React.FC = () => {
         setDraggingPlaced((prev) =>
           prev
             ? {
-                ...prev,
-                moved: true,
-                currentTileX: tile.x,
-                currentTileY: tile.y,
-              }
+              ...prev,
+              moved: true,
+              currentTileX: tile.x,
+              currentTileY: tile.y,
+            }
             : null
         );
       }
@@ -487,14 +487,14 @@ export const IsometricScene: React.FC = () => {
     targetPos !== null && (pos.x !== targetPos.x || pos.y !== targetPos.y);
   const actionPct = activeQueued
     ? Math.min(
-        100,
-        Math.max(
-          0,
-          Math.round(
-            (activeQueued.elapsedMinutes / Math.max(1, activeQueued.totalMinutes)) * 100
-          )
+      100,
+      Math.max(
+        0,
+        Math.round(
+          (activeQueued.elapsedMinutes / Math.max(1, activeQueued.totalMinutes)) * 100
         )
       )
+    )
     : 0;
   const activityParticles = useMemo(
     () => getActivityParticles(activeActionDef),
@@ -518,10 +518,10 @@ export const IsometricScene: React.FC = () => {
   const npcsHere = isHome
     ? []
     : NPCS.filter(
-        (n) =>
-          n.favoriteSpot === locationId ||
-          NPCS.indexOf(n) % 3 === Math.floor(time / 240) % 3
-      );
+      (n) =>
+        n.favoriteSpot === locationId ||
+        NPCS.indexOf(n) % 3 === Math.floor(time / 240) % 3
+    );
 
   // Compute collision-free tile coordinates for NPCs so they never overlap objects, stations, or the Sim
   const npcPositions = useMemo(() => {
@@ -564,10 +564,10 @@ export const IsometricScene: React.FC = () => {
       ownedCars.length > 0
         ? 'tesla'
         : cash >= 18
-        ? 'waymo'
-        : cash >= 6
-        ? 'caltrain'
-        : 'gbus';
+          ? 'waymo'
+          : cash >= 6
+            ? 'caltrain'
+            : 'gbus';
     travelTo('home', mode);
   };
 
@@ -732,9 +732,8 @@ export const IsometricScene: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className={`relative h-full w-full overflow-hidden select-none ${
-        isDragging ? 'cursor-grabbing' : 'cursor-grab'
-      }`}
+      className={`relative h-full w-full overflow-hidden select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -749,12 +748,12 @@ export const IsometricScene: React.FC = () => {
             floorStyle === 'club'
               ? 'radial-gradient(circle at 50% 42%, rgba(168,85,247,0.32), rgba(15,23,42,0.92))'
               : isNight
-              ? 'radial-gradient(circle at 50% 35%, rgba(56,189,248,0.14), rgba(15,23,42,0.58))'
-              : isSunset
-              ? 'radial-gradient(circle at 50% 35%, rgba(251,146,60,0.24), transparent 70%)'
-              : isHome && homeDef.architecture
-              ? homeDef.architecture.ambientGlow
-              : 'radial-gradient(circle at 50% 35%, rgba(255,255,255,0.45), transparent 70%)',
+                ? 'radial-gradient(circle at 50% 35%, rgba(56,189,248,0.14), rgba(15,23,42,0.58))'
+                : isSunset
+                  ? 'radial-gradient(circle at 50% 35%, rgba(251,146,60,0.24), transparent 70%)'
+                  : isHome && homeDef.architecture
+                    ? homeDef.architecture.ambientGlow
+                    : 'radial-gradient(circle at 50% 35%, rgba(255,255,255,0.45), transparent 70%)',
         }}
       />
 
@@ -762,20 +761,18 @@ export const IsometricScene: React.FC = () => {
       <svg
         id="isometric-room-svg"
         viewBox="0 0 900 580"
-        className={`h-full w-full object-contain ${
-          isDragging || draggingPlaced?.moved ? '' : 'transition-transform duration-200 ease-out'
-        }`}
+        className={`h-full w-full object-contain ${isDragging || draggingPlaced?.moved ? '' : 'transition-transform duration-200 ease-out'
+          }`}
         style={{
-          transform: `translate(${pan.x}px, ${
-            pan.y +
+          transform: `translate(${pan.x}px, ${pan.y +
             (isFurnishMode
               ? trayMode === 'dock'
                 ? -68
                 : trayMode === 'expanded'
-                ? -95
-                : -16
+                  ? -95
+                  : -16
               : 0)
-          }px) scale(${isFurnishMode && trayMode === 'dock' ? +(zoom * 0.94).toFixed(3) : zoom})`,
+            }px) scale(${isFurnishMode && trayMode === 'dock' ? +(zoom * 0.94).toFixed(3) : zoom})`,
           transformOrigin: 'center center',
         }}
         onClick={() => {
@@ -798,8 +795,8 @@ export const IsometricScene: React.FC = () => {
                     ? homeDef.architecture.wallLeftNight[0]
                     : homeDef.architecture.wallLeftGrad[0]
                   : isNight
-                  ? '#1E293B'
-                  : '#F8FAFC'
+                    ? '#1E293B'
+                    : '#F8FAFC'
               }
             />
             <stop
@@ -810,8 +807,8 @@ export const IsometricScene: React.FC = () => {
                     ? homeDef.architecture.wallLeftNight[1]
                     : homeDef.architecture.wallLeftGrad[1]
                   : isNight
-                  ? '#0F172A'
-                  : '#E2E8F0'
+                    ? '#0F172A'
+                    : '#E2E8F0'
               }
             />
           </linearGradient>
@@ -824,8 +821,8 @@ export const IsometricScene: React.FC = () => {
                     ? homeDef.architecture.wallRightNight[0]
                     : homeDef.architecture.wallRightGrad[0]
                   : isNight
-                  ? '#334155'
-                  : '#F1F5F9'
+                    ? '#334155'
+                    : '#F1F5F9'
               }
             />
             <stop
@@ -836,8 +833,8 @@ export const IsometricScene: React.FC = () => {
                     ? homeDef.architecture.wallRightNight[1]
                     : homeDef.architecture.wallRightGrad[1]
                   : isNight
-                  ? '#1E293B'
-                  : '#CBD5E1'
+                    ? '#1E293B'
+                    : '#CBD5E1'
               }
             />
           </linearGradient>
@@ -857,10 +854,10 @@ export const IsometricScene: React.FC = () => {
               winType === 'garage_transom'
                 ? `${backCorner.sx - 135},${backCorner.sy - 32} ${backCorner.sx - 42},${backCorner.sy - 79} ${backCorner.sx - 42},${backCorner.sy - 41} ${backCorner.sx - 135},${backCorner.sy + 6}`
                 : winType === 'soma_curtainwall'
-                ? `${backCorner.sx - 188},${backCorner.sy - 10} ${backCorner.sx - 24},${backCorner.sy - 94} ${backCorner.sx - 24},${backCorner.sy - 6} ${backCorner.sx - 188},${backCorner.sy + 78}`
-                : winType === 'pac_heights_terrace'
-                ? `${backCorner.sx - 206},${backCorner.sy - 2} ${backCorner.sx - 24},${backCorner.sy - 95} ${backCorner.sx - 24},${backCorner.sy - 5} ${backCorner.sx - 206},${backCorner.sy + 88}`
-                : `${backCorner.sx - 150},${backCorner.sy - 16} ${backCorner.sx - 35},${backCorner.sy - 74} ${backCorner.sx - 35},${backCorner.sy - 4} ${backCorner.sx - 150},${backCorner.sy + 54}`;
+                  ? `${backCorner.sx - 188},${backCorner.sy - 10} ${backCorner.sx - 24},${backCorner.sy - 94} ${backCorner.sx - 24},${backCorner.sy - 6} ${backCorner.sx - 188},${backCorner.sy + 78}`
+                  : winType === 'pac_heights_terrace'
+                    ? `${backCorner.sx - 206},${backCorner.sy - 2} ${backCorner.sx - 24},${backCorner.sy - 95} ${backCorner.sx - 24},${backCorner.sy - 5} ${backCorner.sx - 206},${backCorner.sy + 88}`
+                    : `${backCorner.sx - 150},${backCorner.sy - 16} ${backCorner.sx - 35},${backCorner.sy - 74} ${backCorner.sx - 35},${backCorner.sy - 4} ${backCorner.sx - 150},${backCorner.sy + 54}`;
             return (
               <clipPath id="bayWindowClip">
                 <polygon points={pts} />
@@ -992,24 +989,24 @@ export const IsometricScene: React.FC = () => {
               winType === 'garage_transom'
                 ? `${backCorner.sx - 135},${backCorner.sy - 32} ${backCorner.sx - 42},${backCorner.sy - 79} ${backCorner.sx - 42},${backCorner.sy - 41} ${backCorner.sx - 135},${backCorner.sy + 6}`
                 : winType === 'soma_curtainwall'
-                ? `${backCorner.sx - 188},${backCorner.sy - 10} ${backCorner.sx - 24},${backCorner.sy - 94} ${backCorner.sx - 24},${backCorner.sy - 6} ${backCorner.sx - 188},${backCorner.sy + 78}`
-                : winType === 'pac_heights_terrace'
-                ? `${backCorner.sx - 206},${backCorner.sy - 2} ${backCorner.sx - 24},${backCorner.sy - 95} ${backCorner.sx - 24},${backCorner.sy - 5} ${backCorner.sx - 206},${backCorner.sy + 88}`
-                : `${backCorner.sx - 150},${backCorner.sy - 16} ${backCorner.sx - 35},${backCorner.sy - 74} ${backCorner.sx - 35},${backCorner.sy - 4} ${backCorner.sx - 150},${backCorner.sy + 54}`;
+                  ? `${backCorner.sx - 188},${backCorner.sy - 10} ${backCorner.sx - 24},${backCorner.sy - 94} ${backCorner.sx - 24},${backCorner.sy - 6} ${backCorner.sx - 188},${backCorner.sy + 78}`
+                  : winType === 'pac_heights_terrace'
+                    ? `${backCorner.sx - 206},${backCorner.sy - 2} ${backCorner.sx - 24},${backCorner.sy - 95} ${backCorner.sx - 24},${backCorner.sy - 5} ${backCorner.sx - 206},${backCorner.sy + 88}`
+                    : `${backCorner.sx - 150},${backCorner.sy - 16} ${backCorner.sx - 35},${backCorner.sy - 74} ${backCorner.sx - 35},${backCorner.sy - 4} ${backCorner.sx - 150},${backCorner.sy + 54}`;
 
             const winMeta =
               winType === 'garage_transom'
                 ? {
-                    needKey: 'energy' as NeedKey,
-                    delta: 14,
-                    emoji: '🌫️',
-                    hoverLabel: '🌫️ Fog & BART (+14% Focus)',
-                    toast: 'Watched Karl the Fog & distant BART train lights (+14% Focus)',
-                    sparkleTitle: 'Daly City Garage Transom',
-                    sparkleSub: 'Cool Pacific fog keeps your GPU & founder hustle running cold',
-                  }
+                  needKey: 'energy' as NeedKey,
+                  delta: 14,
+                  emoji: '🌫️',
+                  hoverLabel: '🌫️ Fog & BART (+14% Focus)',
+                  toast: 'Watched Karl the Fog & distant BART train lights (+14% Focus)',
+                  sparkleTitle: 'Daly City Garage Transom',
+                  sparkleSub: 'Cool Pacific fog keeps your GPU & founder hustle running cold',
+                }
                 : winType === 'ranch_slider'
-                ? {
+                  ? {
                     needKey: 'fun' as NeedKey,
                     delta: 16,
                     emoji: '🌴',
@@ -1018,35 +1015,35 @@ export const IsometricScene: React.FC = () => {
                     sparkleTitle: 'Sunnyvale Backyard Slider',
                     sparkleSub: '74°F South Bay sunshine & Meyer lemon trees outside the hacker house',
                   }
-                : winType === 'soma_curtainwall'
-                ? {
-                    needKey: 'fun' as NeedKey,
-                    delta: 22,
-                    emoji: '🏙️',
-                    hoverLabel: '🏙️ Skyline View (+22% Peace)',
-                    toast: 'Admired the Bay Bridge lights from your SoMa Curtain Wall (+22% Peace)',
-                    sparkleTitle: 'SoMa Penthouse Curtain Wall',
-                    sparkleSub: 'Floor-to-ceiling industrial glass overlooking the Bay Bridge & downtown towers',
-                  }
-                : winType === 'pac_heights_terrace'
-                ? {
-                    needKey: 'fun' as NeedKey,
-                    delta: 28,
-                    emoji: '🥂',
-                    hoverLabel: '🥂 Billionaire View (+28% Peace)',
-                    toast: 'Stepped onto your private Billionaire’s Row Golden Gate terrace (+28% Peace)',
-                    sparkleTitle: 'Billionaire’s Row Grand Terrace',
-                    sparkleSub: 'Unobstructed 270° panorama of the Golden Gate, Alcatraz & yacht regatta',
-                  }
-                : {
-                    needKey: 'fun' as NeedKey,
-                    delta: 18,
-                    emoji: '🌉',
-                    hoverLabel: '🌉 Gaze (+18% Peace)',
-                    toast: 'Watched Karl the Fog roll over the Bay (+18% Peace)',
-                    sparkleTitle: 'Edwardian Bay Panorama',
-                    sparkleSub: 'Warm afternoon sun over Dolores palms & the Golden Gate',
-                  };
+                  : winType === 'soma_curtainwall'
+                    ? {
+                      needKey: 'fun' as NeedKey,
+                      delta: 22,
+                      emoji: '🏙️',
+                      hoverLabel: '🏙️ Skyline View (+22% Peace)',
+                      toast: 'Admired the Bay Bridge lights from your SoMa Curtain Wall (+22% Peace)',
+                      sparkleTitle: 'SoMa Penthouse Curtain Wall',
+                      sparkleSub: 'Floor-to-ceiling industrial glass overlooking the Bay Bridge & downtown towers',
+                    }
+                    : winType === 'pac_heights_terrace'
+                      ? {
+                        needKey: 'fun' as NeedKey,
+                        delta: 28,
+                        emoji: '🥂',
+                        hoverLabel: '🥂 Billionaire View (+28% Peace)',
+                        toast: 'Stepped onto your private Billionaire’s Row Golden Gate terrace (+28% Peace)',
+                        sparkleTitle: 'Billionaire’s Row Grand Terrace',
+                        sparkleSub: 'Unobstructed 270° panorama of the Golden Gate, Alcatraz & yacht regatta',
+                      }
+                      : {
+                        needKey: 'fun' as NeedKey,
+                        delta: 18,
+                        emoji: '🌉',
+                        hoverLabel: '🌉 Gaze (+18% Peace)',
+                        toast: 'Watched Karl the Fog roll over the Bay (+18% Peace)',
+                        sparkleTitle: 'Edwardian Bay Panorama',
+                        sparkleSub: 'Warm afternoon sun over Dolores palms & the Golden Gate',
+                      };
 
             return (
               <g
@@ -1079,8 +1076,8 @@ export const IsometricScene: React.FC = () => {
                     windowHovered
                       ? '#38BDF8'
                       : isHome && homeDef.architecture
-                      ? homeDef.architecture.trimColor
-                      : '#64748B'
+                        ? homeDef.architecture.trimColor
+                        : '#64748B'
                   }
                   strokeWidth={windowHovered ? '3.2' : '2.5'}
                 />
@@ -1393,10 +1390,10 @@ export const IsometricScene: React.FC = () => {
                 isHome && homeDef.tier >= 5
                   ? '#451A03'
                   : isHome && homeDef.tier === 4
-                  ? '#0F172A'
-                  : isNight
-                  ? '#0F172A'
-                  : '#1E293B'
+                    ? '#0F172A'
+                    : isNight
+                      ? '#0F172A'
+                      : '#1E293B'
               }
               stroke={isHome && homeDef.tier >= 4 ? '#F59E0B' : 'rgba(255,255,255,0.28)'}
               strokeWidth="1.5"
@@ -1425,15 +1422,15 @@ export const IsometricScene: React.FC = () => {
               const featMeta =
                 feat === 'breaker_box'
                   ? {
-                      emoji: '🔌',
-                      badge: '🔌 Reset Breaker (+12% Focus)',
-                      needKey: 'energy' as NeedKey,
-                      delta: 12,
-                      title: '20A Garage Sub-Panel & Ramen Runway',
-                      sub: 'Balanced the circuit breaker so your kettle and GPU rig can run simultaneously',
-                    }
+                    emoji: '🔌',
+                    badge: '🔌 Reset Breaker (+12% Focus)',
+                    needKey: 'energy' as NeedKey,
+                    delta: 12,
+                    title: '20A Garage Sub-Panel & Ramen Runway',
+                    sub: 'Balanced the circuit breaker so your kettle and GPU rig can run simultaneously',
+                  }
                   : feat === 'founder_whiteboard'
-                  ? {
+                    ? {
                       emoji: '📐',
                       badge: '📐 System Arch Jam (+16% Focus)',
                       needKey: 'energy' as NeedKey,
@@ -1441,32 +1438,32 @@ export const IsometricScene: React.FC = () => {
                       title: 'Sunnyvale Co-Founder OKR Whiteboard',
                       sub: 'Sketched distributed shard topology & Demo Day growth milestones',
                     }
-                  : feat === 'vinyl_alcove'
-                  ? {
-                      emoji: '🎵',
-                      badge: '🎵 Spin Vinyl (+18% Peace)',
-                      needKey: 'fun' as NeedKey,
-                      delta: 18,
-                      title: 'Valencia Analog Hi-Fi Turntable',
-                      sub: 'Dropped the needle on a warm Japanese jazz pressing in your sunlit studio',
-                    }
-                  : feat === 'acoustic_slats'
-                  ? {
-                      emoji: '📈',
-                      badge: '📈 Angel Deal Ticker (+22% Focus)',
-                      needKey: 'energy' as NeedKey,
-                      delta: 22,
-                      title: 'Walnut Acoustic Wall & Live Angel Ticker',
-                      sub: 'Checked secondary liquidity quotes & AI seed deal flow on the LED ticker',
-                    }
-                  : {
-                      emoji: '🔥',
-                      badge: '🔥 Marble Hearth (+26% Peace)',
-                      needKey: 'fun' as NeedKey,
-                      delta: 26,
-                      title: 'Calacatta Gold Fireplace & Private Art',
-                      sub: 'Warmed by the hand-carved Italian marble hearth under your museum Rothko canvas',
-                    };
+                    : feat === 'vinyl_alcove'
+                      ? {
+                        emoji: '🎵',
+                        badge: '🎵 Spin Vinyl (+18% Peace)',
+                        needKey: 'fun' as NeedKey,
+                        delta: 18,
+                        title: 'Valencia Analog Hi-Fi Turntable',
+                        sub: 'Dropped the needle on a warm Japanese jazz pressing in your sunlit studio',
+                      }
+                      : feat === 'acoustic_slats'
+                        ? {
+                          emoji: '📈',
+                          badge: '📈 Angel Deal Ticker (+22% Focus)',
+                          needKey: 'energy' as NeedKey,
+                          delta: 22,
+                          title: 'Walnut Acoustic Wall & Live Angel Ticker',
+                          sub: 'Checked secondary liquidity quotes & AI seed deal flow on the LED ticker',
+                        }
+                        : {
+                          emoji: '🔥',
+                          badge: '🔥 Marble Hearth (+26% Peace)',
+                          needKey: 'fun' as NeedKey,
+                          delta: 26,
+                          title: 'Calacatta Gold Fireplace & Private Art',
+                          sub: 'Warmed by the hand-carved Italian marble hearth under your museum Rothko canvas',
+                        };
 
               return (
                 <g
@@ -1800,12 +1797,12 @@ export const IsometricScene: React.FC = () => {
                           ? '#FBBF24'
                           : '#34D399'
                         : isHovered
-                        ? isFurnishMode
-                          ? '#38BDF8'
-                          : '#60A5FA'
-                        : isSimHere && !isFurnishMode
-                        ? '#93C5FD'
-                        : getFloorColors(x, y)
+                          ? isFurnishMode
+                            ? '#38BDF8'
+                            : '#60A5FA'
+                          : isSimHere && !isFurnishMode
+                            ? '#93C5FD'
+                            : getFloorColors(x, y)
                     }
                     stroke={
                       isDropTarget
@@ -1813,10 +1810,10 @@ export const IsometricScene: React.FC = () => {
                           ? '#F59E0B'
                           : '#10B981'
                         : isFurnishMode
-                        ? 'rgba(56,189,248,0.42)'
-                        : isHome && homeDef.id === 'pac_heights_victorian'
-                        ? 'rgba(217,119,6,0.22)'
-                        : 'rgba(15,23,42,0.08)'
+                          ? 'rgba(56,189,248,0.42)'
+                          : isHome && homeDef.id === 'pac_heights_victorian'
+                            ? 'rgba(217,119,6,0.22)'
+                            : 'rgba(15,23,42,0.08)'
                     }
                     strokeWidth={isDropTarget ? '2.4' : isFurnishMode ? '1.35' : '1'}
                     strokeDasharray={isFurnishMode && !isDropTarget ? '3 2' : 'none'}
@@ -2167,12 +2164,12 @@ export const IsometricScene: React.FC = () => {
                               ? 'rgba(251,191,36,0.34)'
                               : 'rgba(52,211,153,0.34)'
                             : isInUse
-                            ? 'rgba(52,199,89,0.25)'
-                            : isSelected
-                            ? 'rgba(0,122,255,0.28)'
-                            : isHovered
-                            ? 'rgba(0,122,255,0.16)'
-                            : 'rgba(56,189,248,0.1)'
+                              ? 'rgba(52,199,89,0.25)'
+                              : isSelected
+                                ? 'rgba(0,122,255,0.28)'
+                                : isHovered
+                                  ? 'rgba(0,122,255,0.16)'
+                                  : 'rgba(56,189,248,0.1)'
                         }
                         stroke={
                           isBeingDragged
@@ -2180,12 +2177,12 @@ export const IsometricScene: React.FC = () => {
                               ? '#F59E0B'
                               : '#10B981'
                             : isInUse
-                            ? '#34C759'
-                            : isSelected
-                            ? '#007AFF'
-                            : isHovered
-                            ? '#38BDF8'
-                            : 'rgba(56,189,248,0.4)'
+                              ? '#34C759'
+                              : isSelected
+                                ? '#007AFF'
+                                : isHovered
+                                  ? '#38BDF8'
+                                  : 'rgba(56,189,248,0.4)'
                         }
                         strokeWidth={isSelected || isBeingDragged ? '2' : '1.2'}
                         strokeDasharray={
@@ -2202,8 +2199,8 @@ export const IsometricScene: React.FC = () => {
                         isBeingDragged
                           ? 'translate(0, -14) scale(1.1)'
                           : isSelected || isHovered
-                          ? 'translate(0, -2) scale(1.03)'
-                          : undefined
+                            ? 'translate(0, -2) scale(1.03)'
+                            : undefined
                       }
                     >
                       {/* 3D Isometric Furniture Block Base */}
@@ -2446,15 +2443,15 @@ export const IsometricScene: React.FC = () => {
                       isInUse
                         ? 'rgba(52,199,89,0.26)'
                         : isSelected
-                        ? 'rgba(0,122,255,0.26)'
-                        : 'rgba(56,189,248,0.16)'
+                          ? 'rgba(0,122,255,0.26)'
+                          : 'rgba(56,189,248,0.16)'
                     }
                     stroke={
                       isInUse
                         ? '#34C759'
                         : isSelected
-                        ? '#007AFF'
-                        : '#38BDF8'
+                          ? '#007AFF'
+                          : '#38BDF8'
                     }
                     strokeWidth={isSelected ? '2' : '1.4'}
                   />
@@ -2529,8 +2526,8 @@ export const IsometricScene: React.FC = () => {
                   isSelected
                     ? 'rgba(0,122,255,0.25)'
                     : isHovered
-                    ? 'rgba(56,189,248,0.2)'
-                    : 'rgba(15,23,42,0.2)'
+                      ? 'rgba(56,189,248,0.2)'
+                      : 'rgba(15,23,42,0.2)'
                 }
                 stroke={isSelected ? '#007AFF' : isHovered ? '#38BDF8' : 'none'}
                 strokeWidth="1.5"
@@ -2761,20 +2758,19 @@ export const IsometricScene: React.FC = () => {
               const labelText = isBeingDragged
                 ? swapTargetObj
                   ? `🔄 Swap with ${getShortFurnitureLabel(
-                      FURNITURE_BY_ID[swapTargetObj.objectId] || def
-                    )}`
+                    FURNITURE_BY_ID[swapTargetObj.objectId] || def
+                  )}`
                   : `✨ Drop at (${effectiveX}, ${effectiveY})`
                 : isFurnishMode
-                ? `🖐️ ${shortLabel}`
-                : `${shortLabel}${hasUpgrade ? ' · ⬆️' : ''}${powerOffBadge}`;
+                  ? `🖐️ ${shortLabel}`
+                  : `${shortLabel}${hasUpgrade ? ' · ⬆️' : ''}${powerOffBadge}`;
               const pillW = Math.max(92, labelText.length * 5.9 + 22);
 
               return (
                 <g
                   key={`label-${placed.uid}`}
-                  transform={`translate(${center.sx}, ${
-                    center.sy - (isBeingDragged ? 50 : 38)
-                  })`}
+                  transform={`translate(${center.sx}, ${center.sy - (isBeingDragged ? 50 : 38)
+                    })`}
                 >
                   <rect
                     x={-pillW / 2}
@@ -2793,8 +2789,8 @@ export const IsometricScene: React.FC = () => {
                       isBeingDragged
                         ? '#34D399'
                         : isSelected
-                        ? '#007AFF'
-                        : 'rgba(56,189,248,0.6)'
+                          ? '#007AFF'
+                          : 'rgba(56,189,248,0.6)'
                     }
                     strokeWidth="1.2"
                   />
@@ -3003,9 +2999,8 @@ export const IsometricScene: React.FC = () => {
 
       {/* Sleek Minimal Camera Zoom & Reset Pill */}
       <div
-        className={`apple-pill absolute left-4 z-20 flex items-center gap-1 rounded-full px-2 py-1 text-[var(--ink)] opacity-80 transition-opacity hover:opacity-100 ${
-          isFurnishMode ? 'top-20' : 'bottom-20'
-        }`}
+        className={`apple-pill absolute left-4 z-20 flex items-center gap-1 rounded-full px-2 py-1 text-[var(--ink)] opacity-80 transition-opacity hover:opacity-100 ${isFurnishMode ? 'top-20' : 'bottom-20'
+          }`}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
@@ -3108,9 +3103,8 @@ export const IsometricScene: React.FC = () => {
                     </h3>
                     {selectedFurnitureDef ? (
                       <span
-                        className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${
-                          getFurnitureTier(selectedFurnitureDef.quality).badgeClass
-                        }`}
+                        className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${getFurnitureTier(selectedFurnitureDef.quality).badgeClass
+                          }`}
                       >
                         {getFurnitureTier(selectedFurnitureDef.quality).label}
                       </span>
@@ -3243,11 +3237,10 @@ export const IsometricScene: React.FC = () => {
                       {needBadges.map((nb) => (
                         <span
                           key={nb.key}
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                            nb.val > 0
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${nb.val > 0
                               ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300'
                               : 'bg-amber-500/15 text-amber-600 dark:text-amber-300'
-                          }`}
+                            }`}
                         >
                           {nb.emoji} {nb.val > 0 ? `+${nb.val}` : nb.val} {nb.shortLabel}
                         </span>

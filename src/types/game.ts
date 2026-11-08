@@ -392,17 +392,17 @@ export interface HomeBonuses {
 export interface HomeArchitecture {
   styleName: string;
   windowType:
-    | 'garage_transom'
-    | 'ranch_slider'
-    | 'edwardian_bay'
-    | 'soma_curtainwall'
-    | 'pac_heights_terrace';
+  | 'garage_transom'
+  | 'ranch_slider'
+  | 'edwardian_bay'
+  | 'soma_curtainwall'
+  | 'pac_heights_terrace';
   rightWallFeature:
-    | 'breaker_box'
-    | 'founder_whiteboard'
-    | 'vinyl_alcove'
-    | 'acoustic_slats'
-    | 'marble_fireplace';
+  | 'breaker_box'
+  | 'founder_whiteboard'
+  | 'vinyl_alcove'
+  | 'acoustic_slats'
+  | 'marble_fireplace';
   wallLeftGrad: [string, string];
   wallRightGrad: [string, string];
   wallLeftNight: [string, string];
@@ -564,12 +564,12 @@ export interface MarketAssetDef {
   subtitle: string;
   emoji: string;
   sector:
-    | 'Index ETF'
-    | 'AI Compute'
-    | 'Cloud & Search'
-    | 'Consumer Tech'
-    | '3x Leveraged'
-    | 'Treasury Yield';
+  | 'Index ETF'
+  | 'AI Compute'
+  | 'Cloud & Search'
+  | 'Consumer Tech'
+  | '3x Leveraged'
+  | 'Treasury Yield';
   basePrice: number;
   volatility: number; // daily volatility factor
   drift: number; // average daily drift
@@ -629,16 +629,16 @@ export interface GameState {
   screen: 'title' | 'create' | 'play';
   view: 'live' | 'map' | 'buy';
   activeModal:
-    | null
-    | 'phone'
-    | 'sim'
-    | 'career'
-    | 'commute'
-    | 'wardrobe'
-    | 'backpack'
-    | 'garage'
-    | 'computer'
-    | 'account';
+  | null
+  | 'phone'
+  | 'sim'
+  | 'career'
+  | 'commute'
+  | 'wardrobe'
+  | 'backpack'
+  | 'garage'
+  | 'computer'
+  | 'account';
   phoneApp: 'messages' | 'levels' | 'wealth' | 'doordash' | 'startup' | 'bluefin' | 'zillow' | 'blind';
   simTab: 'needs' | 'skills' | 'relationships' | 'wishes' | 'perks' | 'backpack';
   computerTab?: 'ide' | 'ai_lab' | 'bounties' | 'bluefin' | 'hardware';
