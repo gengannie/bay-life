@@ -316,6 +316,19 @@ interface GameActions {
   resolveEventChoice: (choiceIndex: number) => void;
   dismissToast: () => void;
   updateAppearance: (appearance: SimProfile['appearance']) => void;
+  autoFixNeed: (needKey: NeedKey) => void;
+  triggerMicroReward: (opts: {
+    cashDelta?: number;
+    karmaDelta?: number;
+    skill?: SkillKey;
+    skillDelta?: number;
+    performanceDelta?: number;
+    startupDelta?: number;
+    needKey?: NeedKey;
+    needDelta?: number;
+    toastText?: string;
+    emoji?: string;
+  }) => void;
 }
 
 export const useGameStore = create<GameState & GameActions>()(
@@ -1302,6 +1315,139 @@ export const useGameStore = create<GameState & GameActions>()(
         set((s) => ({
           sim: { ...s.sim, appearance },
         }));
+      },
+
+      autoFixNeed: (needKey) => {
+        const s = get();
+        if (s.locationId === 'home') {
+          let bestActionId: string | null = null;
+          let bestGain = 0;
+          let bestPlacedUid: string | undefined;
+          let bestPos: { x: number; y: number } | undefined;
+
+          for (const placed of s.objects) {
+            const fDef = FURNITURE_BY_ID[placed.objectId];
+            if (!fDef) continue;
+            for (const actId of fDef.actions) {
+              const act = ACTIONS[actId];
+              if (!act) continue;
+              const gain = act.needsDelta?.[needKey] || 0;
+              if (gain > bestGain) {
+                bestGain = gain;
+                bestActionId = actId;
+                bestPlacedUid = placed.uid;
+                bestPos = { x: placed.x, y: placed.y };
+              }
+            }
+          }
+
+          if (bestActionId && bestPlacedUid) {
+            get().enqueueAction(bestActionId, { objectUid: bestPlacedUid, pos: bestPos });
+            return;
+          }
+        } else {
+          const venue = LOCATION_BY_ID[s.locationId];
+          if (venue) {
+            let bestActionId: string | null = null;
+            let bestGain = 0;
+            let bestStationId: string | undefined;
+            let bestPos: { x: number; y: number } | undefined;
+
+            for (const st of venue.stations) {
+              for (const actId of st.actionIds) {
+                const act = ACTIONS[actId];
+                if (!act) continue;
+                const gain = act.needsDelta?.[needKey] || 0;
+                if (gain > bestGain) {
+                  bestGain = gain;
+                  bestActionId = actId;
+                  bestStationId = st.id;
+                  bestPos = { x: st.x, y: st.y };
+                }
+              }
+            }
+
+            if (bestActionId && bestStationId) {
+              get().enqueueAction(bestActionId, { stationId: bestStationId, pos: bestPos });
+              return;
+            }
+          }
+        }
+
+        // Fallback: instant micro-boost if no object in current venue restores this need
+        sfx.play('tap');
+        const nextNeeds = { ...s.needs, [needKey]: clamp(s.needs[needKey] + 22) };
+        const notice = {
+          id: uid(),
+          text: `Quick ${needKey} recharge (+22%)`,
+          emoji: '✨',
+          tone: 'info' as const,
+          time: s.time,
+        };
+        set({
+          needs: nextNeeds,
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      triggerMicroReward: (opts) => {
+        const s = get();
+        const cashAdd = opts.cashDelta || 0;
+        const karmaAdd = opts.karmaDelta || 0;
+        const nextSkills = { ...s.skills };
+        if (opts.skill && opts.skillDelta) {
+          nextSkills[opts.skill] = clamp(nextSkills[opts.skill] + opts.skillDelta, 0, 10);
+        }
+        const nextNeeds = { ...s.needs };
+        if (opts.needKey && opts.needDelta) {
+          nextNeeds[opts.needKey] = clamp(nextNeeds[opts.needKey] + opts.needDelta, 0, 100);
+        }
+        const nextJob =
+          s.job && opts.performanceDelta
+            ? { ...s.job, performance: clamp(s.job.performance + opts.performanceDelta, 0, 100) }
+            : s.job;
+        const nextStartup = opts.startupDelta
+          ? {
+              ...s.startup,
+              productProgress: clamp(s.startup.productProgress + opts.startupDelta, 0, 100),
+              users: s.startup.users + Math.max(0, Math.round(opts.startupDelta * 18)),
+            }
+          : s.startup;
+
+        sfx.play(cashAdd > 0 ? 'cash' : opts.skillDelta || opts.karmaDelta ? 'levelup' : 'tap');
+
+        const notice = opts.toastText
+          ? {
+              id: uid(),
+              text: opts.toastText,
+              emoji: opts.emoji || '⚡',
+              tone: (cashAdd > 0 ? 'cash' : 'good') as 'cash' | 'good',
+              time: s.time,
+            }
+          : null;
+
+        set({
+          cash: Math.max(0, s.cash + cashAdd),
+          karma: Math.max(0, s.karma + karmaAdd),
+          skills: nextSkills,
+          needs: nextNeeds,
+          job: nextJob,
+          startup: nextStartup,
+          stats: {
+            ...s.stats,
+            earnedToday: s.stats.earnedToday + Math.max(0, cashAdd),
+            earnedTotal: s.stats.earnedTotal + Math.max(0, cashAdd),
+            leetCodeSolved:
+              opts.skill === 'coding' ? s.stats.leetCodeSolved + 1 : s.stats.leetCodeSolved,
+            commitsPushed:
+              opts.startupDelta || opts.performanceDelta
+                ? s.stats.commitsPushed + 1
+                : s.stats.commitsPushed,
+          },
+          notices: notice ? [notice, ...s.notices.slice(0, 29)] : s.notices,
+          lastToast: notice || s.lastToast,
+        });
       },
 
       tick: (deltaMinutes) => {

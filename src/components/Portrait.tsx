@@ -98,8 +98,21 @@ export const Portrait: React.FC<PortraitProps> = ({
           {appearance.outfit === 'turtleneck' && (
             <rect x="25" y="40" width="14" height="7" rx="2" fill={topColor} />
           )}
+          {appearance.outfit === 'arcteryx' && (
+            <>
+              <rect x="24" y="41" width="16" height="6" rx="2" fill="#0F172A" />
+              <line x1="32" y1="41" x2="32" y2="64" stroke="#38BDF8" strokeWidth="1.4" />
+              <circle cx="41" cy="52" r="2" fill="#FACC15" />
+            </>
+          )}
           {appearance.outfit === 'founderlinen' && (
             <path d="M25,44 L32,58 L39,44" fill="#F8FAFC" />
+          )}
+          {appearance.outfit === 'stanford' && (
+            <>
+              <path d="M24,44 Q32,50 40,44" fill="none" stroke="#FFFFFF" strokeWidth="2" />
+              <rect x="39" y="51" width="5" height="5" rx="1" fill="#FFFFFF" opacity="0.85" />
+            </>
           )}
 
           {/* Neck */}
