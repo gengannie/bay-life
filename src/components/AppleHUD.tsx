@@ -137,13 +137,18 @@ const SMART_ACTION_PRIORITY = [
   'read_pg_essays',
 ];
 
-function getConciseSummary(text: string): string {
-  const firstSentenceMatch = text.match(/^[^.!?]+[.!?]/);
-  if (firstSentenceMatch && firstSentenceMatch[0].length <= 120) {
-    return firstSentenceMatch[0];
-  }
-  return text.length > 115 ? `${text.slice(0, 112).trim()}...` : text;
-}
+const SMART_ACTION_SHORT_BADGE: Record<string, string> = {
+  train_local_llm: '🧠 Train LLM',
+  build_startup_mvp: '🚀 Build MVP',
+  vibe_code_ai: '⚡ Vibe Code',
+  system_design_doc: '📐 Arch Doc',
+  grind_leetcode: '💻 LeetCode',
+  tonal_strength: '🏋️ Strength',
+  zone2_peloton: '🚴 Zone 2',
+  angel_deal_review: '📈 Deal Memo',
+  spatial_cinema: '🥽 Vision Pro',
+  read_pg_essays: '📖 PG Essays',
+};
 
 export const AppleHUD: React.FC = () => {
   const sim = useGameStore((s) => s.sim);
@@ -159,6 +164,8 @@ export const AppleHUD: React.FC = () => {
   const locationId = useGameStore((s) => s.locationId);
   const homeId = useGameStore((s) => s.homeId);
   const objects = useGameStore((s) => s.objects);
+  const pos = useGameStore((s) => s.pos);
+  const targetPos = useGameStore((s) => s.targetPos);
   const queue = useGameStore((s) => s.queue);
   const job = useGameStore((s) => s.job);
   const workShift = useGameStore((s) => s.workShift);
@@ -264,23 +271,69 @@ export const AppleHUD: React.FC = () => {
     return entries[0];
   }, [needs]);
 
-  const smartNextHint = useMemo(() => {
+  const smartRecommendation = useMemo(() => {
     if (lowestNeedEntry && lowestNeedEntry.value < 45) {
-      return `Fix ${lowestNeedEntry.meta.shortLabel}`;
+      return {
+        shortBadge: `⚡ Auto-Fix: ${lowestNeedEntry.meta.shortLabel}`,
+        fullLabel: `${lowestNeedEntry.meta.emoji} Auto-Fix ${lowestNeedEntry.meta.label} (${lowestNeedEntry.value}%)`,
+        subHint: '1-Tap Need Recovery · Shortcut: A',
+      };
     }
+
     if (locationId === 'home') {
       for (const actId of SMART_ACTION_PRIORITY) {
         const act = ACTIONS[actId];
         if (!act) continue;
         if (act.requiresPower && !powered) continue;
+        if (act.cost && cash < act.cost) continue;
         const hasObj = objects.some((o) => FURNITURE_BY_ID[o.objectId]?.actions.includes(actId));
         if (hasObj) {
-          return act.emoji + ' ' + act.label.split(' ')[0];
+          return {
+            shortBadge: SMART_ACTION_SHORT_BADGE[actId] || `${act.emoji} Flow State`,
+            fullLabel: `${act.emoji} ${act.label}`,
+            subHint: `⏱ ${act.durationMinutes}m · Highest-Value Action (Shortcut: A)`,
+          };
+        }
+      }
+    } else {
+      const venue = LOCATION_BY_ID[locationId];
+      if (venue) {
+        for (const st of venue.stations) {
+          for (const actId of st.actionIds) {
+            const act = ACTIONS[actId];
+            if (!act) continue;
+            if (act.cost && cash < act.cost) continue;
+            if (
+              act.category === 'hustle' ||
+              act.category === 'skill' ||
+              act.category === 'social'
+            ) {
+              return {
+                shortBadge: `${act.emoji} Venue Action`,
+                fullLabel: `${act.emoji} ${act.label}`,
+                subHint: `⏱ ${act.durationMinutes}m at ${venue.shortName} · Shortcut: A`,
+              };
+            }
+          }
+        }
+        const firstSt = venue.stations[0];
+        const firstAct = firstSt?.actionIds[0] ? ACTIONS[firstSt.actionIds[0]] : null;
+        if (firstAct) {
+          return {
+            shortBadge: `${firstAct.emoji} Venue Action`,
+            fullLabel: `${firstAct.emoji} ${firstAct.label}`,
+            subHint: `⏱ ${firstAct.durationMinutes}m at ${venue.shortName} · Shortcut: A`,
+          };
         }
       }
     }
-    return 'Flow Action';
-  }, [lowestNeedEntry, locationId, objects, powered]);
+
+    return {
+      shortBadge: `⚡ Boost ${lowestNeedEntry?.meta.shortLabel || 'Mood'}`,
+      fullLabel: `${lowestNeedEntry?.meta.emoji || '✨'} Boost ${lowestNeedEntry?.meta.label || 'Wellbeing'}`,
+      subHint: '1-Tap Smart Action · Shortcut: A',
+    };
+  }, [cash, locationId, lowestNeedEntry, objects, powered]);
 
   // "✨ Smart Next" Apple Intelligence One-Tap Handler
   const handleSmartNext = useCallback(() => {
@@ -401,7 +454,7 @@ export const AppleHUD: React.FC = () => {
       } else if (key === 'm') {
         e.preventDefault();
         setView(s.view === 'map' ? 'live' : 'map');
-      } else if (key === 'b') {
+      } else if (key === 'b' && s.locationId === 'home') {
         e.preventDefault();
         setView(s.view === 'buy' ? 'live' : 'buy');
       } else if (key === 'p') {
@@ -455,7 +508,7 @@ export const AppleHUD: React.FC = () => {
             title="Toggle Bay Map (M)"
           >
             <span>{currentPlaceEmoji}</span>
-            <span className="max-w-[130px] truncate">{currentPlaceName}</span>
+            <span>{currentPlaceName}</span>
           </button>
 
           <span className="text-slate-300 dark:text-slate-600">|</span>
@@ -552,11 +605,11 @@ export const AppleHUD: React.FC = () => {
 
       {/* DYNAMIC ISLAND TOAST NOTIFICATION */}
       {lastToast && (
-        <div className="pointer-events-none fixed top-14 left-1/2 z-40 w-[calc(100%-32px)] max-w-sm -translate-x-1/2">
-          <div className="apple-glass-heavy pointer-events-auto flex items-center justify-between gap-2.5 rounded-full px-3.5 py-2 shadow-lg">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="text-base">{lastToast.emoji}</span>
-              <span className="truncate text-xs font-semibold">{lastToast.text}</span>
+        <div className="pointer-events-none fixed top-14 left-1/2 z-40 w-[calc(100%-32px)] max-w-lg -translate-x-1/2">
+          <div className="apple-glass-heavy pointer-events-auto flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5 shadow-lg">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="shrink-0 text-base">{lastToast.emoji}</span>
+              <span className="text-xs font-semibold leading-snug">{lastToast.text}</span>
             </div>
             <button
               onClick={dismissToast}
@@ -568,57 +621,120 @@ export const AppleHUD: React.FC = () => {
         </div>
       )}
 
-      {/* SUB-HEADER: COMPACT MILESTONE PILL & ACTION QUEUE */}
+      {/* SUB-HEADER: COMPACT MILESTONE PILL & CLEAR LIVE ACTION STATUS */}
       {view === 'live' && (
-        <div className="pointer-events-none fixed top-15 left-3 z-20 flex flex-col items-start gap-2 sm:left-5">
+        <div className="pointer-events-none fixed top-15 left-3 z-20 flex max-w-[calc(100vw-24px)] flex-col items-start gap-2 sm:left-5">
           {currentGoal && (
             <button
               onClick={() => setActiveModal('sim', 'wishes')}
-              className="apple-pill btn-press pointer-events-auto flex items-center gap-2.5 rounded-2xl px-3 py-1.5 text-left"
+              className="apple-pill btn-press pointer-events-auto flex items-center gap-2.5 rounded-2xl px-3.5 py-2 text-left"
               title={currentGoal.desc}
             >
-              <span className="grid size-7 place-items-center rounded-xl bg-[#007AFF]/15 text-sm">
+              <span className="grid size-7 shrink-0 place-items-center rounded-xl bg-[#007AFF]/15 text-sm">
                 {currentGoal.emoji}
               </span>
               <div>
                 <div className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-wider text-[#007AFF]">
-                  <span>Goal</span>
+                  <span>Next Milestone</span>
                   <span>· +{formatCurrency(currentGoal.rewardCash)}</span>
                 </div>
-                <div className="max-w-[200px] truncate text-xs font-bold">{currentGoal.title}</div>
+                <div className="text-xs font-bold leading-snug">{currentGoal.title}</div>
               </div>
             </button>
           )}
 
-          {/* Active & Queued Actions Strip */}
+          {/* Crystal-Clear Active Action Status Card & Up-Next Queue (No Cut-Off Text) */}
           {queue.length > 0 && (
-            <div className="pointer-events-auto flex flex-wrap items-center gap-1.5">
-              {queue.map((item, idx) => {
-                const pct = Math.min(100, Math.round((item.elapsedMinutes / item.totalMinutes) * 100));
-                return (
-                  <button
-                    key={item.uid}
-                    onClick={() => cancelQueuedAction(item.uid)}
-                    title="Click to cancel action"
-                    className="apple-pill btn-press group relative flex items-center gap-1.5 overflow-hidden rounded-full px-3 py-1 text-xs font-semibold"
-                  >
-                    {idx === 0 && (
-                      <div
-                        className="absolute inset-y-0 left-0 bg-[#007AFF]/15 transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
-                    )}
-                    <span className="relative z-10">{item.emoji}</span>
-                    <span className="relative z-10 max-w-[115px] truncate">{item.label}</span>
-                    {idx === 0 && (
-                      <span className="relative z-10 font-mono text-[10px] font-bold text-[#007AFF]">
-                        {pct}%
-                      </span>
-                    )}
-                    <X className="relative z-10 size-3 opacity-50 group-hover:opacity-100" />
-                  </button>
+            <div className="pointer-events-auto flex flex-col items-start gap-1.5">
+              {(() => {
+                const activeItem = queue[0];
+                const pct = Math.min(
+                  100,
+                  Math.round((activeItem.elapsedMinutes / activeItem.totalMinutes) * 100)
                 );
-              })}
+                const remainingMins = Math.max(
+                  1,
+                  Math.ceil(activeItem.totalMinutes - activeItem.elapsedMinutes)
+                );
+                const isWalkingToTarget = Boolean(
+                  targetPos && (pos.x !== targetPos.x || pos.y !== targetPos.y)
+                );
+
+                return (
+                  <div className="apple-glass-heavy flex min-w-[240px] max-w-sm flex-col gap-1.5 rounded-2xl px-3.5 py-2.5 shadow-md">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="grid size-7 shrink-0 place-items-center rounded-xl bg-[#007AFF]/15 text-base">
+                          {activeItem.emoji}
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                                isWalkingToTarget
+                                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                  : 'bg-[#007AFF]/15 text-[#007AFF]'
+                              }`}
+                            >
+                              {isWalkingToTarget
+                                ? '🚶 Walking there...'
+                                : `⚡ Active · ${remainingMins}m left`}
+                            </span>
+                            {!isWalkingToTarget && (
+                              <span className="font-mono text-[10px] font-extrabold text-[#007AFF]">
+                                {pct}%
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 text-xs font-extrabold leading-snug text-[var(--ink)]">
+                            {activeItem.label}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => cancelQueuedAction(activeItem.uid)}
+                        title="Stop / Cancel current action"
+                        className="btn-press flex shrink-0 items-center gap-1 rounded-full bg-rose-500/12 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
+                      >
+                        <X className="size-3" />
+                        <span>Stop</span>
+                      </button>
+                    </div>
+
+                    {/* Full-Width Progress Bar */}
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          isWalkingToTarget ? 'w-1/4 animate-pulse bg-amber-500' : 'bg-[#007AFF]'
+                        }`}
+                        style={isWalkingToTarget ? undefined : { width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Queued Follow-Up Actions */}
+              {queue.length > 1 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white backdrop-blur-xs">
+                    Up Next:
+                  </span>
+                  {queue.slice(1).map((item) => (
+                    <button
+                      key={item.uid}
+                      onClick={() => cancelQueuedAction(item.uid)}
+                      title="Click to remove from queue"
+                      className="apple-pill btn-press group flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                    >
+                      <span>{item.emoji}</span>
+                      <span>{item.label}</span>
+                      <X className="size-3 opacity-60 group-hover:text-rose-500 group-hover:opacity-100" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -739,7 +855,7 @@ export const AppleHUD: React.FC = () => {
                       <span className="text-sm leading-none">{target.emoji}</span>
                       <span className="font-mono text-[9px] font-extrabold">{target.badge}</span>
                     </div>
-                    <div className="mt-1 w-full truncate text-[10px] font-bold text-[var(--ink)]">
+                    <div className="mt-1 w-full text-[10px] font-bold leading-tight text-[var(--ink)]">
                       {target.title}
                     </div>
                   </button>
@@ -849,7 +965,7 @@ export const AppleHUD: React.FC = () => {
 
             {/* Concise 1-Sentence Summary */}
             <p className="mt-3 text-xs leading-relaxed text-[var(--ink-soft)]">
-              {getConciseSummary(activeEvent.description)}
+              {activeEvent.description}
             </p>
 
             {/* Tactile Choice Cards with Outcome Chips & Shortcut Badges */}
@@ -1013,33 +1129,42 @@ export const AppleHUD: React.FC = () => {
 
         {/* Right: Primary Navigation Dock + "✨ Smart Next" Apple Intelligence Button */}
         <div className="apple-glass-heavy pointer-events-auto flex items-center gap-1.5 rounded-3xl p-1.5">
-          {/* "✨ Smart Next" Apple Intelligence 1-Tap Button */}
+          {/* "✨ Smart Next" Apple Intelligence 1-Tap Button (Zero Cut-Off Text) */}
           <button
             onClick={handleSmartNext}
-            title={`Apple Intelligence Smart Next (Shortcut: A) — ${smartNextHint}`}
-            className="apple-ai-btn btn-press flex items-center gap-1.5 rounded-2xl px-3 py-2 text-white"
+            title={`Apple Intelligence Smart Next (Shortcut: A) — ${smartRecommendation.fullLabel}`}
+            className="apple-ai-btn btn-press group relative flex items-center gap-1.5 rounded-2xl px-3 py-2 text-white"
           >
             <Sparkles className="size-4 shrink-0" />
             <div className="text-left leading-tight">
-              <div className="flex items-center gap-1 text-[10px] font-extrabold">
+              <div className="flex items-center gap-1 text-[10px] font-extrabold whitespace-nowrap">
                 <span>✨ Smart Next</span>
                 <span className="rounded bg-white/25 px-1 font-mono text-[8px] font-bold text-white">
                   A
                 </span>
               </div>
-              <div className="max-w-[82px] truncate text-[9px] font-semibold text-white/90">
-                {smartNextHint}
+              <div className="text-[9px] font-semibold whitespace-nowrap text-white/95">
+                {smartRecommendation.shortBadge}
+              </div>
+            </div>
+
+            {/* Full Action Preview Hover Tooltip */}
+            <div className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2.5 -translate-x-1/2 whitespace-nowrap rounded-2xl bg-black/90 px-3 py-1.5 text-left text-[10px] font-bold text-white opacity-0 shadow-xl backdrop-blur-md transition-all group-hover:visible group-hover:opacity-100">
+              <div className="text-white">{smartRecommendation.fullLabel}</div>
+              <div className="text-[9px] font-semibold text-[#5AC8FA]">
+                {smartRecommendation.subHint}
               </div>
             </div>
           </button>
 
           {locationId !== 'home' ? (
             <button
-              onClick={() => travelTo('home', 'waymo')}
-              className="btn-press flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400"
+              onClick={() => travelTo('home', job?.preferredCommute || 'caltrain')}
+              title="Travel back to your apartment"
+              className="btn-press flex flex-col items-center gap-0.5 rounded-2xl bg-emerald-500/15 px-3 py-1.5 text-[10px] font-extrabold text-emerald-600 hover:bg-emerald-500/25 dark:text-emerald-400"
             >
               <Home className="size-4" />
-              <span>Home</span>
+              <span>Go Home</span>
             </button>
           ) : (
             <button
@@ -1071,21 +1196,24 @@ export const AppleHUD: React.FC = () => {
             </div>
           </button>
 
-          <button
-            onClick={() => setView(view === 'buy' ? 'live' : 'buy')}
-            className={`btn-press flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold ${
-              view === 'buy'
-                ? 'bg-[#007AFF] text-white'
-                : 'text-[var(--ink)] hover:bg-[var(--mist)]'
-            }`}
-            title="Furnish Apartment (Shortcut: B)"
-          >
-            <ShoppingBag className="size-4" />
-            <div className="flex items-center gap-1">
-              <span>Furnish</span>
-              <span className="keycap-hint">B</span>
-            </div>
-          </button>
+          {/* Furnish Icon ONLY visible when at Home */}
+          {locationId === 'home' && (
+            <button
+              onClick={() => setView(view === 'buy' ? 'live' : 'buy')}
+              className={`btn-press flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold ${
+                view === 'buy'
+                  ? 'bg-[#007AFF] text-white'
+                  : 'text-[var(--ink)] hover:bg-[var(--mist)]'
+              }`}
+              title="Furnish Apartment (Shortcut: B)"
+            >
+              <ShoppingBag className="size-4" />
+              <div className="flex items-center gap-1">
+                <span>Furnish</span>
+                <span className="keycap-hint">B</span>
+              </div>
+            </button>
+          )}
 
           <button
             onClick={() => (workShift ? setActiveModal('phone', 'levels') : startWorkShift())}

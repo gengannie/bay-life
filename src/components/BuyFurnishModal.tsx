@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ACTIONS, FURNITURE_CATALOG, HOMES } from '../data/worldData';
 import { formatCurrency, useGameStore } from '../store/useGameStore';
 import { FurnitureDef } from '../types/game';
-import { ShoppingBag, Check, Sparkles, X, Flame } from 'lucide-react';
+import { ShoppingBag, Check, Sparkles, X, Flame, Home } from 'lucide-react';
 
 type FilterCategory = FurnitureDef['category'] | 'all' | 'best';
 
@@ -120,13 +120,54 @@ const CHIP_TONE_CLASSES: Record<StatChip['tone'], string> = {
 export const BuyFurnishModal: React.FC = () => {
   const cash = useGameStore((s) => s.cash);
   const homeId = useGameStore((s) => s.homeId);
+  const locationId = useGameStore((s) => s.locationId);
   const objects = useGameStore((s) => s.objects);
   const buyFurniture = useGameStore((s) => s.buyFurniture);
   const setView = useGameStore((s) => s.setView);
+  const travelTo = useGameStore((s) => s.travelTo);
+  const skipTravelNow = useGameStore((s) => s.skipTravelNow);
 
   const [cat, setCat] = useState<FilterCategory>('all');
 
   const homeDef = HOMES.find((h) => h.id === homeId) || HOMES[1];
+
+  if (locationId !== 'home') {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center bg-slate-100/90 p-6 backdrop-blur-xl dark:bg-slate-950/90">
+        <div className="apple-glass-heavy flex max-w-md flex-col items-center rounded-3xl border border-white/40 p-6 text-center shadow-xl dark:border-white/10">
+          <span className="grid size-14 place-items-center rounded-2xl bg-[#007AFF]/15 text-3xl text-[#007AFF]">
+            🏠
+          </span>
+          <h2 className="mt-4 text-lg font-extrabold">
+            You must be at your apartment to buy or arrange furniture
+          </h2>
+          <p className="mt-1.5 text-xs font-medium text-[var(--ink-soft)]">
+            Head back to {homeDef.name} to install new gear or rearrange your floor plan.
+          </p>
+          <div className="mt-5 flex w-full flex-col gap-2 sm:flex-row">
+            <button
+              onClick={() => {
+                travelTo('home', 'gbus');
+                skipTravelNow();
+              }}
+              className="btn-press flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#007AFF] px-4 py-3 text-xs font-extrabold text-white shadow-sm hover:bg-[#0066CC]"
+            >
+              <Home className="size-4" />
+              🏠 Travel Home
+            </button>
+            <button
+              onClick={() => setView('live')}
+              className="apple-pill btn-press flex items-center justify-center gap-1.5 rounded-2xl px-4 py-3 text-xs font-bold"
+            >
+              <X className="size-4" />
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const items =
     cat === 'all'
       ? FURNITURE_CATALOG
@@ -219,9 +260,9 @@ export const BuyFurnishModal: React.FC = () => {
                       </span>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <h3 className="truncate text-sm font-extrabold">{item.name}</h3>
+                          <h3 className="text-sm font-extrabold leading-snug">{item.name}</h3>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                           <span className="text-[11px] text-amber-500">
                             {'★'.repeat(item.quality)}
                           </span>
@@ -278,15 +319,21 @@ export const BuyFurnishModal: React.FC = () => {
                     className={`btn-press flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold ${
                       canAfford
                         ? 'bg-[#007AFF] text-white shadow-sm hover:bg-[#0066CC]'
-                        : 'bg-[var(--mist)] text-[var(--ink-soft)] opacity-50'
+                        : 'bg-[var(--mist)] text-[var(--ink-soft)] opacity-60 cursor-not-allowed'
                     }`}
                   >
-                    {ownedCount > 0 ? (
-                      <Check className="size-3.5" />
+                    {canAfford ? (
+                      <>
+                        {ownedCount > 0 ? (
+                          <Check className="size-3.5" />
+                        ) : (
+                          <Sparkles className="size-3.5" />
+                        )}
+                        {ownedCount > 0 ? 'Add Another' : 'Buy & Place'}
+                      </>
                     ) : (
-                      <Sparkles className="size-3.5" />
+                      `Need ${formatCurrency(item.price)}`
                     )}
-                    {ownedCount > 0 ? 'Add Another' : 'Buy & Place'}
                   </button>
                 </div>
               </div>

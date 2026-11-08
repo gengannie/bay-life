@@ -174,7 +174,7 @@ export const SimInspectorSheet: React.FC = () => {
                         </div>
 
                         <div className="min-w-0">
-                          <div className="truncate text-xs font-bold">{n.shortLabel}</div>
+                          <div className="text-xs font-bold leading-snug">{n.shortLabel}</div>
                           <div
                             className="text-xs font-extrabold"
                             style={{ color: ringColor }}
@@ -343,7 +343,7 @@ export const SimInspectorSheet: React.FC = () => {
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-2xl">{w.emoji}</span>
                         <div className="min-w-0">
-                          <div className="truncate text-xs font-bold">{w.title}</div>
+                          <div className="text-xs font-bold leading-snug">{w.title}</div>
                           <div className="mt-1 h-1.5 w-32 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                             <div
                               className="h-full rounded-full bg-amber-500 transition-all"
@@ -392,8 +392,8 @@ export const SimInspectorSheet: React.FC = () => {
                     <div className="flex items-start gap-2.5">
                       <span className="text-2xl">{p.emoji}</span>
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-bold">{p.name}</div>
-                        <div className="line-clamp-2 text-[10px] text-[var(--ink-soft)]">
+                        <div className="text-xs font-bold leading-snug">{p.name}</div>
+                        <div className="mt-0.5 text-[10px] leading-relaxed text-[var(--ink-soft)]">
                           {p.desc}
                         </div>
                       </div>
@@ -406,9 +406,9 @@ export const SimInspectorSheet: React.FC = () => {
                       <button
                         disabled={!canAfford}
                         onClick={() => claimPerk(p.id)}
-                        className="btn-press w-full rounded-xl bg-[#007AFF] py-1.5 text-xs font-extrabold text-white disabled:opacity-40"
+                        className="btn-press w-full rounded-xl bg-[#007AFF] py-1.5 text-xs font-extrabold text-white disabled:opacity-45"
                       >
-                        Unlock · {p.cost} ⚡
+                        {canAfford ? `Unlock · ${p.cost} ⚡` : `Need ${p.cost} ⚡`}
                       </button>
                     )}
                   </div>
@@ -431,13 +431,13 @@ export const SimInspectorSheet: React.FC = () => {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Portrait appearance={npc.appearance} size={42} />
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate text-xs font-bold">{npc.name}</span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-bold">{npc.name}</span>
                           <span className="shrink-0 rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[9px] font-extrabold text-[#007AFF]">
                             {rel?.status || 'Stranger'}
                           </span>
                         </div>
-                        <div className="truncate text-[10px] text-[var(--ink-soft)]">
+                        <div className="text-[10px] text-[var(--ink-soft)]">
                           {npc.role} · {npc.company}
                         </div>
                         <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">

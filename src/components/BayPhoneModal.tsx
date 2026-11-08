@@ -6,6 +6,7 @@ import {
   DOORDASH_MENU,
   HOMES,
   NPCS,
+  SKILLS_META,
 } from '../data/worldData';
 import {
   calculateNetWorth,
@@ -128,6 +129,8 @@ export const BayPhoneModal: React.FC = () => {
   const loanOwed = useGameStore((s) => s.loanOwed);
   const pantryMeals = useGameStore((s) => s.pantryMeals);
   const job = useGameStore((s) => s.job);
+  const workShift = useGameStore((s) => s.workShift);
+  const travel = useGameStore((s) => s.travel);
   const skills = useGameStore((s) => s.skills);
   const startup = useGameStore((s) => s.startup);
   const homeId = useGameStore((s) => s.homeId);
@@ -345,7 +348,7 @@ export const BayPhoneModal: React.FC = () => {
           {/* Dynamic Island Pill */}
           <div className="flex h-7 items-center gap-2 rounded-full bg-black px-3.5 text-[10px] font-bold text-white shadow-inner ring-1 ring-white/15">
             <span className="size-2 animate-pulse rounded-full bg-emerald-400" />
-            <span className="truncate max-w-[115px] text-white/90">
+            <span className="text-white/90">
               {currentCareer ? `${currentCareer.emoji} ${currentLevel?.code}` : '🦄 Founder'}
             </span>
             <span className="text-emerald-400">{formatCurrency(cash)}</span>
@@ -433,7 +436,7 @@ export const BayPhoneModal: React.FC = () => {
                     <div className="flex items-center justify-between text-[11px] font-bold">
                       <span>
                         Promo Velocity{' '}
-                        {nextLevel ? `→ ${nextLevel.code}` : '· Max Level'}
+                        {nextLevel ? `→ ${nextLevel.code} (${nextLevel.title})` : '· Max Level'}
                       </span>
                       <span className="text-[#007AFF]">{Math.round(job.performance)}% / 92%</span>
                     </div>
@@ -443,14 +446,31 @@ export const BayPhoneModal: React.FC = () => {
                         style={{ width: `${job.performance}%` }}
                       />
                     </div>
-                    {nextLevel && (
-                      <div className="mt-1 flex items-center justify-between text-[10px] font-semibold text-[var(--ink-soft)]">
+                    {nextLevel ? (
+                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 rounded-xl bg-white/60 px-2.5 py-1.5 text-[10px] font-bold text-[var(--ink)] dark:bg-black/25">
                         <span>
-                          Req: {nextLevel.requiredSkill.skill} Lv.{nextLevel.requiredSkill.level}
+                          🎯 Promo at 92% Performance +{' '}
+                          {SKILLS_META.find((sk) => sk.key === nextLevel.requiredSkill.skill)?.label ||
+                            nextLevel.requiredSkill.skill}{' '}
+                          Lv.{nextLevel.requiredSkill.level}
                         </span>
-                        <span>
-                          Yours: Lv.{Math.floor(skills[nextLevel.requiredSkill.skill])}
+                        <span
+                          className={
+                            Math.floor(skills[nextLevel.requiredSkill.skill]) >=
+                            nextLevel.requiredSkill.level
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                          }
+                        >
+                          {Math.floor(skills[nextLevel.requiredSkill.skill]) >=
+                          nextLevel.requiredSkill.level
+                            ? `✓ Lv.${Math.floor(skills[nextLevel.requiredSkill.skill])}/${nextLevel.requiredSkill.level}`
+                            : `Yours: Lv.${Math.floor(skills[nextLevel.requiredSkill.skill])}/${nextLevel.requiredSkill.level}`}
                         </span>
+                      </div>
+                    ) : (
+                      <div className="mt-1.5 rounded-xl bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                        👑 Top IC/Partner Level Achieved
                       </div>
                     )}
                   </div>
@@ -458,10 +478,15 @@ export const BayPhoneModal: React.FC = () => {
                   {/* 1-Tap Shift Controls */}
                   <div className="mt-3 flex items-center gap-2">
                     <button
+                      disabled={!!workShift || !!travel}
                       onClick={startWorkShift}
-                      className="btn-press flex-1 rounded-2xl bg-[#007AFF] py-2.5 text-xs font-extrabold text-white shadow-sm"
+                      className="btn-press flex-1 rounded-2xl bg-[#007AFF] py-2.5 text-xs font-extrabold text-white shadow-sm disabled:opacity-50"
                     >
-                      ⚡ Badge In for Shift
+                      {workShift
+                        ? '⚡ Shift in Progress'
+                        : travel
+                        ? '🚌 Commuting...'
+                        : '⚡ Badge In for Shift'}
                     </button>
                     <button
                       onClick={toggleAutoWork}
@@ -511,14 +536,14 @@ export const BayPhoneModal: React.FC = () => {
                     <button
                       key={idx}
                       onClick={() => handleBlitzAnswer(opt.optimal)}
-                      className={`btn-press flex items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-bold transition-all ${
+                      className={`btn-press flex flex-wrap items-center justify-between gap-1.5 rounded-xl px-3 py-2 text-left text-xs font-bold transition-all ${
                         blitzFeedback === 'win' && opt.optimal
                           ? 'bg-emerald-500 text-white shadow-sm'
                           : 'bg-white/75 hover:bg-white dark:bg-white/10 dark:hover:bg-white/15'
                       }`}
                     >
                       <span>{opt.label}</span>
-                      <span className="rounded-md bg-black/5 px-2 py-0.5 font-mono text-[10px] text-[var(--ink-soft)] dark:bg-white/10">
+                      <span className="shrink-0 rounded-md bg-black/5 px-2 py-0.5 font-mono text-[10px] text-[var(--ink-soft)] dark:bg-white/10">
                         {opt.complexity}
                       </span>
                     </button>
@@ -552,7 +577,7 @@ export const BayPhoneModal: React.FC = () => {
                               {entry.code}–{top.code}
                             </span>
                           </div>
-                          <div className="mt-1.5 text-xs font-extrabold leading-tight truncate">
+                          <div className="mt-1.5 text-xs font-extrabold leading-snug">
                             {c.company}
                           </div>
                           <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
@@ -774,7 +799,7 @@ export const BayPhoneModal: React.FC = () => {
                     onClick={() => buyCar('tesla', 18500)}
                     className="btn-press rounded-xl bg-[#007AFF] px-3.5 py-2 text-xs font-extrabold text-white disabled:opacity-40"
                   >
-                    $18,500
+                    {cash >= 18500 ? 'Buy $18,500' : 'Need $18,500'}
                   </button>
                 )}
               </div>
@@ -831,8 +856,8 @@ export const BayPhoneModal: React.FC = () => {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-lg font-black">🦄 {startup.name}</h3>
-                    <p className="line-clamp-2 text-[11px] font-medium text-[var(--ink-soft)]">
+                    <h3 className="text-lg font-black leading-snug">🦄 {startup.name}</h3>
+                    <p className="text-[11px] font-medium text-[var(--ink-soft)]">
                       {startup.tagline}
                     </p>
                   </div>
@@ -874,17 +899,20 @@ export const BayPhoneModal: React.FC = () => {
                   </button>
 
                   <button
+                    disabled={startup.productProgress < 50}
                     onClick={pitchStartupVC}
-                    className={`btn-press flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-extrabold text-white shadow-sm ${
+                    className={`btn-press flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-extrabold text-white shadow-sm ${
                       startup.productProgress >= 50
                         ? 'bg-emerald-600 animate-pulse'
-                        : 'bg-orange-500/80'
+                        : 'bg-orange-500/70 opacity-75 cursor-not-allowed'
                     }`}
                   >
-                    <Sparkles className="size-4" />
-                    {startup.productProgress >= 50
-                      ? 'Term Sheet Ready · Pitch Sand Hill VCs!'
-                      : `Pitch Sand Hill VCs (Need 50% MVP)`}
+                    <Sparkles className="size-4 shrink-0" />
+                    <span>
+                      {startup.productProgress >= 50
+                        ? '🦄 Term Sheet Ready · Pitch Sand Hill VCs!'
+                        : `Build MVP to 50% at Desk first (${Math.round(startup.productProgress)}/50%)`}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -935,43 +963,49 @@ export const BayPhoneModal: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
-                {DOORDASH_MENU.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col justify-between rounded-3xl bg-[var(--mist)] p-3.5 border border-black/5 dark:border-white/5"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between">
-                        <span className="text-3xl">{item.emoji}</span>
-                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
-                          {item.pantryAdd > 0 ? `🍱+${item.pantryAdd}` : `🥗+${item.hunger}`}
-                        </span>
-                      </div>
-                      <div className="mt-2 text-xs font-extrabold leading-snug line-clamp-2">
-                        {item.name}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {item.energy > 0 && (
-                          <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">
-                            ⚡+{item.energy}
-                          </span>
-                        )}
-                        {item.fun > 0 && (
-                          <span className="rounded-md bg-purple-500/15 px-1.5 py-0.5 text-[9px] font-bold text-purple-600">
-                            ✨+{item.fun}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => orderDoorDash(item.id)}
-                      className="btn-press mt-3 w-full rounded-2xl bg-[#FF3B30] py-2 text-xs font-black text-white shadow-sm"
+                {DOORDASH_MENU.map((item) => {
+                  const canAffordItem = cash >= item.price;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex flex-col justify-between rounded-3xl bg-[var(--mist)] p-3.5 border border-black/5 dark:border-white/5"
                     >
-                      Order {formatCurrency(item.price)}
-                    </button>
-                  </div>
-                ))}
+                      <div>
+                        <div className="flex items-start justify-between">
+                          <span className="text-3xl">{item.emoji}</span>
+                          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                            {item.pantryAdd > 0 ? `🍱+${item.pantryAdd}` : `🥗+${item.hunger}`}
+                          </span>
+                        </div>
+                        <div className="mt-2 text-xs font-extrabold leading-snug">
+                          {item.name}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {item.energy > 0 && (
+                            <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">
+                              ⚡+{item.energy}
+                            </span>
+                          )}
+                          {item.fun > 0 && (
+                            <span className="rounded-md bg-purple-500/15 px-1.5 py-0.5 text-[9px] font-bold text-purple-600">
+                              ✨+{item.fun}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        disabled={!canAffordItem}
+                        onClick={() => orderDoorDash(item.id)}
+                        className="btn-press mt-3 w-full rounded-2xl bg-[#FF3B30] py-2 text-xs font-black text-white shadow-sm disabled:opacity-45"
+                      >
+                        {canAffordItem
+                          ? `Order ${formatCurrency(item.price)}`
+                          : `Need ${formatCurrency(item.price)}`}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -984,6 +1018,8 @@ export const BayPhoneModal: React.FC = () => {
               {HOMES.map((h) => {
                 const isCurrent = homeId === h.id;
                 const isOwned = ownedHomes.includes(h.id);
+                const canAffordRent = cash >= h.weeklyRent;
+                const canAffordBuy = cash >= h.buyPrice;
                 return (
                   <div
                     key={h.id}
@@ -993,37 +1029,45 @@ export const BayPhoneModal: React.FC = () => {
                         : 'bg-[var(--mist)] border-transparent'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5">
                         <span className="text-3xl">{h.emoji}</span>
                         <div>
-                          <div className="text-xs font-black">{h.name}</div>
+                          <div className="text-xs font-black leading-snug">{h.name}</div>
                           <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
                             {h.area} · {h.gridSize}×{h.gridSize} Lot
                           </div>
                         </div>
                       </div>
                       {isCurrent && (
-                        <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-black text-emerald-600">
-                          Active
+                        <span className="shrink-0 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                          🏠 Current Home
                         </span>
                       )}
                     </div>
 
                     <div className="mt-2.5 grid grid-cols-2 gap-2">
                       <button
-                        disabled={isCurrent}
+                        disabled={isCurrent || !canAffordRent}
                         onClick={() => moveHome(h.id, false)}
-                        className="btn-press rounded-xl bg-[#007AFF] py-2 text-[11px] font-extrabold text-white disabled:opacity-35"
+                        className="btn-press rounded-xl bg-[#007AFF] px-2 py-2 text-[11px] font-extrabold text-white disabled:opacity-40"
                       >
-                        Lease {formatCurrency(h.weeklyRent)}/wk
+                        {isCurrent
+                          ? '🏠 Current Home'
+                          : canAffordRent
+                          ? `Lease ${formatCurrency(h.weeklyRent)}/wk`
+                          : `Need ${formatCurrency(h.weeklyRent)}/wk`}
                       </button>
                       <button
-                        disabled={isOwned}
+                        disabled={isOwned || !canAffordBuy}
                         onClick={() => moveHome(h.id, true)}
-                        className="btn-press rounded-xl bg-emerald-600 py-2 text-[11px] font-extrabold text-white disabled:opacity-35"
+                        className="btn-press rounded-xl bg-emerald-600 px-2 py-2 text-[11px] font-extrabold text-white disabled:opacity-40"
                       >
-                        {isOwned ? '✓ Deed Owned' : `Buy ${formatCurrency(h.buyPrice)}`}
+                        {isOwned
+                          ? '✓ Deed Owned'
+                          : canAffordBuy
+                          ? `Buy ${formatCurrency(h.buyPrice)}`
+                          : `Need ${formatCurrency(h.buyPrice)} to Buy`}
                       </button>
                     </div>
                   </div>
@@ -1069,18 +1113,18 @@ export const BayPhoneModal: React.FC = () => {
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Portrait appearance={npc.appearance} size={38} />
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-black truncate">{npc.name}</span>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-xs font-black">{npc.name}</span>
                                 <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[9px] font-extrabold text-[#007AFF]">
                                   {rel?.status || 'Stranger'}
                                 </span>
                               </div>
-                              <div className="text-[10px] font-semibold text-[var(--ink-soft)] truncate">
+                              <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
                                 {npc.role} · {npc.company}
                               </div>
                             </div>
                           </div>
-                          <span className="text-[10px] font-black text-emerald-600">{score}%</span>
+                          <span className="shrink-0 text-[10px] font-black text-emerald-600">{score}%</span>
                         </div>
 
                         {/* iMessage Bubble */}
@@ -1132,7 +1176,7 @@ export const BayPhoneModal: React.FC = () => {
                           <span className="text-[var(--ink-soft)]">{post.author}</span>
                         </div>
                         <div className="text-xs font-extrabold leading-snug">{post.title}</div>
-                        <p className="text-[11px] text-[var(--ink-soft)] line-clamp-2">{post.body}</p>
+                        <p className="text-[11px] text-[var(--ink-soft)] leading-relaxed">{post.body}</p>
                         <div className="flex items-center justify-between pt-1">
                           <button
                             onClick={() => handleLikeBlindPost(post.id)}

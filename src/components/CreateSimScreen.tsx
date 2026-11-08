@@ -223,7 +223,7 @@ export const CreateSimScreen: React.FC = () => {
                     ? 'Traits & Goal'
                     : 'Runway & Loft'}
                 </div>
-                <h2 className="truncate text-xl font-extrabold">{name || 'Your Engineer'}</h2>
+                <h2 className="text-xl font-extrabold leading-snug">{name || 'Your Engineer'}</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <span className="rounded-lg bg-[var(--mist)] px-2 py-0.5 text-[10px] font-bold">
                     {handle}
@@ -351,7 +351,7 @@ export const CreateSimScreen: React.FC = () => {
                       }`}
                     >
                       <span>{o.emoji}</span>
-                      <span className="truncate">{o.label}</span>
+                      <span className="leading-snug">{o.label}</span>
                     </button>
                   ))}
                 </div>
@@ -394,7 +394,7 @@ export const CreateSimScreen: React.FC = () => {
                         }`}
                       >
                         <span>{acc.emoji}</span>
-                        <span className="truncate">{acc.label}</span>
+                        <span className="leading-snug">{acc.label}</span>
                       </button>
                     ))}
                   </div>
@@ -475,8 +475,8 @@ export const CreateSimScreen: React.FC = () => {
                             {asp.emoji}
                           </span>
                           <div className="min-w-0">
-                            <div className="truncate text-xs font-extrabold">{asp.label}</div>
-                            <div className="truncate text-[10px] font-medium text-[var(--ink-soft)]">
+                            <div className="text-xs font-extrabold leading-snug">{asp.label}</div>
+                            <div className="text-[10px] font-medium leading-snug text-[var(--ink-soft)]">
                               {meta.tag}
                             </div>
                           </div>
@@ -569,8 +569,8 @@ export const CreateSimScreen: React.FC = () => {
                             {h.emoji}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-xs font-extrabold">{h.name}</div>
-                            <div className="truncate text-[10px] font-medium text-[var(--ink-soft)]">
+                            <div className="text-xs font-extrabold leading-snug">{h.name}</div>
+                            <div className="text-[10px] font-medium leading-snug text-[var(--ink-soft)]">
                               {meta.tag}
                             </div>
                           </div>

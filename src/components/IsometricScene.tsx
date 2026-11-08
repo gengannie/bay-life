@@ -19,8 +19,11 @@ import { Portrait } from './Portrait';
 import {
   ArrowUpCircle,
   Compass,
+  Home,
+  Map,
   Minus,
   Plus,
+  ShoppingBag,
   Trash2,
   X,
   Zap,
@@ -36,6 +39,48 @@ function isoToScreen(x: number, y: number) {
   const sx = ORIGIN_X + (x - y) * (TILE_W / 2);
   const sy = ORIGIN_Y + (x + y) * (TILE_H / 2);
   return { sx, sy };
+}
+
+export function clampPopoverX(x: number, viewportW: number, popoverW = 384): number {
+  const half = popoverW / 2;
+  const margin = 12;
+  return Math.max(half + margin, Math.min(viewportW - half - margin, x));
+}
+
+export function clampPopoverY(y: number, viewportH: number, popoverH = 320): number {
+  const margin = 72;
+  return Math.max(margin, Math.min(viewportH - popoverH - 96, y));
+}
+
+const SHORT_FURNITURE_LABELS: Record<string, string> = {
+  twin_mattress: 'Floor Mattress',
+  casper_queen: 'Queen Bed',
+  eightsleep_pod: 'Eight Sleep Pod',
+  folding_desk: 'MacBook Desk',
+  standing_desk: 'Standing Desk',
+  xdr_workstation: 'H100 Dev Rig',
+  ramen_kettle: 'Ramen & Kettle',
+  chemex_bar: 'Pour-Over Bar',
+  linea_micra_bar: 'Espresso Bar',
+  subzero_kitchen: 'Chef Kitchen',
+  basic_shower: 'Corner Shower',
+  rainfall_shower: 'Rainfall Shower',
+  sauna_plunge: 'Sauna & Plunge',
+  basic_toilet: 'Restroom',
+  toto_washlet: 'Smart Washlet',
+  beanbag_chair: 'Beanbag Chair',
+  midcentury_sofa: 'Leather Sofa',
+  vision_theatre: 'Vision Lounge',
+  peloton_bike: 'Peloton Bike+',
+  tonal_gym: 'Tonal AI Gym',
+  ecoflow_delta: 'EcoFlow Backup',
+  tesla_powerwall: 'Powerwall 3',
+  monstera_plant: 'Monstera Plant',
+  yc_neon_sign: 'YC Neon Sign',
+};
+
+function getShortFurnitureLabel(def: FurnitureDef): string {
+  return SHORT_FURNITURE_LABELS[def.id] || def.name;
 }
 
 function tilePolygonPoints(x: number, y: number): string {
@@ -153,10 +198,12 @@ export const IsometricScene: React.FC = () => {
   const homeId = useGameStore((s) => s.homeId);
   const objects = useGameStore((s) => s.objects);
   const pos = useGameStore((s) => s.pos);
+  const targetPos = useGameStore((s) => s.targetPos);
   const queue = useGameStore((s) => s.queue);
   const sim = useGameStore((s) => s.sim);
   const needs = useGameStore((s) => s.needs);
   const cash = useGameStore((s) => s.cash);
+  const pantryMeals = useGameStore((s) => s.pantryMeals);
   const time = useGameStore((s) => s.time);
   const weather = useGameStore((s) => s.weather);
   const pgePowerOn = useGameStore((s) => s.pgePowerOn);
@@ -168,11 +215,15 @@ export const IsometricScene: React.FC = () => {
   const interactWithNpc = useGameStore((s) => s.interactWithNpc);
   const autoFixNeed = useGameStore((s) => s.autoFixNeed);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
+  const setView = useGameStore((s) => s.setView);
+  const travelTo = useGameStore((s) => s.travelTo);
 
   const [selectedObject, setSelectedObject] = useState<PlacedObject | null>(null);
   const [selectedStation, setSelectedStation] = useState<VenueStation | null>(null);
   const [selectedNpc, setSelectedNpc] = useState<NPCDef | null>(null);
+  const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number } | null>(null);
   const [hoveredTile, setHoveredTile] = useState<{ x: number; y: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Camera Zoom & Pan State
   const [zoom, setZoom] = useState<number>(1);
@@ -250,6 +301,19 @@ export const IsometricScene: React.FC = () => {
 
   const activeQueued = queue[0];
   const activeActionDef = activeQueued ? ACTIONS[activeQueued.actionId] : null;
+  const isWalking =
+    targetPos !== null && (pos.x !== targetPos.x || pos.y !== targetPos.y);
+  const actionPct = activeQueued
+    ? Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(
+            (activeQueued.elapsedMinutes / Math.max(1, activeQueued.totalMinutes)) * 100
+          )
+        )
+      )
+    : 0;
   const activityParticles = useMemo(
     () => getActivityParticles(activeActionDef),
     [activeActionDef]
@@ -276,6 +340,47 @@ export const IsometricScene: React.FC = () => {
           n.favoriteSpot === locationId ||
           NPCS.indexOf(n) % 3 === Math.floor(time / 240) % 3
       );
+
+  // Compute collision-free tile coordinates for NPCs so they never overlap objects, stations, or the Sim
+  const npcPositions = useMemo(() => {
+    const occupied = new Set<string>();
+    occupied.add(`${pos.x},${pos.y}`);
+    if (isHome) {
+      objects.forEach((o) => occupied.add(`${o.x},${o.y}`));
+    } else if (venueDef) {
+      venueDef.stations.forEach((st) => occupied.add(`${st.x},${st.y}`));
+    }
+
+    const candidateTiles: Array<{ x: number; y: number }> = [];
+    for (let y = 0; y < gridSize; y++) {
+      for (let x = 0; x < gridSize; x++) {
+        if (!occupied.has(`${x},${y}`)) {
+          candidateTiles.push({ x, y });
+        }
+      }
+    }
+
+    return npcsHere.map((npc, idx) => {
+      const preferredX = isHome ? gridSize - 1 : (idx * 2 + 1) % Math.max(2, gridSize - 1);
+      const preferredY = isHome ? 2 : (idx * 2 + 2) % Math.max(2, gridSize - 1);
+      if (!occupied.has(`${preferredX},${preferredY}`)) {
+        occupied.add(`${preferredX},${preferredY}`);
+        return { npc, x: preferredX, y: preferredY };
+      }
+      const fallback =
+        candidateTiles.find((t) => !occupied.has(`${t.x},${t.y}`)) || {
+          x: preferredX,
+          y: preferredY,
+        };
+      occupied.add(`${fallback.x},${fallback.y}`);
+      return { npc, x: fallback.x, y: fallback.y };
+    });
+  }, [npcsHere, isHome, objects, venueDef, gridSize, pos.x, pos.y]);
+
+  const handleGoHome = () => {
+    const mode = cash >= 18 ? 'waymo' : cash >= 6 ? 'caltrain' : 'gbus';
+    travelTo('home', mode);
+  };
 
   const getFloorColors = (x: number, y: number) => {
     const alt = (x + y) % 2 === 0;
@@ -402,8 +507,22 @@ export const IsometricScene: React.FC = () => {
     }
   };
 
+  const viewportW =
+    containerRef.current?.clientWidth ||
+    (typeof window !== 'undefined' ? window.innerWidth : 960);
+  const viewportH =
+    containerRef.current?.clientHeight ||
+    (typeof window !== 'undefined' ? window.innerHeight : 720);
+  const clampedPopoverLeft = popoverAnchor
+    ? clampPopoverX(popoverAnchor.x, viewportW, 384)
+    : viewportW / 2;
+  const clampedPopoverTop = popoverAnchor
+    ? clampPopoverY(popoverAnchor.y - 160, viewportH, 320)
+    : Math.max(84, viewportH - 400);
+
   return (
     <div
+      ref={containerRef}
       className={`relative h-full w-full overflow-hidden select-none ${
         isDragging ? 'cursor-grabbing' : 'cursor-grab'
       }`}
@@ -650,18 +769,18 @@ export const IsometricScene: React.FC = () => {
             {windowHovered && (
               <g transform={`translate(${backCorner.sx - 92}, ${backCorner.sy - 56})`}>
                 <rect
-                  x="-48"
+                  x="-56"
                   y="-11"
-                  width="96"
-                  height="17"
-                  rx="8.5"
-                  fill="rgba(15,23,42,0.88)"
+                  width="112"
+                  height="18"
+                  rx="9"
+                  fill="rgba(15,23,42,0.9)"
                   stroke="#38BDF8"
                   strokeWidth="1"
                 />
                 <text
                   x="0"
-                  y="0.5"
+                  y="1"
                   fill="#FFFFFF"
                   fontSize="8.5"
                   fontWeight="700"
@@ -673,7 +792,7 @@ export const IsometricScene: React.FC = () => {
             )}
           </g>
 
-          {/* Right Wall Sign / Location Header */}
+          {/* Right Wall Sign / Location Header (translated to sign center before skewY!) */}
           <g>
             <polygon
               points={`${backCorner.sx + 40},${backCorner.sy + 20 - 84} ${backCorner.sx + 165},${backCorner.sy + 82 - 84} ${backCorner.sx + 165},${backCorner.sy + 82 - 44} ${backCorner.sx + 40},${backCorner.sy + 20 - 44}`}
@@ -681,19 +800,20 @@ export const IsometricScene: React.FC = () => {
               stroke="rgba(255,255,255,0.22)"
               strokeWidth="1.5"
             />
-            <text
-              x={backCorner.sx + 102}
-              y={backCorner.sy - 10}
-              fill="#F8FAFC"
-              fontSize="10"
-              fontWeight="700"
-              textAnchor="middle"
-              transform="skewY(27)"
-            >
-              {isHome
-                ? homeDef.name.toUpperCase().slice(0, 20)
-                : venueDef?.shortName.toUpperCase()}
-            </text>
+            <g transform={`translate(${backCorner.sx + 102.5}, ${backCorner.sy - 13}) skewY(26.5)`}>
+              <text
+                x="0"
+                y="3"
+                fill="#F8FAFC"
+                fontSize="8.5"
+                fontWeight="800"
+                textAnchor="middle"
+              >
+                {isHome
+                  ? `🏠 ${homeDef.district.toUpperCase()}`
+                  : `${venueDef?.emoji || '📍'} ${venueDef?.shortName.toUpperCase()}`}
+              </text>
+            </g>
           </g>
         </g>
 
@@ -796,18 +916,18 @@ export const IsometricScene: React.FC = () => {
               {/* Pill Label */}
               <g transform="translate(0, -24)">
                 <rect
-                  x="-44"
+                  x="-52"
                   y="-10"
-                  width="88"
-                  height="15"
-                  rx="7.5"
-                  fill="rgba(15,23,42,0.85)"
+                  width="104"
+                  height="16"
+                  rx="8"
+                  fill="rgba(15,23,42,0.88)"
                   stroke="#38BDF8"
                   strokeWidth="1"
                 />
                 <text
                   x="0"
-                  y="0.5"
+                  y="1"
                   fill="#FFFFFF"
                   fontSize="8"
                   fontWeight="700"
@@ -918,18 +1038,18 @@ export const IsometricScene: React.FC = () => {
             {botHovered && (
               <g transform="translate(0, -18)">
                 <rect
-                  x="-42"
+                  x="-52"
                   y="-10"
-                  width="84"
-                  height="15"
-                  rx="7.5"
-                  fill="rgba(15,23,42,0.88)"
+                  width="104"
+                  height="16"
+                  rx="8"
+                  fill="rgba(15,23,42,0.9)"
                   stroke="#38BDF8"
                   strokeWidth="1"
                 />
                 <text
                   x="0"
-                  y="0.5"
+                  y="1"
                   fill="#FFFFFF"
                   fontSize="8"
                   fontWeight="700"
@@ -954,6 +1074,10 @@ export const IsometricScene: React.FC = () => {
               const isSelected = selectedObject?.uid === placed.uid;
               const isInUse = activeQueued?.targetObjectUid === placed.uid;
               const hasUpgrade = Boolean(getNextUpgradeFurniture(def));
+              const shortLabel = getShortFurnitureLabel(def);
+              const powerOffBadge = !powered && def.requiresPower ? ' 🔌' : '';
+              const fullBadgeText = `${shortLabel}${hasUpgrade ? ' ⬆️' : ''}${powerOffBadge}`;
+              const pillW = Math.max(82, fullBadgeText.length * 5.4 + 18);
 
               return (
                 <g
@@ -963,6 +1087,7 @@ export const IsometricScene: React.FC = () => {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (dragRef.current.moved) return;
+                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
                     setSelectedObject(placed);
                     setSelectedStation(null);
                     setSelectedNpc(null);
@@ -1002,29 +1127,30 @@ export const IsometricScene: React.FC = () => {
                     strokeWidth="1.2"
                   />
 
-                  {/* Icon & Compact Label */}
+                  {/* Icon & Dynamic Width Label */}
                   <text x="0" y="-8" fontSize="20" textAnchor="middle">
                     {def.emoji}
                   </text>
                   <g transform="translate(0, -34)">
                     <rect
-                      x="-38"
+                      x={-pillW / 2}
                       y="-11"
-                      width="76"
+                      width={pillW}
                       height="16"
                       rx="8"
-                      fill="rgba(15,23,42,0.75)"
+                      fill="rgba(15,23,42,0.82)"
+                      stroke={isSelected ? '#38BDF8' : 'rgba(255,255,255,0.18)'}
+                      strokeWidth="1"
                     />
                     <text
                       x="0"
-                      y="0"
+                      y="0.5"
                       fill="#FFFFFF"
                       fontSize="8.5"
-                      fontWeight="600"
+                      fontWeight="700"
                       textAnchor="middle"
                     >
-                      {def.name.split(' ')[0]} {def.name.split(' ')[1] || ''}
-                      {hasUpgrade ? ' ⬆️' : ''}
+                      {fullBadgeText}
                     </text>
                   </g>
                 </g>
@@ -1036,6 +1162,8 @@ export const IsometricScene: React.FC = () => {
           venueDef?.stations.map((st) => {
             const center = isoToScreen(st.x + 0.5, st.y + 0.5);
             const isSelected = selectedStation?.id === st.id;
+            const isInUse = activeQueued?.targetStationId === st.id;
+            const stPillW = Math.max(94, st.label.length * 5.4 + 20);
             return (
               <g
                 key={st.id}
@@ -1044,18 +1172,20 @@ export const IsometricScene: React.FC = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   if (dragRef.current.moved) return;
+                  setPopoverAnchor({ x: e.clientX, y: e.clientY });
                   setSelectedStation(st);
+                  setSelectedObject(null);
                   setSelectedNpc(null);
                 }}
               >
-                {isSelected && (
+                {(isSelected || isInUse) && (
                   <ellipse
                     cx="0"
                     cy="4"
                     rx="34"
                     ry="18"
-                    fill="rgba(0,122,255,0.28)"
-                    stroke="#007AFF"
+                    fill={isInUse ? 'rgba(52,199,89,0.28)' : 'rgba(0,122,255,0.28)'}
+                    stroke={isInUse ? '#34C759' : '#007AFF'}
                     strokeWidth="2"
                   />
                 )}
@@ -1083,34 +1213,42 @@ export const IsometricScene: React.FC = () => {
                 </text>
                 <g transform="translate(0, -36)">
                   <rect
-                    x="-48"
+                    x={-stPillW / 2}
                     y="-12"
-                    width="96"
+                    width={stPillW}
                     height="17"
                     rx="8.5"
-                    fill="rgba(15,23,42,0.8)"
+                    fill="rgba(15,23,42,0.85)"
+                    stroke={isSelected ? '#38BDF8' : 'rgba(255,255,255,0.2)'}
+                    strokeWidth="1"
                   />
                   <text
                     x="0"
-                    y="-1"
+                    y="-0.5"
                     fill="#FFFFFF"
                     fontSize="8.5"
-                    fontWeight="600"
+                    fontWeight="700"
                     textAnchor="middle"
                   >
-                    {st.label.slice(0, 20)}
+                    {st.label}
                   </text>
                 </g>
               </g>
             );
           })}
 
-        {/* NPCs in Scene */}
-        {npcsHere.map((npc, idx) => {
-          const npcX = isHome ? gridSize - 1 : (idx * 2 + 1) % (gridSize - 1);
-          const npcY = isHome ? 2 : (idx * 3 + 4) % (gridSize - 1);
+        {/* NPCs in Scene with Clear Name & Role Tags Under Feet */}
+        {npcPositions.map(({ npc, x: npcX, y: npcY }) => {
           const pt = isoToScreen(npcX + 0.5, npcY + 0.5);
           const rel = relationships[npc.id];
+          const isSelected = selectedNpc?.id === npc.id;
+          const npcNameText = `💬 ${npc.name}${rel && rel.score >= 38 ? ' ★' : ''}`;
+          const npcRoleText = `${npc.role} · ${npc.company}`;
+          const npcTagW = Math.max(
+            98,
+            Math.max(npcNameText.length * 5.3, npcRoleText.length * 4.7) + 20
+          );
+
           return (
             <g
               key={npc.id}
@@ -1119,38 +1257,59 @@ export const IsometricScene: React.FC = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 if (dragRef.current.moved) return;
+                setPopoverAnchor({ x: e.clientX, y: e.clientY });
                 setSelectedNpc(npc);
                 setSelectedObject(null);
                 setSelectedStation(null);
               }}
             >
-              <ellipse cx="0" cy="6" rx="14" ry="7" fill="rgba(15,23,42,0.22)" />
+              {/* Selection / Hover Ring */}
+              <ellipse
+                cx="0"
+                cy="6"
+                rx={isSelected ? '18' : '14'}
+                ry={isSelected ? '9' : '7'}
+                fill={isSelected ? 'rgba(0,122,255,0.25)' : 'rgba(15,23,42,0.22)'}
+                stroke={isSelected ? '#007AFF' : 'none'}
+                strokeWidth="1.5"
+              />
               {/* Body */}
               <path d="M-9,4 L-7,-18 L7,-18 L9,4 Z" fill={npc.appearance.topColor} />
               {/* Head */}
               <circle cx="0" cy="-26" r="8.5" fill={npc.appearance.skin} />
               <path d="M-8,-28 Q0,-37 8,-28" fill={npc.appearance.hairColor} />
-              {/* Name Pill */}
-              <g transform="translate(0, -44)">
+
+              {/* Crisp Name & Role Tag Under NPC's Feet */}
+              <g transform="translate(0, 21)">
                 <rect
-                  x="-42"
-                  y="-11"
-                  width="84"
-                  height="16"
+                  x={-npcTagW / 2}
+                  y="-9"
+                  width={npcTagW}
+                  height="25"
                   rx="8"
-                  fill="rgba(255,255,255,0.9)"
-                  stroke="rgba(0,122,255,0.4)"
-                  strokeWidth="1"
+                  fill="rgba(255,255,255,0.94)"
+                  stroke="rgba(0,122,255,0.45)"
+                  strokeWidth="1.2"
                 />
                 <text
                   x="0"
-                  y="0"
+                  y="1"
                   fill="#0F172A"
                   fontSize="8.5"
-                  fontWeight="700"
+                  fontWeight="800"
                   textAnchor="middle"
                 >
-                  💬 {npc.name.split(' ')[0]} {rel && rel.score >= 38 ? '★' : ''}
+                  {npcNameText}
+                </text>
+                <text
+                  x="0"
+                  y="11"
+                  fill="#475569"
+                  fontSize="7.5"
+                  fontWeight="600"
+                  textAnchor="middle"
+                >
+                  {npcRoleText}
                 </text>
               </g>
             </g>
@@ -1162,8 +1321,18 @@ export const IsometricScene: React.FC = () => {
           transform={`translate(${simScreen.sx}, ${simScreen.sy})`}
           className="transition-transform duration-300 ease-out"
         >
-          {/* Floor Shadow */}
-          <ellipse cx="0" cy="6" rx="16" ry="8" fill="rgba(15,23,42,0.28)" />
+          {/* Distinct Player "YOU" Floor Ring & Shadow */}
+          <ellipse
+            cx="0"
+            cy="6"
+            rx="21"
+            ry="10.5"
+            fill="rgba(0,122,255,0.18)"
+            stroke="#007AFF"
+            strokeWidth="1.5"
+            strokeDasharray="3 2"
+          />
+          <ellipse cx="0" cy="6" rx="15" ry="7.5" fill="rgba(15,23,42,0.28)" />
 
           {/* Legs */}
           <rect x="-6" y="-6" width="4.5" height="12" rx="2" fill="#1E293B" />
@@ -1202,6 +1371,36 @@ export const IsometricScene: React.FC = () => {
             </g>
           )}
 
+          {/* Crisp "YOU" Name Tag Under the Sim's Feet */}
+          {(() => {
+            const youLabel = `${sim.name} (You)`;
+            const youPillW = Math.max(92, youLabel.length * 5.5 + 22);
+            return (
+              <g transform="translate(0, 22)">
+                <rect
+                  x={-youPillW / 2}
+                  y="-10"
+                  width={youPillW}
+                  height="17"
+                  rx="8.5"
+                  fill="#007AFF"
+                  stroke="#FFFFFF"
+                  strokeWidth="1.4"
+                />
+                <text
+                  x="0"
+                  y="1.5"
+                  fill="#FFFFFF"
+                  fontSize="8.5"
+                  fontWeight="800"
+                  textAnchor="middle"
+                >
+                  {youLabel}
+                </text>
+              </g>
+            );
+          })()}
+
           {/* Floating Plumbob / Flow State Diamond */}
           <polygon
             points="0,-58 6,-50 0,-42 -6,-50"
@@ -1210,18 +1409,19 @@ export const IsometricScene: React.FC = () => {
             strokeWidth="1.2"
           />
 
-          {/* Floating Activity Particles when executing queue[0] */}
+          {/* Floating Activity Particles when actively executing queue[0] */}
           {activeActionDef &&
+            !isWalking &&
             activityParticles.map((particle, idx) => {
-              const xOffset = (idx - 1) * 20;
+              const xOffset = idx === 0 ? -36 : idx === 1 ? 36 : 0;
               const beginSec = `${idx * 0.65}s`;
               return (
-                <g key={`particle-${idx}`} transform={`translate(${xOffset}, -54)`}>
+                <g key={`particle-${idx}`} transform={`translate(${xOffset}, -48)`}>
                   <g>
                     <animateTransform
                       attributeName="transform"
                       type="translate"
-                      values="0,0; 0,-36"
+                      values="0,0; 0,-32"
                       dur="1.9s"
                       begin={beginSec}
                       repeatCount="indefinite"
@@ -1248,128 +1448,238 @@ export const IsometricScene: React.FC = () => {
               );
             })}
 
-          {/* Active Action Speech Bubble */}
-          {activeActionDef && (
-            <g transform="translate(0, -74)">
-              <rect
-                x="-64"
-                y="-14"
-                width="128"
-                height="20"
-                rx="10"
-                fill="rgba(255,255,255,0.95)"
-                stroke="#007AFF"
-                strokeWidth="1.5"
-              />
-              <text
-                x="0"
-                y="-1"
-                fill="#0F172A"
-                fontSize="9"
-                fontWeight="700"
-                textAnchor="middle"
-              >
-                {activeActionDef.speechBubble ||
-                  `${activeActionDef.emoji} ${activeActionDef.label.slice(0, 18)}`}
-              </text>
-            </g>
-          )}
-
-          {/* Clickable Sim Low-Need Thought Bubble (when any need < 35) */}
-          {lowestAlertNeed && (
-            <g
-              transform={`translate(0, ${activeActionDef ? -100 : -76})`}
-              className="cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (dragRef.current.moved) return;
-                autoFixNeed(lowestAlertNeed.key);
-                triggerSparkle(
-                  simScreen.sx,
-                  simScreen.sy - 64,
-                  NEED_BADGE_META[lowestAlertNeed.key].emoji,
-                  `Auto-Fixing ${NEED_BADGE_META[lowestAlertNeed.key].shortLabel}!`
+          {/* Clean On-Canvas Sim Action / Walking Status Pill (Dynamic Width, Never Cut Off) */}
+          {(isWalking || activeQueued) &&
+            (() => {
+              if (isWalking && activeQueued) {
+                const walkText = `🚶 Walking to ${activeQueued.label}...`;
+                const walkPillW = Math.max(144, walkText.length * 5.6 + 26);
+                return (
+                  <g transform="translate(0, -78)">
+                    <rect
+                      x={-walkPillW / 2}
+                      y="-13"
+                      width={walkPillW}
+                      height="22"
+                      rx="11"
+                      fill="rgba(15,23,42,0.92)"
+                      stroke="#38BDF8"
+                      strokeWidth="1.5"
+                    />
+                    <text
+                      x="0"
+                      y="1"
+                      fill="#FFFFFF"
+                      fontSize="9"
+                      fontWeight="800"
+                      textAnchor="middle"
+                    >
+                      {walkText}
+                    </text>
+                  </g>
                 );
-              }}
-            >
-              {/* Thought bubble connector dots */}
-              {!activeActionDef && (
-                <>
-                  <circle cx="-4" cy="11" r="2" fill="#FFFFFF" stroke="#F59E0B" strokeWidth="1" />
-                  <circle cx="-1" cy="6" r="2.8" fill="#FFFFFF" stroke="#F59E0B" strokeWidth="1" />
-                </>
-              )}
-              <rect
-                x="-76"
-                y="-15"
-                width="152"
-                height="22"
-                rx="11"
-                fill="rgba(255,255,255,0.97)"
-                stroke="#F59E0B"
-                strokeWidth="1.8"
-              />
-              <text
-                x="0"
-                y="-1"
-                fill="#B45309"
-                fontSize="9"
-                fontWeight="800"
-                textAnchor="middle"
-              >
-                {NEED_BADGE_META[lowestAlertNeed.key].alertText}
-              </text>
-            </g>
-          )}
+              }
+
+              if (isWalking && !activeQueued) {
+                const walkText = '🚶 Walking...';
+                const walkPillW = 104;
+                return (
+                  <g transform="translate(0, -78)">
+                    <rect
+                      x={-walkPillW / 2}
+                      y="-13"
+                      width={walkPillW}
+                      height="22"
+                      rx="11"
+                      fill="rgba(15,23,42,0.92)"
+                      stroke="#38BDF8"
+                      strokeWidth="1.5"
+                    />
+                    <text
+                      x="0"
+                      y="1"
+                      fill="#FFFFFF"
+                      fontSize="9"
+                      fontWeight="800"
+                      textAnchor="middle"
+                    >
+                      {walkText}
+                    </text>
+                  </g>
+                );
+              }
+
+              if (activeQueued) {
+                const statusText = `${activeQueued.emoji} ${activeQueued.label} (${actionPct}%)`;
+                const statusPillW = Math.max(154, statusText.length * 5.7 + 28);
+                const barW = statusPillW - 24;
+                const fillW = Math.max(6, (barW * actionPct) / 100);
+                return (
+                  <g transform="translate(0, -80)">
+                    <rect
+                      x={-statusPillW / 2}
+                      y="-16"
+                      width={statusPillW}
+                      height="27"
+                      rx="13.5"
+                      fill="rgba(15,23,42,0.94)"
+                      stroke="#007AFF"
+                      strokeWidth="1.5"
+                    />
+                    <text
+                      x="0"
+                      y="-2.5"
+                      fill="#FFFFFF"
+                      fontSize="9"
+                      fontWeight="800"
+                      textAnchor="middle"
+                    >
+                      {statusText}
+                    </text>
+                    {/* Embedded Progress Bar inside Status Pill */}
+                    <rect
+                      x={-barW / 2}
+                      y="4"
+                      width={barW}
+                      height="3.5"
+                      rx="1.75"
+                      fill="rgba(255,255,255,0.22)"
+                    />
+                    <rect
+                      x={-barW / 2}
+                      y="4"
+                      width={fillW}
+                      height="3.5"
+                      rx="1.75"
+                      fill="#34C759"
+                    />
+                  </g>
+                );
+              }
+              return null;
+            })()}
+
+          {/* Clickable Sim Low-Need Thought Bubble (Positioned cleanly above so it NEVER collides) */}
+          {lowestAlertNeed &&
+            (() => {
+              const alertText = NEED_BADGE_META[lowestAlertNeed.key].alertText;
+              const alertPillW = Math.max(162, alertText.length * 5.6 + 26);
+              const hasLowerPill = Boolean(isWalking || activeQueued);
+              const yOffset = hasLowerPill ? -112 : -78;
+              return (
+                <g
+                  transform={`translate(0, ${yOffset})`}
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (dragRef.current.moved) return;
+                    autoFixNeed(lowestAlertNeed.key);
+                    triggerSparkle(
+                      simScreen.sx,
+                      simScreen.sy - 64,
+                      NEED_BADGE_META[lowestAlertNeed.key].emoji,
+                      `Auto-Fixing ${NEED_BADGE_META[lowestAlertNeed.key].shortLabel}!`
+                    );
+                  }}
+                >
+                  {/* Thought bubble connector dots when idle */}
+                  {!hasLowerPill && (
+                    <>
+                      <circle
+                        cx="-4"
+                        cy="12"
+                        r="2"
+                        fill="#FFFFFF"
+                        stroke="#F59E0B"
+                        strokeWidth="1"
+                      />
+                      <circle
+                        cx="-1"
+                        cy="7"
+                        r="2.8"
+                        fill="#FFFFFF"
+                        stroke="#F59E0B"
+                        strokeWidth="1"
+                      />
+                    </>
+                  )}
+                  <rect
+                    x={-alertPillW / 2}
+                    y="-14"
+                    width={alertPillW}
+                    height="22"
+                    rx="11"
+                    fill="rgba(255,255,255,0.97)"
+                    stroke="#F59E0B"
+                    strokeWidth="1.8"
+                  />
+                  <text
+                    x="0"
+                    y="0"
+                    fill="#B45309"
+                    fontSize="9"
+                    fontWeight="800"
+                    textAnchor="middle"
+                  >
+                    {alertText}
+                  </text>
+                </g>
+              );
+            })()}
         </g>
 
         {/* Visual Sparkle Burst Feedback Overlay */}
-        {sparkleBurst && (
-          <g
-            key={sparkleBurst.id}
-            transform={`translate(${sparkleBurst.x}, ${sparkleBurst.y})`}
-            pointerEvents="none"
-          >
-            <g>
-              <animateTransform
-                attributeName="transform"
-                type="translate"
-                values="0,0; 0,-28"
-                dur="1.3s"
-                fill="freeze"
-              />
-              <animate
-                attributeName="opacity"
-                values="1;1;0"
-                dur="1.3s"
-                fill="freeze"
-              />
-              <circle cx="-18" cy="-6" r="2.5" fill="#FBBF24" />
-              <circle cx="20" cy="-8" r="2.5" fill="#38BDF8" />
-              <circle cx="0" cy="-20" r="3" fill="#34D399" />
-              <rect
-                x="-58"
-                y="-14"
-                width="116"
-                height="20"
-                rx="10"
-                fill="rgba(15,23,42,0.9)"
-                stroke="#34D399"
-                strokeWidth="1.4"
-              />
-              <text
-                x="0"
-                y="-1"
-                fill="#ECFDF5"
-                fontSize="9"
-                fontWeight="800"
-                textAnchor="middle"
+        {sparkleBurst &&
+          (() => {
+            const burstText = `✨ ${sparkleBurst.emoji} ${sparkleBurst.label}`;
+            const burstW = Math.max(124, burstText.length * 5.6 + 24);
+            return (
+              <g
+                key={sparkleBurst.id}
+                transform={`translate(${sparkleBurst.x}, ${sparkleBurst.y})`}
+                pointerEvents="none"
               >
-                ✨ {sparkleBurst.emoji} {sparkleBurst.label}
-              </text>
-            </g>
-          </g>
-        )}
+                <g>
+                  <animateTransform
+                    attributeName="transform"
+                    type="translate"
+                    values="0,0; 0,-28"
+                    dur="1.3s"
+                    fill="freeze"
+                  />
+                  <animate
+                    attributeName="opacity"
+                    values="1;1;0"
+                    dur="1.3s"
+                    fill="freeze"
+                  />
+                  <circle cx="-18" cy="-6" r="2.5" fill="#FBBF24" />
+                  <circle cx="20" cy="-8" r="2.5" fill="#38BDF8" />
+                  <circle cx="0" cy="-20" r="3" fill="#34D399" />
+                  <rect
+                    x={-burstW / 2}
+                    y="-14"
+                    width={burstW}
+                    height="20"
+                    rx="10"
+                    fill="rgba(15,23,42,0.92)"
+                    stroke="#34D399"
+                    strokeWidth="1.4"
+                  />
+                  <text
+                    x="0"
+                    y="-1"
+                    fill="#ECFDF5"
+                    fontSize="9"
+                    fontWeight="800"
+                    textAnchor="middle"
+                  >
+                    {burstText}
+                  </text>
+                </g>
+              </g>
+            );
+          })()}
 
         {/* PG&E Blackout Overlay if Home Power is Out and No Backup */}
         {isHome && !powered && (

@@ -249,11 +249,11 @@ export const TitleScreen: React.FC = () => {
                 <div className="mt-3 flex items-center gap-3">
                   <Portrait appearance={arch.profile.appearance} size={48} ringColor={arch.accent} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-lg">{arch.emoji}</span>
-                      <h3 className="truncate text-base font-extrabold">{arch.title}</h3>
+                      <h3 className="text-base font-extrabold leading-snug">{arch.title}</h3>
                     </div>
-                    <p className="truncate text-[11px] font-medium text-[var(--ink-soft)]">
+                    <p className="mt-0.5 text-[11px] font-medium leading-snug text-[var(--ink-soft)]">
                       {arch.subtitle}
                     </p>
                   </div>
@@ -283,13 +283,13 @@ export const TitleScreen: React.FC = () => {
             <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-[var(--mist)] p-2.5">
               <Portrait appearance={sim.appearance} size={46} ringColor="#007AFF" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-sm font-extrabold">{sim.name}</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-sm font-extrabold">{sim.name}</span>
                   <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[10px] font-bold text-[#007AFF]">
                     {levelDef ? levelDef.code : 'Founder'}
                   </span>
                 </div>
-                <div className="truncate text-[11px] text-[var(--ink-soft)]">
+                <div className="text-[11px] text-[var(--ink-soft)]">
                   {getDayOfWeekName(time)} {formatTime(time)} · {homeDef.name}
                 </div>
                 <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
