@@ -12,7 +12,6 @@ import { SimProfile } from '../types/game';
 import {
   AccountSaveModal,
   formatRelativeTimestamp,
-  GoogleLogoSvg,
 } from './AccountSaveModal';
 import { Portrait } from './Portrait';
 import {
@@ -194,46 +193,24 @@ export const TitleScreen: React.FC = () => {
 
   return (
     <div className="relative flex h-dvh w-screen flex-col justify-between overflow-y-auto overflow-x-hidden bg-[linear-gradient(180deg,#bae6fd_0%,#e0f2fe_45%,#f1f5f9_100%)] px-4 py-6 sm:px-6 sm:py-8 dark:bg-[linear-gradient(180deg,#0f172a_0%,#1e1b4b_55%,#0f172a_100%)]">
-      {/* Top-Right Google Sign-In & Cloud Save Pill */}
+      {/* Top Save Status & Save Slots Bar (No Login Required) */}
       <div className="relative z-20 flex w-full items-center justify-between gap-2">
         <div className="inline-flex items-center gap-1.5 rounded-full bg-white/75 px-3 py-1 text-[11px] font-bold text-slate-700 shadow-xs backdrop-blur-md dark:bg-white/10 dark:text-slate-200">
           <Cloud className="size-3.5 text-[#007AFF]" />
           <span>
             {user
-              ? `Cloud Synced · ${formatRelativeTimestamp(lastSavedAtMs)}`
-              : `Auto-Save Ready · ${formatRelativeTimestamp(lastSavedAtMs)}`}
+              ? `${user.givenName || user.name} · Saved ${formatRelativeTimestamp(lastSavedAtMs)}`
+              : `Instant Browser Auto-Save · ${formatRelativeTimestamp(lastSavedAtMs)}`}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAccountModal(true)}
-            className="apple-pill btn-press inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-extrabold text-[var(--ink)] shadow-sm hover:border-[#007AFF]/50"
-          >
-            {user ? (
-              <>
-                <span className="grid size-5 place-items-center rounded-full bg-[#007AFF] text-[10px] font-extrabold text-white">
-                  {user.name[0]?.toUpperCase() || 'G'}
-                </span>
-                <span>{user.givenName || user.name}</span>
-                <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400">
-                  Synced
-                </span>
-              </>
-            ) : (
-              <>
-                <GoogleLogoSvg className="size-3.5" />
-                <span>Sign in with Google</span>
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={() => setShowAccountModal(true)}
-            className="apple-pill btn-press inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-[var(--ink)]"
+            className="apple-pill btn-press inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-extrabold text-[var(--ink)] shadow-sm hover:border-[#007AFF]/50"
           >
             <FolderOpen className="size-3.5 text-[#007AFF]" />
-            <span>Saves ({savedSlotCount}/4)</span>
+            <span>Save Slots & Backup ({savedSlotCount}/4)</span>
           </button>
         </div>
       </div>

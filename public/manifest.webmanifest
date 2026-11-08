@@ -2,14 +2,14 @@
   "name": "Bay Life — Silicon Valley Life Simulator",
   "short_name": "Bay Life",
   "description": "A Sims-style life simulation game set in the San Francisco Bay Area. Ship code, climb from L3 to Staff+, raise VC capital, and own the Bay.",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#090d16",
   "theme_color": "#007AFF",
   "orientation": "any",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
