@@ -5,19 +5,27 @@ import {
   CAREER_BY_ID,
   DOORDASH_MENU,
   HOMES,
+  LOCATION_BY_ID,
+  MARKET_ASSETS,
+  MARKET_ASSET_BY_TICKER,
   NPCS,
+  SKILL_TREE_NODE_BY_ID,
   SKILLS_META,
   WORK_EXPLORATION_TASKS,
   WORK_PROJECTS,
   WORK_PROJECT_BY_ID,
+  calculateCommuteDetails,
 } from '../data/worldData';
 import {
+  calculateCashFlowMetrics,
   calculateNetWorth,
+  ensureFinanceState,
   formatCurrency,
   formatTime,
+   getDayNumber,
   useGameStore,
 } from '../store/useGameStore';
-import { CommuteModeId, WorkMode } from '../types/game';
+import { CommuteModeId, MarketTicker, WorkMode } from '../types/game';
 import { Portrait } from './Portrait';
 import {
   Briefcase,
@@ -136,6 +144,7 @@ export const BayPhoneModal: React.FC = () => {
   const workShift = useGameStore((s) => s.workShift);
   const travel = useGameStore((s) => s.travel);
   const skills = useGameStore((s) => s.skills);
+  const unlockedTechNodes = useGameStore((s) => s.unlockedTechNodes) ?? ['node_git_monorepo'];
   const startup = useGameStore((s) => s.startup);
   const homeId = useGameStore((s) => s.homeId);
   const ownedHomes = useGameStore((s) => s.ownedHomes);
@@ -171,12 +180,20 @@ export const BayPhoneModal: React.FC = () => {
   const vestRsuToCash = useGameStore((s) => s.vestRsuToCash);
   const investInPortfolio = useGameStore((s) => s.investInPortfolio);
   const withdrawPortfolio = useGameStore((s) => s.withdrawPortfolio);
+  const buyStock = useGameStore((s) => s.buyStock);
+  const sellStock = useGameStore((s) => s.sellStock);
+  const applyPortfolioPreset = useGameStore((s) => s.applyPortfolioPreset);
+  const toggleDrip = useGameStore((s) => s.toggleDrip);
+  const toggleAutoSellRsu = useGameStore((s) => s.toggleAutoSellRsu);
+  const executeOptionsStrategy = useGameStore((s) => s.executeOptionsStrategy);
+  const financeRaw = useGameStore((s) => s.finance);
   const payLoan = useGameStore((s) => s.payLoan);
   const buyCar = useGameStore((s) => s.buyCar);
   const orderDoorDash = useGameStore((s) => s.orderDoorDash);
   const pitchStartupVC = useGameStore((s) => s.pitchStartupVC);
   const renameStartup = useGameStore((s) => s.renameStartup);
   const moveHome = useGameStore((s) => s.moveHome);
+  const setView = useGameStore((s) => s.setView);
   const interactWithNpc = useGameStore((s) => s.interactWithNpc);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
 
@@ -190,6 +207,9 @@ export const BayPhoneModal: React.FC = () => {
   const [blitzFeedback, setBlitzFeedback] = useState<'win' | 'miss' | null>(null);
 
   const [chartRange, setChartRange] = useState<'1D' | '1W' | '1M' | 'ALL'>('1W');
+  const [wealthSubTab, setWealthSubTab] = useState<'market' | 'cashflow' | 'equity'>('market');
+  const [selectedTicker, setSelectedTicker] = useState<MarketTicker>('NVDAX');
+  const [ledgerFilter, setLedgerFilter] = useState<'all' | 'inflow' | 'outflow' | 'trade'>('all');
   const [tradeCooldown, setTradeCooldown] = useState(0);
   const [phCooldown, setPhCooldown] = useState(0);
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
@@ -205,6 +225,8 @@ export const BayPhoneModal: React.FC = () => {
   }, [tradeCooldown, phCooldown]);
 
   const state = useGameStore.getState();
+  const finance = financeRaw ?? ensureFinanceState(state);
+  const cfMetrics = calculateCashFlowMetrics(state);
   const netWorth = calculateNetWorth(state);
   const currentCareer = job ? CAREER_BY_ID[job.careerId] : null;
   const currentLevel = currentCareer && job ? currentCareer.levels[job.levelIndex] : null;
@@ -226,7 +248,7 @@ export const BayPhoneModal: React.FC = () => {
     },
     {
       id: 'wealth',
-      label: 'Schwab',
+      label: 'Schwaab',
       icon: <TrendingUp className="size-4" />,
       gradient: 'from-[#34C759] to-[#0D9488]',
       badge: vestedRsu >= 500 ? '1' : undefined,
@@ -320,14 +342,14 @@ export const BayPhoneModal: React.FC = () => {
 
   const handleProductHuntLaunch = () => {
     if (phCooldown > 0) return;
-    setPhCooldown(6);
+    setPhCooldown(15);
     triggerMicroReward({
       cashDelta: 480,
       startupDelta: 14,
       skill: 'hustle',
       skillDelta: 0.3,
-      karmaDelta: 3,
-      toastText: 'Trending #1 on ProductHunt! +14% MVP, +250 Devs & +$480 Stripe MRR',
+      karmaDelta: 1,
+      toastText: 'Trending #1 on ProductHunt! +14% MVP, +$480 Stripe MRR & +1 ⚡ Karma',
       emoji: '🚀',
     });
   };
@@ -338,13 +360,12 @@ export const BayPhoneModal: React.FC = () => {
     triggerMicroReward({
       needKey: 'fun',
       needDelta: 8,
-      karmaDelta: 1,
       toastText: 'Upvoted spicy TC thread on Blind (+8 Vibe)',
       emoji: '🔥',
     });
   };
 
-  // Asset allocation percentages for Schwab ring/bar
+  // Asset allocation percentages for Schwaab ring/bar
   const totalLiquidAssets = Math.max(1, cash + vestedRsu + unvestedRsu + portfolioValue);
   const cashPct = Math.round((cash / totalLiquidAssets) * 100);
   const rsuPct = Math.round(((vestedRsu + unvestedRsu) / totalLiquidAssets) * 100);
@@ -397,7 +418,7 @@ export const BayPhoneModal: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="text-sm font-black tracking-tight">
               {phoneApp === 'levels' && '📊 Levels.fyi'}
-              {phoneApp === 'wealth' && '💎 Schwab Private Wealth'}
+              {phoneApp === 'wealth' && '💎 Schwaab Private Wealth'}
               {phoneApp === 'startup' && '🦄 YC Startup Studio'}
               {phoneApp === 'doordash' && '🛵 DoorDash Express'}
               {phoneApp === 'zillow' && '🏡 Zillow Bay Area'}
@@ -603,6 +624,30 @@ export const BayPhoneModal: React.FC = () => {
                               </div>
                             )}
 
+                            {nextLevel.requiredTechNode && (() => {
+                              const reqNode = SKILL_TREE_NODE_BY_ID[nextLevel.requiredTechNode];
+                              const hasNode = unlockedTechNodes.includes(nextLevel.requiredTechNode);
+                              return (
+                                <div className="flex items-center justify-between gap-2 rounded-lg bg-black/5 px-2 py-1 dark:bg-white/5">
+                                  <span className="truncate">
+                                    🌳 Tech Spec: {reqNode ? `${reqNode.emoji} ${reqNode.title}` : nextLevel.requiredTechNode}
+                                  </span>
+                                  {hasNode ? (
+                                    <span className="shrink-0 text-emerald-600 dark:text-emerald-400">
+                                      ✓ Unlocked
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => setActiveModal('career')}
+                                      className="btn-press shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-black text-amber-600 dark:text-amber-400"
+                                    >
+                                      🔒 Tech Tree ↗
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
                             <button
                               onClick={() => submitPromoPacket?.()}
                               className="btn-press mt-1 w-full rounded-xl bg-gradient-to-r from-[#007AFF] to-indigo-600 py-1.5 text-[11px] font-black text-white shadow-xs"
@@ -639,7 +684,9 @@ export const BayPhoneModal: React.FC = () => {
                               isAtCampus
                                 ? startWorkShift('office')
                                 : commuteToOfficeAndWork
-                                ? commuteToOfficeAndWork(job.preferredCommute)
+                                ? commuteToOfficeAndWork(
+                                    ownedCars.length > 0 ? 'tesla' : job.preferredCommute
+                                  )
                                 : startWorkShift('office')
                             }
                             className="btn-press rounded-xl bg-emerald-600 py-2 text-[11px] font-extrabold text-white shadow-xs disabled:opacity-50"
@@ -758,52 +805,164 @@ export const BayPhoneModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* 1-Tap Switch Career Track Cards */}
-              <div className="space-y-2">
-                <div className="px-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
-                  Switch Track · Instant Offer
+              {/* Selective Onsite Interview Loops & Career Track Switching */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between px-1">
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
+                    Switch Track · Onsite Interview Loops
+                  </div>
+                  <button
+                    onClick={() => setActiveModal('career')}
+                    className="btn-press rounded-lg bg-[#007AFF]/15 px-2.5 py-1 text-[10px] font-extrabold text-[#007AFF]"
+                  >
+                    🌳 Skill Tech Tree & Hub ↗
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+
+                <div className="grid grid-cols-1 gap-2.5">
                   {CAREERS.map((c) => {
                     const isCurrent = job?.careerId === c.id;
                     const entry = c.levels[0];
                     const top = c.levels[c.levels.length - 1];
+                    const entryReq = c.entryRequirements;
+
+                    const reqNodes = entryReq?.requiredTechNodes ?? [];
+                    const reqSkills = entryReq?.requiredSkills ?? [];
+                    const minDeliv = entryReq?.minDeliverables ?? 0;
+                    const curDeliv = job?.deliverablesCompleted ?? 0;
+
+                    const allNodesMet = reqNodes.every((nid) => unlockedTechNodes.includes(nid));
+                    const allSkillsMet = reqSkills.every(
+                      (req) => Math.floor(skills[req.skill] ?? 0) >= req.level
+                    );
+                    const delivMet = curDeliv >= minDeliv;
+                    const canPassGate = allNodesMet && allSkillsMet && delivMet;
+
                     return (
                       <div
                         key={c.id}
-                        className={`flex flex-col justify-between rounded-2xl p-3 border transition-all ${
+                        className={`flex flex-col justify-between rounded-2xl p-3 border transition-all space-y-2 ${
                           isCurrent
                             ? 'bg-[#007AFF]/10 border-[#007AFF]/40'
+                            : canPassGate
+                            ? 'bg-[var(--mist)] border-emerald-500/35'
                             : 'bg-[var(--mist)] border-transparent'
                         }`}
                       >
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xl">{c.emoji}</span>
-                            <span className="rounded-full bg-black/5 px-2 py-0.5 text-[9px] font-extrabold dark:bg-white/10">
+                        <div className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xl">{c.emoji}</span>
+                              <div className="min-w-0">
+                                <div className="text-xs font-extrabold leading-snug">
+                                  {c.company}
+                                </div>
+                                <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  {formatCurrency(entry.baseSalary + entry.rsuAnnual)} →{' '}
+                                  {formatCurrency(top.baseSalary + top.rsuAnnual)} TC
+                                </div>
+                              </div>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-[9px] font-extrabold dark:bg-white/10">
                               {entry.code}–{top.code}
                             </span>
                           </div>
-                          <div className="mt-1.5 text-xs font-extrabold leading-snug">
-                            {c.company}
-                          </div>
-                          <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(entry.baseSalary + entry.rsuAnnual)} →{' '}
-                            {formatCurrency(top.baseSalary + top.rsuAnnual)}
-                          </div>
+
+                          {/* Selectivity Label Badge */}
+                          {entryReq && (
+                            <div className="flex flex-wrap items-center justify-between gap-1 rounded-xl bg-black/5 px-2.5 py-1 text-[10px] font-extrabold dark:bg-white/5">
+                              <span>{entryReq.selectivityLabel}</span>
+                              <span className="text-[9px] font-bold text-[var(--ink-soft)]">
+                                -{entryReq.interviewEnergyCost} ⚡ Energy
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Required Custom Tech Tree Nodes & Core Skills Badges */}
+                          {entryReq && (
+                            <div className="space-y-1">
+                              <div className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
+                                Required Custom Tech Tree & Core Skills:
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {reqNodes.map((nid) => {
+                                  const nodeDef = SKILL_TREE_NODE_BY_ID[nid];
+                                  const hasNode = unlockedTechNodes.includes(nid);
+                                  return (
+                                    <span
+                                      key={nid}
+                                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${
+                                        hasNode
+                                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                          : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                                      }`}
+                                    >
+                                      {hasNode ? '✓' : '🔒'} {nodeDef?.emoji} {nodeDef?.title || nid}
+                                    </span>
+                                  );
+                                })}
+
+                                {reqSkills.map((req) => {
+                                  const skMeta = SKILLS_META.find((m) => m.key === req.skill);
+                                  const curLvl = Math.floor(skills[req.skill] ?? 0);
+                                  const met = curLvl >= req.level;
+                                  return (
+                                    <span
+                                      key={req.skill}
+                                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
+                                        met
+                                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                          : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                      }`}
+                                    >
+                                      {met ? '✓' : '🔒'} {skMeta?.emoji} {req.skill} Lv.{req.level} (at Lv.{curLvl})
+                                    </span>
+                                  );
+                                })}
+
+                                {minDeliv > 0 && (
+                                  <span
+                                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
+                                      delivMet
+                                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                        : 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+                                    }`}
+                                  >
+                                    {delivMet ? '✓' : '🔒'} 📦 {curDeliv}/{minDeliv} Deliverable
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        <button
-                          disabled={isCurrent}
-                          onClick={() => applyJob(c.id)}
-                          className={`btn-press mt-2.5 w-full rounded-xl py-1.5 text-[11px] font-extrabold ${
-                            isCurrent
-                              ? 'bg-emerald-500/20 text-emerald-600'
-                              : 'bg-[#007AFF] text-white'
-                          }`}
-                        >
-                          {isCurrent ? '✓ Current' : 'Switch Track'}
-                        </button>
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <button
+                            disabled={isCurrent}
+                            onClick={() => applyJob(c.id)}
+                            className={`btn-press flex-1 rounded-xl py-1.5 text-[11px] font-extrabold ${
+                              isCurrent
+                                ? 'bg-emerald-500/20 text-emerald-600'
+                                : canPassGate
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-[#007AFF] text-white'
+                            }`}
+                          >
+                            {isCurrent
+                              ? '✓ Current Track'
+                              : canPassGate
+                              ? `🎯 Sit Onsite Loop (-${entryReq?.interviewEnergyCost ?? 15} ⚡)`
+                              : '🔒 Attempt Onsite Loop'}
+                          </button>
+                          {!isCurrent && !canPassGate && (
+                            <button
+                              onClick={() => setActiveModal('career')}
+                              className="btn-press rounded-xl bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-extrabold text-purple-600 dark:text-purple-300"
+                            >
+                              🌳 Tech Tree
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -985,30 +1144,27 @@ export const BayPhoneModal: React.FC = () => {
                 </div>
               )}
 
-              {/* EV Garage Card */}
-              <div className="flex items-center justify-between rounded-2xl bg-[var(--mist)] p-3.5">
+              {/* EV Garage & Apple CarPlay Card */}
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#007AFF]/25 bg-[#007AFF]/8 p-3.5">
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">🏎️</span>
                   <div>
-                    <div className="text-xs font-extrabold">Porsche Taycan / Plaid EV</div>
+                    <div className="text-xs font-extrabold">
+                      Apple CarPlay & Bay Area EV Garage
+                    </div>
                     <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
-                      Zero-fare 12m I-280 HOV commute
+                      {ownedCars.length > 0
+                        ? 'EV Owned · $0 Fares, Fast HOV Autopilot & Scenic Joyrides'
+                        : 'Prius ($4.2k) · Model 3 FSD ($12.5k) · Taycan GT ($18.5k)'}
                     </div>
                   </div>
                 </div>
-                {ownedCars.includes('tesla') ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-extrabold text-emerald-600">
-                    <CheckCircle2 className="size-3.5" /> Owned
-                  </span>
-                ) : (
-                  <button
-                    disabled={cash < 18500}
-                    onClick={() => buyCar('tesla', 18500)}
-                    className="btn-press rounded-xl bg-[#007AFF] px-3.5 py-2 text-xs font-extrabold text-white disabled:opacity-40"
-                  >
-                    {cash >= 18500 ? 'Buy $18,500' : 'Need $18,500'}
-                  </button>
-                )}
+                <button
+                  onClick={() => setActiveModal('garage')}
+                  className="btn-press shrink-0 rounded-xl bg-[#007AFF] px-3.5 py-2 text-xs font-extrabold text-white shadow-xs"
+                >
+                  {ownedCars.length > 0 ? '🚗 Open CarPlay' : '🚗 EV Showroom'}
+                </button>
               </div>
             </div>
           )}
@@ -1221,46 +1377,131 @@ export const BayPhoneModal: React.FC = () => {
               5. ZILLOW BAY AREA REAL ESTATE BENTO
           ========================================================= */}
           {phoneApp === 'zillow' && (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-2xl border border-[#5856D6]/25 bg-[#5856D6]/10 px-3.5 py-2.5">
+                <div>
+                  <div className="text-xs font-extrabold text-[var(--ink)]">
+                    🏡 Bay Area Luxury Real Estate & Leases
+                  </div>
+                  <div className="text-[10px] font-medium text-[var(--ink-soft)]">
+                    Higher tiers unlock custom window views, passive XP & need-drain shields, and keeps your upgraded furniture!
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setActiveModal(null);
+                    setView('map');
+                  }}
+                  className="btn-press shrink-0 rounded-xl bg-[#5856D6] px-2.5 py-1.5 text-[10px] font-extrabold text-white shadow-xs"
+                >
+                  🗺️ View on Map
+                </button>
+              </div>
+
               {HOMES.map((h) => {
                 const isCurrent = homeId === h.id;
                 const isOwned = ownedHomes.includes(h.id);
                 const canAffordRent = cash >= h.weeklyRent;
                 const canAffordBuy = cash >= h.buyPrice;
+                const hqId = currentCareer?.locationId || 'soma_yc_loft';
+                const hqVenue = LOCATION_BY_ID[hqId];
+                const hqCommute = calculateCommuteDetails(
+                  h.id,
+                  hqId,
+                  h.id,
+                  ownedCars.length > 0 ? 'tesla' : 'waymo'
+                );
+
                 return (
                   <div
                     key={h.id}
                     className={`rounded-3xl p-3.5 border transition-all ${
                       isCurrent
-                        ? 'bg-[#5856D6]/12 border-[#5856D6]/40'
-                        : 'bg-[var(--mist)] border-transparent'
+                        ? 'bg-[#5856D6]/12 border-[#5856D6]/50 ring-1 ring-[#5856D6]/30'
+                        : 'bg-[var(--mist)] border-black/5 dark:border-white/5'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-3xl">{h.emoji}</span>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2.5">
+                        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white/75 text-2xl shadow-xs dark:bg-white/10">
+                          {h.emoji}
+                        </span>
                         <div>
-                          <div className="text-xs font-black leading-snug">{h.name}</div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[9.5px] font-extrabold ${
+                                h.tier >= 5
+                                  ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                  : h.tier >= 4
+                                  ? 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
+                                  : h.tier >= 3
+                                  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                              }`}
+                            >
+                              {h.tierLabel}
+                            </span>
+                            <span className="rounded-md bg-black/5 px-1.5 py-0.5 font-mono text-[9.5px] font-bold text-[var(--ink-soft)] dark:bg-white/10">
+                              {h.gridSize}×{h.gridSize} Grid
+                            </span>
+                          </div>
+                          <div className="mt-0.5 text-xs font-black leading-snug">
+                            {h.name}
+                          </div>
                           <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
-                            {h.area} · {h.gridSize}×{h.gridSize} Lot
+                            {h.area} · {h.district}
                           </div>
                         </div>
                       </div>
-                      {isCurrent && (
+                      {isCurrent ? (
                         <span className="shrink-0 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
-                          🏠 Current Home
+                          🏠 Active Lease
+                        </span>
+                      ) : isOwned ? (
+                        <span className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-black text-amber-700 dark:text-amber-300">
+                          🔑 Deed Owned
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <p className="mt-2 text-[11px] leading-snug text-[var(--ink-soft)]">
+                      {h.tagline}
+                    </p>
+
+                    {/* Luxury Perks & Commute Pills */}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {h.perks.map((perk, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[var(--ink)] dark:bg-black/30"
+                        >
+                          <span>{perk.emoji}</span>
+                          <span>{perk.label}:</span>
+                          <span className="font-extrabold text-[#5856D6] dark:text-indigo-300">
+                            {perk.desc}
+                          </span>
+                        </span>
+                      ))}
+                      {hqVenue && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/12 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:text-indigo-300">
+                          <span>🚆 To {hqVenue.shortName}:</span>
+                          <span>
+                            {hqCommute.miles} mi · {hqCommute.durationMinutes}m
+                          </span>
                         </span>
                       )}
                     </div>
 
                     <div className="mt-2.5 grid grid-cols-2 gap-2">
                       <button
-                        disabled={isCurrent || !canAffordRent}
+                        disabled={isCurrent || (!isOwned && !canAffordRent)}
                         onClick={() => moveHome(h.id, false)}
                         className="btn-press rounded-xl bg-[#007AFF] px-2 py-2 text-[11px] font-extrabold text-white disabled:opacity-40"
                       >
                         {isCurrent
-                          ? '🏠 Current Home'
+                          ? '🏠 Current Residence'
+                          : isOwned
+                          ? '🔑 Move In ($0/wk)'
                           : canAffordRent
                           ? `Lease ${formatCurrency(h.weeklyRent)}/wk`
                           : `Need ${formatCurrency(h.weeklyRent)}/wk`}
@@ -1271,10 +1512,10 @@ export const BayPhoneModal: React.FC = () => {
                         className="btn-press rounded-xl bg-emerald-600 px-2 py-2 text-[11px] font-extrabold text-white disabled:opacity-40"
                       >
                         {isOwned
-                          ? '✓ Deed Owned'
+                          ? '✓ Deed Owned ($0 Rent)'
                           : canAffordBuy
-                          ? `Buy ${formatCurrency(h.buyPrice)}`
-                          : `Need ${formatCurrency(h.buyPrice)} to Buy`}
+                          ? `Buy Deed ${formatCurrency(h.buyPrice)}`
+                          : `Deed ${formatCurrency(h.buyPrice)}`}
                       </button>
                     </div>
                   </div>

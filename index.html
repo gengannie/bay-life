@@ -3,17 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#eef2f7" />
+    <meta name="theme-color" content="#007AFF" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Bay Life" />
     <title>Bay Life — Live your Silicon Valley story</title>
     <meta name="description" content="A Sims-style life simulation game set in the San Francisco Bay Area. Grind LeetCode, ride Caltrain & Waymo, survive PG&E outages, pitch on Sand Hill Road, and climb from L3 to Staff+ or Unicorn Founder." />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='%23007AFF'/><path d='M12 46h40M18 46V24l6 10h16l6-10v22M24 18v28M40 18v28' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>" />
+
+    <!-- OpenGraph / Social Sharing -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Bay Life" />
+    <meta property="og:title" content="Bay Life — Live your Silicon Valley story" />
+    <meta property="og:description" content="Ship code. Raise capital. Own the Bay. A Sims-style life simulator set in the San Francisco Bay Area with Google Cloud saves." />
+    <meta property="og:image" content="/og-preview.svg" />
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Bay Life — Silicon Valley Life Simulator" />
+    <meta name="twitter:description" content="Ship code. Raise capital. Own the Bay. Climb from L3 to Staff+ or Unicorn Founder." />
+    <meta name="twitter:image" content="/og-preview.svg" />
+
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Google Identity Services (OAuth 2.0 / Sign In with Google) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body class="h-dvh w-screen overflow-hidden bg-[#eef2f7] text-[var(--ink)] dark:bg-[#090d16]">
     <div id="root" class="h-dvh w-screen overflow-hidden"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

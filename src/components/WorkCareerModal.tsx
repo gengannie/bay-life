@@ -4,6 +4,9 @@ import {
   CAREER_BY_ID,
   HOMES,
   LOCATION_BY_ID,
+  SKILL_TREE_BRANCHES,
+  SKILL_TREE_NODES,
+  SKILL_TREE_NODE_BY_ID,
   SKILLS_META,
   WORK_EXPLORATION_TASKS,
   WORK_PROJECTS,
@@ -18,6 +21,7 @@ import {
 } from '../store/useGameStore';
 import {
   CommuteModeId,
+  TechNodeId,
   WeekdayAttendance,
   WorkMode,
   WorkProjectDef,
@@ -50,22 +54,29 @@ interface CareerStoreExtensions {
   selectWorkProject?: (projectId: string) => void;
   doWorkExploration?: (taskId: string) => void;
   submitPromoPacket?: () => void;
+  unlockTechNode?: (nodeId: TechNodeId) => void;
+  trainTechNodeSkill?: (nodeId: TechNodeId) => void;
 }
 
-type CareerModalTab = 'hybrid' | 'explore' | 'ladder';
+type CareerModalTab = 'hybrid' | 'explore' | 'tree' | 'ladder';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
 export const WorkCareerModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<CareerModalTab>('hybrid');
   const [selectedLevelIdx, setSelectedLevelIdx] = useState<number | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<TechNodeId>('node_cuda_triton');
 
   const sim = useGameStore((s) => s.sim);
   const job = useGameStore((s) => s.job);
+  const ownedCars = useGameStore((s) => s.ownedCars);
   const workShift = useGameStore((s) => s.workShift);
   const travel = useGameStore((s) => s.travel);
   const skills = useGameStore((s) => s.skills);
   const needs = useGameStore((s) => s.needs);
+  const karma = useGameStore((s) => s.karma);
+  const unlockedPerks = useGameStore((s) => s.unlockedPerks);
+  const unlockedTechNodes = useGameStore((s) => s.unlockedTechNodes);
   const locationId = useGameStore((s) => s.locationId);
   const homeId = useGameStore((s) => s.homeId);
   const time = useGameStore((s) => s.time);
@@ -90,6 +101,12 @@ export const WorkCareerModal: React.FC = () => {
   );
   const submitPromoPacket = useGameStore(
     (s) => (s as typeof s & CareerStoreExtensions).submitPromoPacket
+  );
+  const unlockTechNode = useGameStore(
+    (s) => (s as typeof s & CareerStoreExtensions).unlockTechNode
+  );
+  const trainTechNodeSkill = useGameStore(
+    (s) => (s as typeof s & CareerStoreExtensions).trainTechNodeSkill
   );
 
   if (!job) return null;
@@ -143,7 +160,13 @@ export const WorkCareerModal: React.FC = () => {
     ? SKILLS_META.find((sk) => sk.key === secondarySkillKey)
     : null;
 
-  const gatePerfPass = Math.round(job.performance) >= 92;
+  const unlockedNodes: TechNodeId[] = unlockedTechNodes ?? ['node_git_monorepo'];
+  const reqTechNodeId = nextLevel?.requiredTechNode;
+  const reqTechNodeDef = reqTechNodeId ? SKILL_TREE_NODE_BY_ID[reqTechNodeId] : null;
+  const gateTechNodePass = !reqTechNodeId || unlockedNodes.includes(reqTechNodeId);
+
+  const reqPerfGate = unlockedPerks.includes('perk_exec_halo') ? 82 : 92;
+  const gatePerfPass = Math.round(job.performance) >= reqPerfGate;
   const gateTenurePass = shiftsAtLevel >= reqShifts;
   const gatePrimaryPass = primarySkillCur >= primarySkillReq;
   const gateSecondaryPass = !secondarySkillKey || secondarySkillCur >= secondarySkillReq;
@@ -155,10 +178,13 @@ export const WorkCareerModal: React.FC = () => {
     gateTenurePass,
     gatePrimaryPass,
     gateSecondaryPass,
+    gateTechNodePass,
     gateDeliverablesPass,
     gateRtoPass,
   ].filter(Boolean).length;
-  const allPromoGatesReady = Boolean(nextLevel && gatesPassedCount === 6);
+  const allPromoGatesReady = Boolean(nextLevel && gatesPassedCount === 7);
+
+  const selectedNode = SKILL_TREE_NODE_BY_ID[selectedNodeId] || SKILL_TREE_NODES[5];
 
   const inspectedLevelIdx = selectedLevelIdx !== null ? selectedLevelIdx : job.levelIndex;
   const inspectedLevel = career.levels[inspectedLevelIdx] || currentLevel;
@@ -167,7 +193,7 @@ export const WorkCareerModal: React.FC = () => {
     if (isAtCampus) {
       startWorkShift('office');
     } else if (commuteToOfficeAndWork) {
-      commuteToOfficeAndWork(job.preferredCommute);
+      commuteToOfficeAndWork(ownedCars.length > 0 ? 'tesla' : job.preferredCommute);
     } else {
       startWorkShift('office');
     }
@@ -234,28 +260,42 @@ export const WorkCareerModal: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('explore')}
-                className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                className={`btn-press flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition-all ${
                   activeTab === 'explore'
                     ? 'bg-white text-[var(--ink)] shadow-sm dark:bg-zinc-800 dark:text-white'
                     : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
                 }`}
               >
                 <Cpu className="size-3.5 text-purple-500" />
-                <span>🔬 Work Exploration</span>
+                <span>🔬 Exploration</span>
                 <span className="rounded-full bg-purple-500/20 px-1.5 py-0.2 text-[10px] font-black text-purple-600 dark:text-purple-300">
                   {projectProgress}%
                 </span>
               </button>
               <button
+                onClick={() => setActiveTab('tree')}
+                className={`btn-press flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition-all ${
+                  activeTab === 'tree'
+                    ? 'bg-white text-[var(--ink)] shadow-sm dark:bg-zinc-800 dark:text-white'
+                    : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                }`}
+              >
+                <Layers className="size-3.5 text-amber-500" />
+                <span>🌳 Skill Tech Tree</span>
+                <span className="rounded-full bg-amber-500/20 px-1.5 py-0.2 text-[10px] font-black text-amber-600 dark:text-amber-300">
+                  {unlockedNodes.length}/{SKILL_TREE_NODES.length}
+                </span>
+              </button>
+              <button
                 onClick={() => setActiveTab('ladder')}
-                className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                className={`btn-press flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition-all ${
                   activeTab === 'ladder'
                     ? 'bg-white text-[var(--ink)] shadow-sm dark:bg-zinc-800 dark:text-white'
                     : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
                 }`}
               >
                 <TrendingUp className="size-3.5 text-emerald-500" />
-                <span>📈 Career Track & Promo</span>
+                <span>📈 Career & Promo</span>
                 {nextLevel && (
                   <span
                     className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
@@ -264,7 +304,7 @@ export const WorkCareerModal: React.FC = () => {
                         : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
                     }`}
                   >
-                    {gatesPassedCount}/6
+                    {gatesPassedCount}/7
                   </span>
                 )}
               </button>
@@ -1332,13 +1372,13 @@ export const WorkCareerModal: React.FC = () => {
                                   : 'font-black text-[#007AFF]'
                               }
                             >
-                              {Math.round(job.performance)}% / 92%
+                              {Math.round(job.performance)}% / {reqPerfGate}%
                             </span>
                           </div>
                           <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-[#007AFF] to-emerald-500 transition-all duration-300"
-                              style={{ width: `${Math.min(100, (job.performance / 92) * 100)}%` }}
+                              style={{ width: `${Math.min(100, (job.performance / reqPerfGate) * 100)}%` }}
                             />
                           </div>
                         </div>

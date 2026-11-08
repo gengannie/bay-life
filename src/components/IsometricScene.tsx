@@ -9,7 +9,9 @@ import {
 import {
   calculateOverallMood,
   formatCurrency,
+  getHomeDeskCoord,
   getHourOfDay,
+  getInstalledHomeComputer,
   hasHomeBackupPower,
   isHomePowered,
   useGameStore,
@@ -22,12 +24,16 @@ import {
   Home,
   Map,
   Minus,
+  Monitor,
+  Move,
   Plus,
+  RotateCw,
   ShoppingBag,
   Trash2,
   X,
   Zap,
 } from 'lucide-react';
+import { getIsoTileFromClientPoint, useFurnishStore } from '../store/useFurnishStore';
 
 // Convert grid (x, y) to isometric SVG coordinates
 const TILE_W = 68;
@@ -58,6 +64,7 @@ const SHORT_FURNITURE_LABELS: Record<string, string> = {
   eightsleep_pod: 'Eight Sleep Pod',
   folding_desk: 'MacBook Desk',
   standing_desk: 'Standing Desk',
+  mac_studio_desk: 'Mac Studio Rig',
   xdr_workstation: 'H100 Dev Rig',
   ramen_kettle: 'Ramen & Kettle',
   chemex_bar: 'Pour-Over Bar',
@@ -195,6 +202,7 @@ function getActivityParticles(act: ActionDef | null): string[] {
 
 export const IsometricScene: React.FC = () => {
   const locationId = useGameStore((s) => s.locationId);
+  const view = useGameStore((s) => s.view);
   const homeId = useGameStore((s) => s.homeId);
   const objects = useGameStore((s) => s.objects);
   const pos = useGameStore((s) => s.pos);
@@ -203,8 +211,10 @@ export const IsometricScene: React.FC = () => {
   const sim = useGameStore((s) => s.sim);
   const needs = useGameStore((s) => s.needs);
   const cash = useGameStore((s) => s.cash);
+  const ownedCars = useGameStore((s) => s.ownedCars);
   const pantryMeals = useGameStore((s) => s.pantryMeals);
   const time = useGameStore((s) => s.time);
+  const workShift = useGameStore((s) => s.workShift);
   const weather = useGameStore((s) => s.weather);
   const pgePowerOn = useGameStore((s) => s.pgePowerOn);
   const relationships = useGameStore((s) => s.relationships);
@@ -212,6 +222,7 @@ export const IsometricScene: React.FC = () => {
   const enqueueAction = useGameStore((s) => s.enqueueAction);
   const buyFurniture = useGameStore((s) => s.buyFurniture);
   const sellFurniture = useGameStore((s) => s.sellFurniture);
+  const storeFurnitureInBackpack = useGameStore((s) => s.storeFurnitureInBackpack);
   const interactWithNpc = useGameStore((s) => s.interactWithNpc);
   const autoFixNeed = useGameStore((s) => s.autoFixNeed);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
@@ -219,11 +230,35 @@ export const IsometricScene: React.FC = () => {
   const setActiveModal = useGameStore((s) => s.setActiveModal);
   const travelTo = useGameStore((s) => s.travelTo);
 
+  // Furnishing Mode Store State
+  const catalogDrag = useFurnishStore((s) => s.catalogDrag);
+  const selectedFurnishUid = useFurnishStore((s) => s.selectedFurnishUid);
+  const pendingPlaceId = useFurnishStore((s) => s.pendingPlaceId);
+  const trayMode = useFurnishStore((s) => s.trayMode);
+  const furnishSparkle = useFurnishStore((s) => s.furnishSparkle);
+  const setSelectedFurnishUid = useFurnishStore((s) => s.setSelectedFurnishUid);
+  const setPendingPlaceId = useFurnishStore((s) => s.setPendingPlaceId);
+  const buyAndPlaceFurniture = useFurnishStore((s) => s.buyAndPlaceFurniture);
+  const movePlacedFurniture = useFurnishStore((s) => s.movePlacedFurniture);
+  const rotatePlacedFurniture = useFurnishStore((s) => s.rotatePlacedFurniture);
+
   const [selectedObject, setSelectedObject] = useState<PlacedObject | null>(null);
   const [selectedStation, setSelectedStation] = useState<VenueStation | null>(null);
   const [selectedNpc, setSelectedNpc] = useState<NPCDef | null>(null);
   const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number } | null>(null);
   const [hoveredTile, setHoveredTile] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredObjectUid, setHoveredObjectUid] = useState<string | null>(null);
+  const [draggingPlaced, setDraggingPlaced] = useState<{
+    uid: string;
+    objectId: string;
+    startX: number;
+    startY: number;
+    origTileX: number;
+    origTileY: number;
+    currentTileX: number;
+    currentTileY: number;
+    moved: boolean;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Camera Zoom & Pan State
@@ -295,16 +330,147 @@ export const IsometricScene: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [droneAvailable]);
 
+  // Clear local selection popovers when location, apartment, or loaded Sim changes
+  useEffect(() => {
+    setSelectedObject(null);
+    setSelectedStation(null);
+    setSelectedNpc(null);
+    setPopoverAnchor(null);
+  }, [homeId, locationId, sim.name]);
+
   const state = useGameStore.getState();
   const moodInfo = calculateOverallMood(state);
   const powered = isHomePowered(state);
   const backupActive = !pgePowerOn && hasHomeBackupPower(state);
 
   const isHome = locationId === 'home';
+  const isFurnishMode = isHome && view === 'buy';
   const homeDef = HOMES.find((h) => h.id === homeId) || HOMES[1];
   const venueDef = !isHome ? LOCATION_BY_ID[locationId] : null;
   const gridSize = isHome ? homeDef.gridSize : 7;
   const floorStyle = isHome ? homeDef.floorStyle : venueDef?.floorStyle || 'concrete';
+
+  // Clear live action popovers when entering Furnish Mode
+  useEffect(() => {
+    if (isFurnishMode) {
+      setSelectedObject(null);
+      setSelectedStation(null);
+      setSelectedNpc(null);
+    } else {
+      setPendingPlaceId(null);
+    }
+  }, [isFurnishMode, setPendingPlaceId]);
+
+  // Global pointer tracking when dragging a placed furniture object across the isometric grid
+  useEffect(() => {
+    if (!draggingPlaced) return;
+
+    const onPointerMove = (e: PointerEvent) => {
+      const dist = Math.hypot(e.clientX - draggingPlaced.startX, e.clientY - draggingPlaced.startY);
+      const threshold = isFurnishMode ? 4 : 9;
+      if (!draggingPlaced.moved && dist < threshold) return;
+
+      const tile = getIsoTileFromClientPoint(e.clientX, e.clientY, gridSize, true);
+      if (tile) {
+        setDraggingPlaced((prev) =>
+          prev
+            ? {
+                ...prev,
+                moved: true,
+                currentTileX: tile.x,
+                currentTileY: tile.y,
+              }
+            : null
+        );
+      }
+    };
+
+    const onPointerUp = () => {
+      if (draggingPlaced.moved) {
+        if (
+          draggingPlaced.currentTileX !== draggingPlaced.origTileX ||
+          draggingPlaced.currentTileY !== draggingPlaced.origTileY
+        ) {
+          movePlacedFurniture(
+            draggingPlaced.uid,
+            draggingPlaced.currentTileX,
+            draggingPlaced.currentTileY
+          );
+        } else {
+          setSelectedFurnishUid(draggingPlaced.uid);
+        }
+      } else {
+        // Quick tap without dragging
+        const found = useGameStore
+          .getState()
+          .objects.find((o) => o.uid === draggingPlaced.uid);
+        if (isFurnishMode) {
+          setSelectedFurnishUid(
+            selectedFurnishUid === draggingPlaced.uid ? null : draggingPlaced.uid
+          );
+        } else if (found) {
+          setPopoverAnchor({ x: draggingPlaced.startX, y: draggingPlaced.startY });
+          setSelectedObject(found);
+          setSelectedStation(null);
+          setSelectedNpc(null);
+        }
+      }
+      setDraggingPlaced(null);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [
+    draggingPlaced,
+    gridSize,
+    isFurnishMode,
+    movePlacedFurniture,
+    selectedFurnishUid,
+    setSelectedFurnishUid,
+  ]);
+
+  // Furnish Mode Keyboard Shortcuts (R to rotate selected item, Escape to cancel/exit)
+  useEffect(() => {
+    if (!isFurnishMode) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key.toLowerCase() === 'r' && selectedFurnishUid) {
+        e.preventDefault();
+        rotatePlacedFurniture(selectedFurnishUid);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (pendingPlaceId) {
+          setPendingPlaceId(null);
+        } else if (selectedFurnishUid) {
+          setSelectedFurnishUid(null);
+        } else {
+          setView('live');
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    isFurnishMode,
+    pendingPlaceId,
+    rotatePlacedFurniture,
+    selectedFurnishUid,
+    setPendingPlaceId,
+    setSelectedFurnishUid,
+    setView,
+  ]);
 
   const hour = getHourOfDay(time);
   const isNight = hour < 6 || hour >= 19.5;
@@ -389,7 +555,14 @@ export const IsometricScene: React.FC = () => {
   }, [npcsHere, isHome, objects, venueDef, gridSize, pos.x, pos.y]);
 
   const handleGoHome = () => {
-    const mode = cash >= 18 ? 'waymo' : cash >= 6 ? 'caltrain' : 'gbus';
+    const mode =
+      ownedCars.length > 0
+        ? 'tesla'
+        : cash >= 18
+        ? 'waymo'
+        : cash >= 6
+        ? 'caltrain'
+        : 'gbus';
     travelTo('home', mode);
   };
 
@@ -488,6 +661,23 @@ export const IsometricScene: React.FC = () => {
     ? Math.max(0, upgradeTargetDef.price - resaleValue)
     : 0;
 
+  // Furnish Mode selected object definitions
+  const selectedFurnishObj = selectedFurnishUid
+    ? objects.find((o) => o.uid === selectedFurnishUid) || null
+    : null;
+  const selectedFurnishDef = selectedFurnishObj
+    ? FURNITURE_BY_ID[selectedFurnishObj.objectId] || null
+    : null;
+  const furnishUpgradeTargetDef = selectedFurnishDef
+    ? getNextUpgradeFurniture(selectedFurnishDef)
+    : null;
+  const furnishResaleValue = selectedFurnishDef
+    ? Math.round(selectedFurnishDef.price * 0.65)
+    : 0;
+  const furnishUpgradeNetCost = furnishUpgradeTargetDef
+    ? Math.max(0, furnishUpgradeTargetDef.price - furnishResaleValue)
+    : 0;
+
   const handleUpgradeFurniture = () => {
     if (!selectedObject || !selectedFurnitureDef || !upgradeTargetDef) return;
     const oldX = selectedObject.x;
@@ -565,12 +755,22 @@ export const IsometricScene: React.FC = () => {
 
       {/* Main Interactive Isometric SVG Canvas with Zoom & Pan */}
       <svg
+        id="isometric-room-svg"
         viewBox="0 0 900 580"
         className={`h-full w-full object-contain ${
-          isDragging ? '' : 'transition-transform duration-150 ease-out'
+          isDragging || draggingPlaced?.moved ? '' : 'transition-transform duration-200 ease-out'
         }`}
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transform: `translate(${pan.x}px, ${
+            pan.y +
+            (isFurnishMode
+              ? trayMode === 'dock'
+                ? -68
+                : trayMode === 'expanded'
+                ? -95
+                : -16
+              : 0)
+          }px) scale(${isFurnishMode && trayMode === 'dock' ? +(zoom * 0.94).toFixed(3) : zoom})`,
           transformOrigin: 'center center',
         }}
         onClick={() => {
@@ -578,6 +778,9 @@ export const IsometricScene: React.FC = () => {
           setSelectedObject(null);
           setSelectedStation(null);
           setSelectedNpc(null);
+          if (isFurnishMode && !pendingPlaceId) {
+            setSelectedFurnishUid(null);
+          }
         }}
       >
         <defs>
@@ -851,7 +1054,6 @@ export const IsometricScene: React.FC = () => {
                   triggerMicroReward({
                     needKey: winMeta.needKey,
                     needDelta: winMeta.delta,
-                    karmaDelta: isHome ? homeDef.tier : 1,
                     toastText: winMeta.toast,
                     emoji: winMeta.emoji,
                   });
@@ -859,7 +1061,7 @@ export const IsometricScene: React.FC = () => {
                     backCorner.sx - 96,
                     backCorner.sy - 38,
                     winMeta.emoji,
-                    `🎮 +${winMeta.delta}% ${winMeta.needKey === 'energy' ? 'Focus' : 'Peace'} · ✨ +${isHome ? homeDef.tier : 1} Karma`,
+                    `🎮 +${winMeta.delta}% ${winMeta.needKey === 'energy' ? 'Focus' : 'Peace'}`,
                     winMeta.sparkleTitle,
                     winMeta.sparkleSub
                   );
@@ -1272,7 +1474,6 @@ export const IsometricScene: React.FC = () => {
                     triggerMicroReward({
                       needKey: featMeta.needKey,
                       needDelta: featMeta.delta,
-                      karmaDelta: homeDef.tier,
                       toastText: `${featMeta.title} (+${featMeta.delta}% ${featMeta.needKey === 'energy' ? 'Focus' : 'Peace'})`,
                       emoji: featMeta.emoji,
                     });
@@ -1280,7 +1481,7 @@ export const IsometricScene: React.FC = () => {
                       backCorner.sx + 106,
                       backCorner.sy + 12,
                       featMeta.emoji,
-                      `⚡ +${featMeta.delta}% ${featMeta.needKey === 'energy' ? 'Focus' : 'Peace'} · ✨ +${homeDef.tier} Karma`,
+                      `⚡ +${featMeta.delta}% ${featMeta.needKey === 'energy' ? 'Focus' : 'Peace'}`,
                       featMeta.title,
                       featMeta.sub
                     );
@@ -1448,16 +1649,16 @@ export const IsometricScene: React.FC = () => {
                   cashDelta: 140,
                   needKey: 'hunger',
                   needDelta: 18,
-                  karmaDelta: 2,
+                  karmaDelta: 1,
                   toastText:
-                    'Drone Care Package! Blue Bottle Cold Brew + $140 Founder Rebate',
+                    'Drone Care Package! Blue Bottle Cold Brew + $140 Founder Rebate (+1 ⚡ Karma)',
                   emoji: '🚁',
                 });
                 triggerSparkle(
                   backCorner.sx + 210,
                   backCorner.sy - 62,
                   '🚁',
-                  '💵 +$140 Cash · 🍔 +18% Fuel · ⚡ +2 Karma',
+                  '💵 +$140 Cash · 🍔 +18% Fuel · ⚡ +1 Karma',
                   'Prime Air Care Drop Claimed!',
                   'Blue Bottle Cold Brew + YC Founder AWS Credits Rebate'
                 );
@@ -1465,16 +1666,16 @@ export const IsometricScene: React.FC = () => {
                 triggerMicroReward({
                   needKey: 'energy',
                   needDelta: 22,
-                  karmaDelta: 3,
+                  karmaDelta: 1,
                   toastText:
-                    'AirDrop Care Package! Philz Mint Mojito + Tartine Bun (+22% Focus)',
+                    'AirDrop Care Package! Philz Mint Mojito + Tartine Bun (+22% Focus · +1 ⚡ Karma)',
                   emoji: '📦',
                 });
                 triggerSparkle(
                   backCorner.sx + 210,
                   backCorner.sy - 62,
                   '📦',
-                  '⚡ +22% Focus · ✨ +3 Karma',
+                  '⚡ +22% Focus · ✨ +1 Karma',
                   'Philz & Tartine Care Drop!',
                   'Iced Mint Mojito + Warm Morning Bun delivered by drone'
                 );
@@ -1565,35 +1766,84 @@ export const IsometricScene: React.FC = () => {
             Array.from({ length: gridSize }).map((__, x) => {
               const isHovered = hoveredTile?.x === x && hoveredTile?.y === y;
               const isSimHere = pos.x === x && pos.y === y;
+              const activeDragTile =
+                draggingPlaced &&
+                draggingPlaced.currentTileX === x &&
+                draggingPlaced.currentTileY === y;
+              const activeCatalogDropTile =
+                catalogDrag?.targetTile?.x === x && catalogDrag?.targetTile?.y === y;
+              const activeStampTile =
+                isFurnishMode && Boolean(pendingPlaceId) && isHovered;
+              const isDropTarget =
+                activeDragTile || activeCatalogDropTile || activeStampTile;
+              const occupantOnTile = objects.find(
+                (o) =>
+                  o.x === x &&
+                  o.y === y &&
+                  (!draggingPlaced || o.uid !== draggingPlaced.uid)
+              );
+
               return (
-                <polygon
-                  key={`tile-${x}-${y}`}
-                  points={tilePolygonPoints(x, y)}
-                  fill={
-                    isHovered
-                      ? '#60A5FA'
-                      : isSimHere
-                      ? '#93C5FD'
-                      : getFloorColors(x, y)
-                  }
-                  stroke={
-                    isHome && homeDef.id === 'pac_heights_victorian'
-                      ? 'rgba(217,119,6,0.22)'
-                      : 'rgba(15,23,42,0.08)'
-                  }
-                  strokeWidth="1"
-                  className="cursor-pointer transition-colors duration-150"
-                  onMouseEnter={() => setHoveredTile({ x, y })}
-                  onMouseLeave={() => setHoveredTile(null)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (dragRef.current.moved) return;
-                    moveToTile(x, y);
-                    setSelectedObject(null);
-                    setSelectedStation(null);
-                    setSelectedNpc(null);
-                  }}
-                />
+                <g key={`tile-${x}-${y}`}>
+                  <polygon
+                    points={tilePolygonPoints(x, y)}
+                    fill={
+                      isDropTarget
+                        ? occupantOnTile
+                          ? '#FBBF24'
+                          : '#34D399'
+                        : isHovered
+                        ? isFurnishMode
+                          ? '#38BDF8'
+                          : '#60A5FA'
+                        : isSimHere && !isFurnishMode
+                        ? '#93C5FD'
+                        : getFloorColors(x, y)
+                    }
+                    stroke={
+                      isDropTarget
+                        ? occupantOnTile
+                          ? '#F59E0B'
+                          : '#10B981'
+                        : isFurnishMode
+                        ? 'rgba(56,189,248,0.42)'
+                        : isHome && homeDef.id === 'pac_heights_victorian'
+                        ? 'rgba(217,119,6,0.22)'
+                        : 'rgba(15,23,42,0.08)'
+                    }
+                    strokeWidth={isDropTarget ? '2.4' : isFurnishMode ? '1.35' : '1'}
+                    strokeDasharray={isFurnishMode && !isDropTarget ? '3 2' : 'none'}
+                    className="cursor-pointer transition-colors duration-150"
+                    onMouseEnter={() => setHoveredTile({ x, y })}
+                    onMouseLeave={() => setHoveredTile(null)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (dragRef.current.moved) return;
+                      if (isFurnishMode) {
+                        if (pendingPlaceId) {
+                          buyAndPlaceFurniture(pendingPlaceId, { x, y });
+                        } else {
+                          setSelectedFurnishUid(null);
+                        }
+                        return;
+                      }
+                      moveToTile(x, y);
+                      setSelectedObject(null);
+                      setSelectedStation(null);
+                      setSelectedNpc(null);
+                    }}
+                  />
+                  {/* Subtle grid center dot in Furnish Mode */}
+                  {isFurnishMode && !occupantOnTile && (
+                    <circle
+                      cx={isoToScreen(x + 0.5, y + 0.5).sx}
+                      cy={isoToScreen(x + 0.5, y + 0.5).sy}
+                      r={isDropTarget ? 3.5 : 1.7}
+                      fill={isDropTarget ? '#FFFFFF' : 'rgba(56,189,248,0.45)'}
+                      pointerEvents="none"
+                    />
+                  )}
+                </g>
               );
             })
           )}
@@ -1647,15 +1897,14 @@ export const IsometricScene: React.FC = () => {
               triggerMicroReward({
                 needKey: 'hygiene',
                 needDelta: 12,
-                karmaDelta: 2,
-                toastText: 'Matic Bot sanitized the floor! +12% Bio & +2 Karma',
+                toastText: 'Matic Bot sanitized the floor! (+12% Bio)',
                 emoji: '🤖',
               });
               triggerSparkle(
                 botScreen.sx,
                 botScreen.sy - 18,
                 '🤖',
-                '🫧 +12% Bio · ⚡ +2 Karma',
+                '🫧 +12% Bio · Spotless Studio',
                 'Matic AI Robot Vacuum',
                 'LiDAR floor sanitization complete — studio is spotless!'
               );
@@ -1727,6 +1976,75 @@ export const IsometricScene: React.FC = () => {
           </g>
         )}
 
+        {/* Optional Home Computer Blueprint Slot (when no compute workstation is installed yet) */}
+        {isHome &&
+          !getInstalledHomeComputer({ objects }) &&
+          (() => {
+            const deskSpot = getHomeDeskCoord(homeId);
+            const occupied = objects.some((o) => o.x === deskSpot.x && o.y === deskSpot.y);
+            if (occupied) return null;
+            const center = isoToScreen(deskSpot.x + 0.5, deskSpot.y + 0.5);
+            const labelText = '🖥️ + Install PC (Optional)';
+            const pillW = Math.max(154, labelText.length * 6.0 + 24);
+            return (
+              <g
+                transform={`translate(${center.sx}, ${center.sy})`}
+                className="cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (dragRef.current.moved) return;
+                  setSelectedObject(null);
+                  setSelectedStation(null);
+                  setSelectedNpc(null);
+                  setActiveModal('computer');
+                }}
+              >
+                <ellipse
+                  cx="0"
+                  cy="4"
+                  rx="32"
+                  ry="16"
+                  fill="rgba(0,122,255,0.16)"
+                  stroke="#38BDF8"
+                  strokeWidth="1.8"
+                  strokeDasharray="4 2"
+                />
+                <polygon
+                  points="0,-22 25,-10 0,2 -25,-10"
+                  fill="rgba(56,189,248,0.2)"
+                  stroke="#38BDF8"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 2"
+                />
+                <text x="0" y="-6" fontSize="22" textAnchor="middle" opacity="0.88">
+                  🖥️
+                </text>
+                <g transform="translate(0, -35)">
+                  <rect
+                    x={-pillW / 2}
+                    y="-12"
+                    width={pillW}
+                    height="20"
+                    rx="10"
+                    fill="rgba(15,23,42,0.92)"
+                    stroke="#38BDF8"
+                    strokeWidth="1.4"
+                  />
+                  <text
+                    x="0"
+                    y="1.5"
+                    fill="#E0F2FE"
+                    fontSize="9.5"
+                    fontWeight="800"
+                    textAnchor="middle"
+                  >
+                    {labelText}
+                  </text>
+                </g>
+              </g>
+            );
+          })()}
+
         {/* Home Placed Furniture Objects */}
         {isHome &&
           objects
@@ -1735,92 +2053,391 @@ export const IsometricScene: React.FC = () => {
             .map((placed) => {
               const def = FURNITURE_BY_ID[placed.objectId];
               if (!def) return null;
-              const center = isoToScreen(placed.x + 0.5, placed.y + 0.5);
-              const isSelected = selectedObject?.uid === placed.uid;
+              const isBeingDragged = draggingPlaced?.uid === placed.uid;
+              const effectiveX = isBeingDragged
+                ? draggingPlaced.currentTileX
+                : placed.x;
+              const effectiveY = isBeingDragged
+                ? draggingPlaced.currentTileY
+                : placed.y;
+              const center = isoToScreen(effectiveX + 0.5, effectiveY + 0.5);
+              const origCenter = isoToScreen(placed.x + 0.5, placed.y + 0.5);
+              const isSelected = isFurnishMode
+                ? selectedFurnishUid === placed.uid
+                : selectedObject?.uid === placed.uid;
               const isInUse = activeQueued?.targetObjectUid === placed.uid;
               const hasUpgrade = Boolean(getNextUpgradeFurniture(def));
               const shortLabel = getShortFurnitureLabel(def);
               const powerOffBadge = !powered && def.requiresPower ? ' 🔌' : '';
-              const fullBadgeText = `${shortLabel}${hasUpgrade ? ' ⬆️' : ''}${powerOffBadge}`;
+              const fullBadgeText = isFurnishMode
+                ? `🖐️ ${shortLabel}`
+                : `${shortLabel}${hasUpgrade ? ' ⬆️' : ''}${powerOffBadge}`;
               const pillW = Math.max(96, fullBadgeText.length * 6.2 + 22);
+              const rot = (placed.rot || 0) % 4;
+              const isOddRot = rot % 2 === 1;
+              const swapTargetObj =
+                isBeingDragged &&
+                objects.find(
+                  (o) =>
+                    o.uid !== placed.uid &&
+                    o.x === effectiveX &&
+                    o.y === effectiveY
+                );
 
               return (
-                <g
-                  key={placed.uid}
-                  transform={`translate(${center.sx}, ${center.sy})`}
-                  className="cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (dragRef.current.moved) return;
-                    setPopoverAnchor({ x: e.clientX, y: e.clientY });
-                    setSelectedObject(placed);
-                    setSelectedStation(null);
-                    setSelectedNpc(null);
-                  }}
-                >
-                  {/* Selection / Active Halo */}
-                  {(isSelected || isInUse) && (
-                    <ellipse
-                      cx="0"
-                      cy="4"
-                      rx="32"
-                      ry="17"
-                      fill={isInUse ? 'rgba(52,199,89,0.28)' : 'rgba(0,122,255,0.28)'}
-                      stroke={isInUse ? '#34C759' : '#007AFF'}
-                      strokeWidth="2"
-                    />
+                <React.Fragment key={placed.uid}>
+                  {/* Origin blueprint footprint while dragging */}
+                  {isBeingDragged && (
+                    <g
+                      transform={`translate(${origCenter.sx}, ${origCenter.sy})`}
+                      pointerEvents="none"
+                      opacity="0.4"
+                    >
+                      <polygon
+                        points="0,-24 26,-11 0,2 -26,-11"
+                        fill="none"
+                        stroke="#38BDF8"
+                        strokeWidth="1.6"
+                        strokeDasharray="4 2"
+                      />
+                      <text x="0" y="-8" fontSize="20" textAnchor="middle">
+                        {def.emoji}
+                      </text>
+                    </g>
                   )}
 
-                  {/* 3D Isometric Furniture Block Base */}
-                  <polygon
-                    points="0,-24 26,-11 0,2 -26,-11"
-                    fill={def.accentColor}
-                    stroke="rgba(15,23,42,0.2)"
-                    strokeWidth="1.2"
-                  />
-                  <polygon
-                    points="-26,-11 0,2 0,16 -26,3"
-                    fill={def.color}
-                    stroke="rgba(15,23,42,0.2)"
-                    strokeWidth="1.2"
-                  />
-                  <polygon
-                    points="26,-11 0,2 0,16 26,3"
-                    fill={def.color}
-                    opacity="0.85"
-                    stroke="rgba(15,23,42,0.2)"
-                    strokeWidth="1.2"
-                  />
+                  <g
+                    transform={`translate(${center.sx}, ${center.sy})`}
+                    className={
+                      isFurnishMode
+                        ? isBeingDragged
+                          ? 'cursor-grabbing'
+                          : 'cursor-grab'
+                        : 'cursor-pointer'
+                    }
+                    onPointerDown={(e) => {
+                      if (!isFurnishMode) return;
+                      e.stopPropagation();
+                      setSelectedFurnishUid(placed.uid);
+                      setPendingPlaceId(null);
+                      setDraggingPlaced({
+                        uid: placed.uid,
+                        objectId: placed.objectId,
+                        origTileX: placed.x,
+                        origTileY: placed.y,
+                        currentTileX: placed.x,
+                        currentTileY: placed.y,
+                        startX: e.clientX,
+                        startY: e.clientY,
+                        moved: false,
+                      });
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (dragRef.current.moved) return;
+                      if (isFurnishMode) {
+                        setSelectedFurnishUid(placed.uid);
+                        return;
+                      }
+                      setPopoverAnchor({ x: e.clientX, y: e.clientY });
+                      setSelectedObject(placed);
+                      setSelectedStation(null);
+                      setSelectedNpc(null);
+                    }}
+                  >
+                    {/* Selection / Active / Furnish Drag Halo */}
+                    {(isSelected || isInUse || isFurnishMode) && (
+                      <ellipse
+                        cx="0"
+                        cy="4"
+                        rx={isBeingDragged ? '36' : isSelected ? '34' : '29'}
+                        ry={isBeingDragged ? '19' : isSelected ? '18' : '15'}
+                        fill={
+                          isBeingDragged
+                            ? swapTargetObj
+                              ? 'rgba(251,191,36,0.34)'
+                              : 'rgba(52,211,153,0.34)'
+                            : isInUse
+                            ? 'rgba(52,199,89,0.28)'
+                            : isSelected
+                            ? 'rgba(56,189,248,0.32)'
+                            : 'rgba(56,189,248,0.12)'
+                        }
+                        stroke={
+                          isBeingDragged
+                            ? swapTargetObj
+                              ? '#F59E0B'
+                              : '#10B981'
+                            : isInUse
+                            ? '#34C759'
+                            : isSelected
+                            ? '#007AFF'
+                            : 'rgba(56,189,248,0.45)'
+                        }
+                        strokeWidth={isSelected || isBeingDragged ? '2.2' : '1.2'}
+                        strokeDasharray={
+                          isFurnishMode && !isSelected && !isBeingDragged
+                            ? '3 2'
+                            : 'none'
+                        }
+                      />
+                    )}
 
-                  {/* Icon & Dynamic Width Label */}
-                  <text x="0" y="-8" fontSize="22" textAnchor="middle">
-                    {def.emoji}
-                  </text>
-                  <g transform="translate(0, -35)">
-                    <rect
-                      x={-pillW / 2}
-                      y="-12"
-                      width={pillW}
-                      height="20"
-                      rx="10"
-                      fill="rgba(15,23,42,0.88)"
-                      stroke={isSelected ? '#38BDF8' : 'rgba(255,255,255,0.24)'}
-                      strokeWidth="1.2"
-                    />
-                    <text
-                      x="0"
-                      y="1.5"
-                      fill="#FFFFFF"
-                      fontSize="9.5"
-                      fontWeight="800"
-                      textAnchor="middle"
+                    {/* Lift visual when actively dragging in Furnish Mode */}
+                    <g
+                      transform={
+                        isBeingDragged
+                          ? 'translate(0, -14) scale(1.1)'
+                          : isSelected && isFurnishMode
+                          ? 'translate(0, -4) scale(1.04)'
+                          : undefined
+                      }
                     >
-                      {fullBadgeText}
-                    </text>
+                      {/* 3D Isometric Furniture Block Base (rotates shading & orientation bar with rot) */}
+                      <polygon
+                        points="0,-24 26,-11 0,2 -26,-11"
+                        fill={def.accentColor}
+                        stroke={
+                          isSelected && isFurnishMode
+                            ? '#38BDF8'
+                            : 'rgba(15,23,42,0.2)'
+                        }
+                        strokeWidth={isSelected && isFurnishMode ? '1.8' : '1.2'}
+                      />
+                      <polygon
+                        points="-26,-11 0,2 0,16 -26,3"
+                        fill={def.color}
+                        opacity={isOddRot ? '0.82' : '1'}
+                        stroke="rgba(15,23,42,0.2)"
+                        strokeWidth="1.2"
+                      />
+                      <polygon
+                        points="26,-11 0,2 0,16 26,3"
+                        fill={def.color}
+                        opacity={isOddRot ? '1' : '0.82'}
+                        stroke="rgba(15,23,42,0.2)"
+                        strokeWidth="1.2"
+                      />
+
+                      {/* Orientation Front-Edge Indicator Line when rotated or in Furnish Mode */}
+                      {(rot > 0 || isFurnishMode) && (
+                        <line
+                          x1={rot === 0 || rot === 2 ? -13 : 0}
+                          y1={rot === 0 || rot === 2 ? -4.5 : -4.5}
+                          x2={rot === 0 || rot === 2 ? 0 : 13}
+                          y2={rot === 0 || rot === 2 ? 2 : 2}
+                          stroke="#38BDF8"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                        />
+                      )}
+
+                      {/* Icon (Hero Scale in Furnish Mode, Flips horizontally on odd rotation) */}
+                      <g transform={isOddRot ? 'scale(-1, 1)' : undefined}>
+                        <text
+                          x="0"
+                          y="-7"
+                          fontSize={isFurnishMode ? '26' : '22'}
+                          textAnchor="middle"
+                        >
+                          {def.emoji}
+                        </text>
+                      </g>
+
+                      {/* Dynamic Width Label Pill (In Furnish Mode, only show on select/hover/drag so icons stay clean!) */}
+                      {(!isFurnishMode ||
+                        isSelected ||
+                        isBeingDragged ||
+                        (hoveredTile?.x === placed.x &&
+                          hoveredTile?.y === placed.y)) && (
+                        <g transform="translate(0, -36)">
+                          <rect
+                            x={-pillW / 2}
+                            y="-12"
+                            width={pillW}
+                            height="20"
+                            rx="10"
+                            fill={
+                              isBeingDragged
+                                ? swapTargetObj
+                                  ? 'rgba(180,83,9,0.95)'
+                                  : 'rgba(6,95,70,0.95)'
+                                : 'rgba(15,23,42,0.88)'
+                            }
+                            stroke={
+                              isBeingDragged
+                                ? '#34D399'
+                                : isSelected
+                                ? '#38BDF8'
+                                : 'rgba(255,255,255,0.24)'
+                            }
+                            strokeWidth="1.2"
+                          />
+                          <text
+                            x="0"
+                            y="1.5"
+                            fill="#FFFFFF"
+                            fontSize="9.5"
+                            fontWeight="800"
+                            textAnchor="middle"
+                          >
+                            {isBeingDragged
+                              ? swapTargetObj
+                                ? `🔄 Swap with ${getShortFurnitureLabel(
+                                    FURNITURE_BY_ID[swapTargetObj.objectId] || def
+                                  )}`
+                                : `✨ Drop at (${effectiveX}, ${effectiveY})`
+                              : fullBadgeText}
+                          </text>
+                        </g>
+                      )}
+                    </g>
                   </g>
-                </g>
+                </React.Fragment>
               );
             })}
+
+        {/* Live Ghost Preview when Dragging from Shopping Dock or Stamp-Placing in Furnish Mode */}
+        {isHome &&
+          (() => {
+            const ghostItemId =
+              catalogDrag?.furnitureId || (isFurnishMode ? pendingPlaceId : null);
+            const ghostTile =
+              catalogDrag?.targetTile ||
+              (isFurnishMode && pendingPlaceId ? hoveredTile : null);
+            if (!ghostItemId || !ghostTile) return null;
+            const ghostDef = FURNITURE_BY_ID[ghostItemId];
+            if (!ghostDef) return null;
+            const ghostCenter = isoToScreen(ghostTile.x + 0.5, ghostTile.y + 0.5);
+            const occupied = objects.some(
+              (o) => o.x === ghostTile.x && o.y === ghostTile.y
+            );
+            const labelText = occupied
+              ? `✨ Drop ${ghostDef.emoji} (Auto-nudges to nearest open tile)`
+              : `✨ Place ${ghostDef.emoji} ${getShortFurnitureLabel(ghostDef)} ($${ghostDef.price})`;
+            const ghostPillW = Math.max(135, labelText.length * 5.8 + 24);
+            return (
+              <g
+                transform={`translate(${ghostCenter.sx}, ${ghostCenter.sy - 8})`}
+                pointerEvents="none"
+              >
+                <ellipse
+                  cx="0"
+                  cy="10"
+                  rx="34"
+                  ry="18"
+                  fill="rgba(52,211,153,0.32)"
+                  stroke="#10B981"
+                  strokeWidth="2.2"
+                  strokeDasharray="4 2"
+                />
+                <polygon
+                  points="0,-24 26,-11 0,2 -26,-11"
+                  fill={ghostDef.accentColor}
+                  opacity="0.88"
+                  stroke="#34D399"
+                  strokeWidth="1.8"
+                />
+                <polygon
+                  points="-26,-11 0,2 0,16 -26,3"
+                  fill={ghostDef.color}
+                  opacity="0.82"
+                  stroke="#34D399"
+                  strokeWidth="1.5"
+                />
+                <polygon
+                  points="26,-11 0,2 0,16 26,3"
+                  fill={ghostDef.color}
+                  opacity="0.7"
+                  stroke="#34D399"
+                  strokeWidth="1.5"
+                />
+                <text x="0" y="-7" fontSize="28" textAnchor="middle">
+                  {ghostDef.emoji}
+                </text>
+                <g transform="translate(0, -38)">
+                  <rect
+                    x={-ghostPillW / 2}
+                    y="-12"
+                    width={ghostPillW}
+                    height="22"
+                    rx="11"
+                    fill="rgba(6,95,70,0.96)"
+                    stroke="#34D399"
+                    strokeWidth="1.5"
+                  />
+                  <text
+                    x="0"
+                    y="2"
+                    fill="#ECFDF5"
+                    fontSize="10"
+                    fontWeight="800"
+                    textAnchor="middle"
+                  >
+                    {labelText}
+                  </text>
+                </g>
+              </g>
+            );
+          })()}
+
+        {/* Celebratory Furnish Placement / Move Sparkle Burst */}
+        {isHome &&
+          furnishSparkle &&
+          (() => {
+            const spCenter = isoToScreen(
+              furnishSparkle.tileX + 0.5,
+              furnishSparkle.tileY + 0.5
+            );
+            const spText = `${furnishSparkle.emoji} ${furnishSparkle.text}`;
+            const spW = Math.max(138, spText.length * 6.2 + 28);
+            return (
+              <g
+                key={furnishSparkle.id}
+                transform={`translate(${spCenter.sx}, ${spCenter.sy - 28})`}
+                pointerEvents="none"
+              >
+                <g>
+                  <animateTransform
+                    attributeName="transform"
+                    type="translate"
+                    values="0,0; 0,-26"
+                    dur="1.2s"
+                    fill="freeze"
+                  />
+                  <animate
+                    attributeName="opacity"
+                    values="1;1;0"
+                    dur="1.2s"
+                    fill="freeze"
+                  />
+                  <circle cx="-24" cy="-8" r="3.5" fill="#FBBF24" />
+                  <circle cx="24" cy="-10" r="3.5" fill="#38BDF8" />
+                  <circle cx="0" cy="-22" r="4" fill="#34D399" />
+                  <rect
+                    x={-spW / 2}
+                    y="-15"
+                    width={spW}
+                    height="24"
+                    rx="12"
+                    fill="rgba(15,23,42,0.95)"
+                    stroke="#38BDF8"
+                    strokeWidth="1.6"
+                  />
+                  <text
+                    x="0"
+                    y="1"
+                    fill="#F0F9FF"
+                    fontSize="10.5"
+                    fontWeight="800"
+                    textAnchor="middle"
+                  >
+                    {spText}
+                  </text>
+                </g>
+              </g>
+            );
+          })()}
 
         {/* Venue Interactive Stations */}
         {!isHome &&
@@ -2345,10 +2962,14 @@ export const IsometricScene: React.FC = () => {
         )}
       </svg>
 
-      {/* Full-Size Apple Glass Care Drop / Micro-Reward Popup Window (Top-Right) */}
+      {/* Full-Size Apple Glass Care Drop / Micro-Reward Popup Window */}
       {sparkleBurst && (
         <div
-          className="fixed top-20 right-4 z-40 w-[calc(100%-32px)] max-w-sm animate-target-pop"
+          className={`fixed z-40 w-[calc(100%-32px)] max-w-sm animate-target-pop ${
+            workShift
+              ? 'bottom-28 right-4'
+              : 'top-20 right-4'
+          }`}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
@@ -2385,7 +3006,7 @@ export const IsometricScene: React.FC = () => {
       )}
 
       {/* Residence Luxury Status & Active Perks Strip (Stacked above Camera Controls when at Home) */}
-      {isHome && (
+      {isHome && !isFurnishMode && (
         <div
           className="pointer-events-auto absolute bottom-36 left-4 z-20 max-w-md"
           onMouseDown={(e) => e.stopPropagation()}
@@ -2469,19 +3090,31 @@ export const IsometricScene: React.FC = () => {
                 {venueDef.vibes[Math.floor(time / 60) % venueDef.vibes.length]}
               </div>
             </div>
-            <button
-              onClick={handleGoHome}
-              className="btn-press shrink-0 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm"
-            >
-              🏠 Go Home
-            </button>
+            {workShift ? (
+              <button
+                onClick={() => setActiveModal('career')}
+                title="Travel is locked while on the clock — open Career Hub"
+                className="btn-press shrink-0 rounded-xl bg-amber-500/20 px-3 py-1.5 text-xs font-extrabold text-amber-700 shadow-xs dark:text-amber-300"
+              >
+                🔒 On Shift
+              </button>
+            ) : (
+              <button
+                onClick={handleGoHome}
+                className="btn-press shrink-0 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm"
+              >
+                🏠 Go Home
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Interactive Camera Zoom & Pan Controls Pill (Bottom-Left) */}
+      {/* Interactive Camera Zoom & Pan Controls Pill (Bottom-Left in Live Mode, Top-Left in Furnish Mode) */}
       <div
-        className="apple-pill absolute bottom-24 left-4 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[var(--ink)] shadow-sm"
+        className={`apple-pill absolute left-4 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[var(--ink)] shadow-sm ${
+          isFurnishMode ? 'top-20' : 'bottom-24'
+        }`}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
@@ -2582,6 +3215,33 @@ export const IsometricScene: React.FC = () => {
                 <X className="size-4" />
               </button>
             </div>
+
+            {/* Interactive Workstation OS CTA when a Home Computer is selected */}
+            {selectedFurnitureDef?.category === 'compute' && (
+              <button
+                onClick={() => {
+                  setSelectedObject(null);
+                  setSelectedStation(null);
+                  setActiveModal('computer');
+                }}
+                className="btn-press mt-3.5 flex w-full items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-[#007AFF] to-indigo-600 px-4 py-3 text-left text-white shadow-md hover:opacity-95"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Monitor className="size-5 shrink-0" />
+                  <div>
+                    <div className="text-xs font-extrabold">
+                      🖥️ Launch Interactive Workstation OS
+                    </div>
+                    <div className="text-[10px] font-semibold text-white/85">
+                      Cursor IDE · Local GPU AI Lab · Freelance Bounties · WFH & Hardware Upgrades
+                    </div>
+                  </div>
+                </div>
+                <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 font-mono text-[10px] font-extrabold text-white">
+                  Open OS →
+                </span>
+              </button>
+            )}
 
             {/* Action Buttons with Full Unclipped Labels & Clear Stat Impact Badges */}
             <div className="mt-3.5 grid gap-2">
@@ -2691,25 +3351,50 @@ export const IsometricScene: React.FC = () => {
               })}
             </div>
 
-            {/* 1-Click Furniture Upgrade & Sell Footer */}
-            {selectedObject && (upgradeTargetDef || objects.length > 3) && (
+            {/* 1-Click Furniture Upgrade, Furnish Move & Sell Footer */}
+            {selectedObject && (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3 dark:border-white/10">
-                {upgradeTargetDef ? (
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
-                    onClick={handleUpgradeFurniture}
-                    className="btn-press flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#007AFF] px-3.5 py-2 text-xs font-extrabold text-white shadow-sm hover:opacity-95"
+                    onClick={() => {
+                      const uid = selectedObject.uid;
+                      setSelectedObject(null);
+                      setSelectedFurnishUid(uid);
+                      setView('buy');
+                    }}
+                    className="btn-press flex items-center gap-1.5 rounded-2xl bg-[var(--mist)] px-3 py-2 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+                    title="Enter Furnish Mode to drag & rearrange this item"
                   >
-                    <ArrowUpCircle className="size-4 shrink-0" />
-                    <span>
-                      ⬆️ Upgrade ({formatCurrency(upgradeNetCost)}) · {upgradeTargetDef.emoji}{' '}
-                      {upgradeTargetDef.name}
-                    </span>
+                    <Move className="size-3.5 text-[#007AFF]" />
+                    <span>🖐️ Move / Furnish</span>
                   </button>
-                ) : (
-                  <span />
-                )}
 
-                {objects.length > 3 && (
+                  <button
+                    onClick={() => {
+                      storeFurnitureInBackpack(selectedObject.uid);
+                      setSelectedObject(null);
+                    }}
+                    className="btn-press flex items-center gap-1.5 rounded-2xl bg-indigo-500/15 px-3 py-2 text-xs font-extrabold text-indigo-700 hover:bg-indigo-500/25 dark:text-indigo-300"
+                    title="Pack this furniture item into your Backpack at 100% value so you can unpack it later"
+                  >
+                    <span>🎒 Store in Pack</span>
+                  </button>
+
+                  {upgradeTargetDef && (
+                    <button
+                      onClick={handleUpgradeFurniture}
+                      className="btn-press flex items-center justify-center gap-1.5 rounded-2xl bg-[#007AFF] px-3.5 py-2 text-xs font-extrabold text-white shadow-sm hover:opacity-95"
+                    >
+                      <ArrowUpCircle className="size-4 shrink-0" />
+                      <span>
+                        ⬆️ Upgrade ({formatCurrency(upgradeNetCost)}) · {upgradeTargetDef.emoji}{' '}
+                        {upgradeTargetDef.name}
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {(objects.length > 3 || selectedFurnitureDef?.category === 'compute') && (
                   <button
                     onClick={() => {
                       sellFurniture(selectedObject.uid);
@@ -2724,6 +3409,87 @@ export const IsometricScene: React.FC = () => {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Selected Furniture Quick-Action Pill in Furnish Mode (Rotate / Upgrade / Sell) */}
+      {isFurnishMode && selectedFurnishObj && selectedFurnishDef && (
+        <div
+          className="pointer-events-auto absolute top-20 right-4 z-30 max-w-md animate-target-pop"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="apple-glass-heavy flex flex-wrap items-center gap-2 rounded-2xl border border-sky-400/40 px-3.5 py-2.5 text-xs text-[var(--ink)] shadow-xl">
+            <div className="flex items-center gap-2 pr-1">
+              <span className="grid size-9 place-items-center rounded-xl bg-sky-500/15 text-2xl shadow-inner">
+                {selectedFurnishDef.emoji}
+              </span>
+              <div>
+                <div className="font-extrabold leading-tight text-[var(--ink)]">
+                  {selectedFurnishDef.name}
+                </div>
+                <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
+                  Tile ({selectedFurnishObj.x}, {selectedFurnishObj.y}) · Drag to move or swap
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => rotatePlacedFurniture(selectedFurnishObj.uid)}
+              className="btn-press flex items-center gap-1 rounded-xl bg-[var(--mist)] px-2.5 py-1.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+              title="Rotate 90° (Shortcut: R)"
+            >
+              <RotateCw className="size-3.5 text-[#007AFF]" />
+              <span>Rotate (R)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                storeFurnitureInBackpack(selectedFurnishObj.uid);
+                setSelectedFurnishUid(null);
+              }}
+              className="btn-press flex items-center gap-1 rounded-xl bg-indigo-500/15 px-2.5 py-1.5 text-xs font-extrabold text-indigo-700 hover:bg-indigo-500/25 dark:text-indigo-300"
+              title="Pack into Backpack (100% value preserved)"
+            >
+              <span>🎒 Pack</span>
+            </button>
+
+            {furnishUpgradeTargetDef && (
+              <button
+                onClick={() => {
+                  buyFurniture(furnishUpgradeTargetDef.id);
+                  setSelectedFurnishUid(selectedFurnishObj.uid);
+                }}
+                className="btn-press flex items-center gap-1 rounded-xl bg-[#007AFF] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs"
+              >
+                <ArrowUpCircle className="size-3.5" />
+                <span>
+                  ⬆️ {furnishUpgradeTargetDef.emoji} ({formatCurrency(furnishUpgradeNetCost)})
+                </span>
+              </button>
+            )}
+
+            {objects.length > 3 && (
+              <button
+                onClick={() => {
+                  sellFurniture(selectedFurnishObj.uid);
+                  setSelectedFurnishUid(null);
+                }}
+                className="btn-press flex items-center gap-1 rounded-xl bg-rose-500/15 px-2.5 py-1.5 text-xs font-extrabold text-rose-600 hover:bg-rose-500/25 dark:text-rose-400"
+              >
+                <Trash2 className="size-3.5" />
+                <span>Sell +{formatCurrency(furnishResaleValue)}</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setSelectedFurnishUid(null)}
+              className="btn-press grid size-7 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+              title="Deselect"
+            >
+              <X className="size-3.5" />
+            </button>
           </div>
         </div>
       )}

@@ -153,6 +153,53 @@ export interface WorkExplorationTaskDef {
   badgeLabel: string;
 }
 
+export type TechTreeBranchId = 'cloud' | 'frontier_ai' | 'silicon_os' | 'founder_vc';
+
+export type TechNodeId =
+  | 'node_git_monorepo'
+  | 'node_distributed_rpc'
+  | 'node_spanner_sharding'
+  | 'node_borg_orchestrator'
+  | 'node_pytorch_autodiff'
+  | 'node_cuda_triton'
+  | 'node_rlhf_posttrain'
+  | 'node_agi_scaling_laws'
+  | 'node_cxx_memory'
+  | 'node_metal_shaders'
+  | 'node_ane_silicon'
+  | 'node_spatial_os'
+  | 'node_yc_pmf'
+  | 'node_growth_loops'
+  | 'node_cap_table_alpha'
+  | 'node_midas_kingmaker';
+
+export interface TechTreeNodeDef {
+  id: TechNodeId;
+  branch: TechTreeBranchId;
+  tier: 1 | 2 | 3 | 4;
+  title: string;
+  codeName: string;
+  emoji: string;
+  desc: string;
+  perkSummary: string;
+  prereqNodes: TechNodeId[];
+  requiredSkills: Array<{ skill: SkillKey; level: number }>;
+  karmaCost: number;
+  unlocksCareerId?: string;
+  unlocksLevelLabel?: string;
+  accent: string;
+}
+
+export interface CareerEntryRequirements {
+  selectivityLabel: string;
+  difficultyTier: 'Standard' | 'Selective' | 'Ultra-Selective';
+  interviewLoopTitle: string;
+  interviewEnergyCost: number;
+  requiredSkills: Array<{ skill: SkillKey; level: number }>;
+  requiredTechNodes: TechNodeId[];
+  minDeliverables?: number;
+}
+
 export interface CareerLevel {
   level: number;
   code: string; // e.g., "L3", "L4", "L5", "L6", "L7", "L8"
@@ -163,6 +210,7 @@ export interface CareerLevel {
   rsuPerShift: number; // per shift RSU grant
   requiredSkill: { skill: SkillKey; level: number };
   secondarySkill?: { skill: SkillKey; level: number };
+  requiredTechNode?: TechNodeId; // specialized tech tree node required for this level
   minShiftsForPromo?: number; // minimum shifts at current level before promo packet
   requiredDeliverables?: number; // completed work exploration deliverables required for promo
   scopeSummary?: string; // what this level actually owns / explores
@@ -179,6 +227,7 @@ export interface CareerDef {
   accent: string;
   shiftStartHour: number; // e.g. 9 (9:00 AM)
   shiftEndHour: number; // e.g. 17 (5:00 PM)
+  entryRequirements?: CareerEntryRequirements;
   levels: CareerLevel[];
 }
 
@@ -216,6 +265,60 @@ export interface ActiveWorkShift {
 }
 
 export type CommuteModeId = 'caltrain' | 'gbus' | 'waymo' | 'uber' | 'tesla';
+
+export type VehicleId = 'prius' | 'tesla' | 'taycan';
+
+export interface VehicleDef {
+  id: VehicleId;
+  name: string;
+  shortName: string;
+  brand: string;
+  emoji: string;
+  tagline: string;
+  price: number;
+  speedTimeMult: number; // multiplier on personal car commute time
+  baseMinutes: number;
+  moodletId: string;
+  moodBonusLabel: string;
+  autopilotTier: string;
+  tier?: string;
+  tierLabel?: string;
+  joyrideLabel?: string;
+  joyrideReward: {
+    fun: number;
+    energy: number;
+    karma: number;
+    label: string;
+  };
+  accent: string;
+}
+
+export interface BackpackItemDef {
+  id: string;
+  name: string;
+  subtitle: string;
+  emoji: string;
+  category: 'consumable' | 'edc';
+  price: number;
+  consumable: boolean;
+  needsDelta?: Partial<NeedsState>;
+  skillGain?: { skill: SkillKey; amount: number };
+  startupDelta?: number;
+  cashBonus?: number;
+  karmaBonus?: number;
+  moodletId?: string;
+  equipAccessory?: SimAppearance['accessory'];
+  passiveBadge?: string;
+  passiveBoost?: string;
+  powerBackupPortable?: boolean;
+  useLabel: string;
+}
+
+export interface InventoryEntry {
+  itemId: string;
+  kind: 'item' | 'furniture';
+  quantity: number;
+}
 
 export interface CommuteModeDef {
   id: CommuteModeId;
@@ -272,6 +375,7 @@ export interface HomePerkBadge {
   emoji: string;
   label: string;
   desc: string;
+  boost?: string;
 }
 
 export interface HomeBonuses {
@@ -323,6 +427,7 @@ export interface HomeDef {
   tagline: string;
   weeklyRent: number;
   buyPrice: number;
+  purchasePrice?: number;
   gridSize: number;
   floorStyle: 'wood' | 'concrete' | 'marble';
   mapCoords: { x: number; y: number };
@@ -374,12 +479,29 @@ export interface WishItem {
   progress: number;
 }
 
+export type RewardPerkBranchId = 'engineering' | 'career' | 'wealth' | 'biohack';
+
+export interface RewardPerkBranchDef {
+  id: RewardPerkBranchId;
+  label: string;
+  shortLabel: string;
+  emoji: string;
+  accent: string;
+  tagline: string;
+}
+
 export interface RewardPerkDef {
   id: string;
+  branch: RewardPerkBranchId;
+  tier: 1 | 2 | 3 | 4;
+  codeName: string;
   name: string;
   emoji: string;
   cost: number; // karma points
+  shortEffect: string;
   desc: string;
+  prereqId?: string;
+  accent: string;
 }
 
 export interface DilemmaChoice {
@@ -427,13 +549,98 @@ export interface NoticeItem {
 
 export type WeatherKind = 'sunny' | 'foggy' | 'breezy' | 'rain';
 
+export type MarketTicker = 'QQQX' | 'NVDAX' | 'GOGL' | 'FRUT' | 'AI3X' | 'SGOV';
+
+export type MarketRegime =
+  | 'AI Supercycle'
+  | 'Rate Cut Rally'
+  | 'Earnings Volatility'
+  | 'Sector Rotation'
+  | 'Macro Jitters';
+
+export interface MarketAssetDef {
+  ticker: MarketTicker;
+  name: string;
+  subtitle: string;
+  emoji: string;
+  sector:
+    | 'Index ETF'
+    | 'AI Compute'
+    | 'Cloud & Search'
+    | 'Consumer Tech'
+    | '3x Leveraged'
+    | 'Treasury Yield';
+  basePrice: number;
+  volatility: number; // daily volatility factor
+  drift: number; // average daily drift
+  dailyDividendYield: number; // daily dividend/yield ratio (e.g. 0.002 = 0.2%/day)
+  color: string;
+  desc: string;
+}
+
+export interface StockHolding {
+  shares: number;
+  avgCost: number;
+}
+
+export type CashFlowInflowKey = 'salary' | 'rsu' | 'startup' | 'investments' | 'bounties';
+export type CashFlowOutflowKey = 'rent' | 'living' | 'upgrades' | 'investments';
+
+export type CashFlowCategory =
+  | 'salary'
+  | 'rsu'
+  | 'startup'
+  | 'investments'
+  | 'bounties'
+  | 'rent'
+  | 'living'
+  | 'upgrades'
+  | 'trade';
+
+export interface CashFlowEntry {
+  id: string;
+  time: number;
+  day: number;
+  label: string;
+  emoji: string;
+  amount: number; // positive = inflow, negative = outflow
+  category: CashFlowCategory;
+}
+
+export interface FinanceState {
+  marketPrices: Record<MarketTicker, number>;
+  marketPrevClose: Record<MarketTicker, number>;
+  marketHistory: Record<MarketTicker, number[]>;
+  holdings: Record<MarketTicker, StockHolding>;
+  marketRegime: MarketRegime;
+  marketNews: string;
+  dripEnabled: boolean;
+  autoSellRsu: boolean;
+  realizedGains: number;
+  dividendsEarnedTotal: number;
+  dividendsEarnedToday: number;
+  inflowsBySource: Record<CashFlowInflowKey, number>;
+  outflowsBySource: Record<CashFlowOutflowKey, number>;
+  ledger: CashFlowEntry[];
+}
+
 export interface GameState {
   version: number;
   screen: 'title' | 'create' | 'play';
   view: 'live' | 'map' | 'buy';
-  activeModal: null | 'phone' | 'sim' | 'career' | 'commute' | 'wardrobe';
+  activeModal:
+    | null
+    | 'phone'
+    | 'sim'
+    | 'career'
+    | 'commute'
+    | 'wardrobe'
+    | 'backpack'
+    | 'garage'
+    | 'computer'
+    | 'account';
   phoneApp: 'messages' | 'levels' | 'wealth' | 'doordash' | 'startup' | 'zillow' | 'blind';
-  simTab: 'needs' | 'skills' | 'relationships' | 'wishes' | 'perks';
+  simTab: 'needs' | 'skills' | 'relationships' | 'wishes' | 'perks' | 'backpack';
 
   sim: SimProfile;
   needs: NeedsState;
@@ -445,11 +652,15 @@ export interface GameState {
   unvestedRsu: number;
   portfolioValue: number; // index funds
   loanOwed: number; // YC SAFE / Student loan
+  finance?: FinanceState;
   karma: number; // aspiration points (like blessings in Lagos Life)
   unlockedPerks: string[];
-  ownedCars: CommuteModeId[];
+  unlockedTechNodes?: TechNodeId[];
+  ownedCars: Array<CommuteModeId | VehicleId>;
+  activeCarId?: VehicleId | null;
   ownedHomes: string[];
   pantryMeals: number;
+  inventory: InventoryEntry[];
 
   // Time & Environment
   time: number; // minutes since Day 1 00:00 (starts Day 1 at 07:30 = 450)
@@ -499,4 +710,52 @@ export interface GameState {
   };
   goalIndex: number;
 }
+
+export interface GoogleUserProfile {
+  id: string; // Google 'sub' claim or deterministic ID
+  email: string;
+  name: string;
+  givenName?: string;
+  picture?: string;
+  hd?: string; // Google Workspace hosted domain if any
+  provider: 'google_gis' | 'google_instant';
+  signedInAt: number;
+}
+
+export type SerializableGameState = Omit<
+  GameState,
+  'screen' | 'view' | 'activeModal' | 'phoneApp' | 'simTab' | 'lastToast'
+>;
+
+export interface SaveSlotSummary {
+  slotId: string; // 'autosave' | 'slot-1' | 'slot-2' | 'slot-3'
+  label: string;
+  isAutosave: boolean;
+  savedAtIso: string;
+  savedAtMs: number;
+  userId?: string;
+  userEmail?: string;
+  simName: string;
+  simHandle: string;
+  appearance: SimAppearance;
+  careerCompany: string;
+  careerCode: string;
+  homeId: string;
+  homeName: string;
+  locationId: string;
+  dayNumber: number;
+  timeFormatted: string;
+  cash: number;
+  netWorth: number;
+}
+
+export interface SaveGameData {
+  schema: 'bay-life-save';
+  version: number;
+  savedAtIso: string;
+  savedAtMs: number;
+  summary: SaveSlotSummary;
+  state: SerializableGameState;
+}
+
 

@@ -16,15 +16,21 @@ import {
   calculateOverallMood,
   formatCurrency,
   formatTime,
+  getActiveVehicle,
   getDayNumber,
   getDayOfWeekName,
+  getInstalledHomeComputer,
+  hasPersonalCar,
   isHomePowered,
   useGameStore,
 } from '../store/useGameStore';
 import { NeedKey, SkillKey, WorkToneId } from '../types/game';
+import { useAuthSaveStore } from '../store/useAuthSaveStore';
+import { GoogleLogoSvg } from './AccountSaveModal';
 import { Portrait } from './Portrait';
 import {
   Map,
+  Monitor,
   ShoppingBag,
   Smartphone,
   Briefcase,
@@ -40,6 +46,12 @@ import {
   X,
   Sparkles,
   SkipForward,
+  ChevronDown,
+  ChevronUp,
+  Compass,
+  Backpack,
+  Car,
+  Save,
 } from 'lucide-react';
 
 interface SprintTarget {
@@ -105,8 +117,8 @@ const SPRINT_TEMPLATES: Omit<SprintTarget, 'id'>[] = [
     title: 'LGTM Design Doc',
     badge: '+6% Promo',
     accent: 'border-indigo-500/40 bg-indigo-500/12 text-indigo-700 dark:text-indigo-300',
-    reward: { performanceDelta: 6, karmaDelta: 1, skill: 'systemDesign', skillDelta: 0.12 },
-    popText: '+6% Promo · +1 ⚡',
+    reward: { performanceDelta: 6, skill: 'systemDesign', skillDelta: 0.12 },
+    popText: '+6% Promo · +0.12 Arch',
   },
   {
     emoji: '⚡',
@@ -170,6 +182,9 @@ export const AppleHUD: React.FC = () => {
   const targetPos = useGameStore((s) => s.targetPos);
   const queue = useGameStore((s) => s.queue);
   const job = useGameStore((s) => s.job);
+  const ownedCars = useGameStore((s) => s.ownedCars);
+  const activeCarId = useGameStore((s) => s.activeCarId);
+  const inventory = useGameStore((s) => s.inventory || []);
   const workShift = useGameStore((s) => s.workShift);
   const travel = useGameStore((s) => s.travel);
   const activeEvent = useGameStore((s) => s.activeEvent);
@@ -196,6 +211,9 @@ export const AppleHUD: React.FC = () => {
   const autoFixNeed = useGameStore((s) => s.autoFixNeed);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
 
+  const authUser = useAuthSaveStore((s) => s.user);
+  const quickSaveNow = useAuthSaveStore((s) => s.quickSaveNow);
+
   const state = useGameStore.getState();
   const moodInfo = calculateOverallMood(state);
   const powered = isHomePowered(state);
@@ -205,6 +223,7 @@ export const AppleHUD: React.FC = () => {
   const [floatingPops, setFloatingPops] = useState<FloatingRewardPop[]>([]);
   const [sprintCombo, setSprintCombo] = useState(0);
   const [shiftBonusEarned, setShiftBonusEarned] = useState(0);
+  const [isWorkCardCollapsed, setIsWorkCardCollapsed] = useState(false);
 
   // Spawn interactive targets during an active workShift
   useEffect(() => {
@@ -212,6 +231,7 @@ export const AppleHUD: React.FC = () => {
       setSprintTargets([]);
       setSprintCombo(0);
       setShiftBonusEarned(0);
+      setIsWorkCardCollapsed(false);
       return;
     }
 
@@ -340,7 +360,7 @@ export const AppleHUD: React.FC = () => {
   // "✨ Smart Next" Apple Intelligence One-Tap Handler
   const handleSmartNext = useCallback(() => {
     const s = useGameStore.getState();
-    if (s.travel || s.workShift) return;
+    if (s.travel) return;
 
     // 1. If any need is < 45%, auto-fix the lowest need immediately
     const sortedNeeds = (Object.entries(s.needs) as Array<[NeedKey, number]>).sort(
@@ -420,6 +440,11 @@ export const AppleHUD: React.FC = () => {
       ) {
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        void quickSaveNow();
+        return;
+      }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const s = useGameStore.getState();
@@ -459,6 +484,15 @@ export const AppleHUD: React.FC = () => {
       } else if (key === 'b' && s.locationId === 'home') {
         e.preventDefault();
         setView(s.view === 'buy' ? 'live' : 'buy');
+      } else if (key === 'c' && s.locationId === 'home') {
+        e.preventDefault();
+        setActiveModal(s.activeModal === 'computer' ? null : 'computer');
+      } else if (key === 'k') {
+        e.preventDefault();
+        setActiveModal(s.activeModal === 'backpack' ? null : 'backpack');
+      } else if (key === 'g') {
+        e.preventDefault();
+        setActiveModal(s.activeModal === 'garage' ? null : 'garage');
       } else if (key === 'p') {
         e.preventDefault();
         setActiveModal(s.activeModal === 'phone' ? null : 'phone', 'levels');
@@ -468,6 +502,9 @@ export const AppleHUD: React.FC = () => {
       } else if (key === 'w') {
         e.preventDefault();
         setActiveModal(s.activeModal === 'career' ? null : 'career');
+      } else if (key === 's') {
+        e.preventDefault();
+        setActiveModal(s.activeModal === 'account' ? null : 'account');
       } else if (key === 'a') {
         e.preventDefault();
         handleSmartNext();
@@ -476,8 +513,10 @@ export const AppleHUD: React.FC = () => {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSmartNext, resolveEventChoice, setActiveModal, setSpeed, setView]);
+  }, [handleSmartNext, quickSaveNow, resolveEventChoice, setActiveModal, setSpeed, setView]);
 
+  const activeVehicle = getActiveVehicle({ ownedCars, activeCarId });
+  const totalPackCount = inventory.reduce((sum, entry) => sum + entry.quantity, 0);
   const homeDef = HOMES.find((h) => h.id === homeId) || HOMES[1];
   const currentPlaceName =
     locationId === 'home'
@@ -539,6 +578,24 @@ export const AppleHUD: React.FC = () => {
             <span>{powered ? 'Grid' : 'Outage'}</span>
           </span>
 
+          {/* Apple CarPlay / EV Status Pill */}
+          <button
+            onClick={() => setActiveModal(activeModal === 'garage' ? null : 'garage')}
+            className={`btn-press inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold transition ${
+              activeVehicle
+                ? 'bg-[#007AFF]/15 text-[#007AFF] hover:bg-[#007AFF]/25'
+                : 'bg-indigo-500/12 text-indigo-700 hover:bg-indigo-500/20 dark:text-indigo-300'
+            }`}
+            title={
+              activeVehicle
+                ? `Apple CarPlay (${activeVehicle.name}) — $0 Fares, ${activeVehicle.baseMinutes}m HOV Drives & Scenic Joyrides (Shortcut: G)`
+                : 'Open EV Garage — Unlock $0 Commute Fares, Fast HOV Autopilot & Scenic Joyrides (Shortcut: G)'
+            }
+          >
+            <span>{activeVehicle ? activeVehicle.emoji : '🚗'}</span>
+            <span>{activeVehicle ? `${activeVehicle.shortName} · $0` : 'EV Garage'}</span>
+          </button>
+
           {/* Speed Segmented Control */}
           <div
             className="flex items-center gap-0.5 rounded-full bg-[var(--mist)] p-0.5"
@@ -597,6 +654,35 @@ export const AppleHUD: React.FC = () => {
             title={`Theme: ${nightMode}`}
           >
             {nightMode === 'dark' ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
+          </button>
+
+          <button
+            onClick={() => void quickSaveNow()}
+            className="btn-press grid size-7 place-items-center rounded-full bg-[#007AFF]/15 text-[#007AFF] hover:bg-[#007AFF]/25"
+            title="Quick Save Now (Cmd/Ctrl + S)"
+            aria-label="Quick Save Now"
+          >
+            <Save className="size-3.5" />
+          </button>
+
+          <button
+            onClick={() => setActiveModal(activeModal === 'account' ? null : 'account')}
+            className="btn-press inline-flex items-center gap-1.5 rounded-full bg-[var(--mist)] px-2.5 py-1 text-[11px] font-extrabold text-[var(--ink)] hover:bg-black/10 dark:hover:bg-white/15"
+            title="Google Account & Save Slots (Shortcut: S)"
+          >
+            {authUser ? (
+              <>
+                <span className="grid size-4 place-items-center rounded-full bg-[#007AFF] text-[9px] font-extrabold text-white">
+                  {authUser.name[0]?.toUpperCase() || 'G'}
+                </span>
+                <span className="hidden sm:inline">{authUser.givenName || 'Cloud'}</span>
+              </>
+            ) : (
+              <>
+                <GoogleLogoSvg className="size-3.5" />
+                <span>Saves</span>
+              </>
+            )}
           </button>
 
           <button
@@ -759,12 +845,12 @@ export const AppleHUD: React.FC = () => {
         </div>
       )}
 
-      {/* INTERACTIVE WORK SHIFT MINI-GAME ("LIVE CODE SPRINT & BUG SQUASH") */}
-      {workShift && job && careerDef && levelDef && (
-        <div className="fixed top-20 left-1/2 z-30 w-[calc(100%-24px)] max-w-md -translate-x-1/2">
-          <div className="apple-glass-heavy relative overflow-hidden rounded-3xl p-3.5 shadow-xl">
+      {/* INTERACTIVE WORK SHIFT MINI-GAME ("LIVE CODE SPRINT & BUG SQUASH") — DOCKED TO TOP-RIGHT RAIL IN LIVE VIEW ONLY */}
+      {view === 'live' && !activeModal && workShift && job && careerDef && levelDef && (
+        <div className="pointer-events-none fixed top-16 right-3 z-20 w-[calc(100%-24px)] max-w-[385px] sm:right-5">
+          <div className="apple-glass-heavy pointer-events-auto relative overflow-hidden rounded-3xl p-3.5 shadow-xl">
             {/* Floating +$$$ / +Promo Micro-Reward Popups */}
-            <div className="pointer-events-none absolute top-3 right-4 z-40 flex flex-col items-end gap-1">
+            <div className="pointer-events-none absolute top-3 right-12 z-40 flex flex-col items-end gap-1">
               {floatingPops.map((pop) => (
                 <div
                   key={pop.id}
@@ -790,124 +876,22 @@ export const AppleHUD: React.FC = () => {
                 WORK_PROJECTS?.[0] ||
                 null;
               const projPct = Math.min(100, Math.round(job.projectProgress || 0));
+              const shiftPct = Math.min(
+                100,
+                Math.round((workShift.elapsedMinutes / workShift.totalMinutes) * 100)
+              );
 
               return (
                 <>
-                  {/* Custom SVG Work Environment Illustration Banner */}
-                  <div className="mb-2.5 overflow-hidden rounded-2xl border border-black/10 bg-slate-900/90 text-white shadow-inner dark:border-white/10">
-                    <div className="relative h-14 w-full overflow-hidden">
-                      {shiftMode === 'office' && (
-                        <svg viewBox="0 0 360 56" className="h-full w-full">
-                          <defs>
-                            <linearGradient id="officeGrad" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#0f172a" />
-                              <stop offset="50%" stopColor="#1e3a8a" />
-                              <stop offset="100%" stopColor="#0284c7" />
-                            </linearGradient>
-                          </defs>
-                          <rect width="360" height="56" fill="url(#officeGrad)" />
-                          {/* Glass Campus Curtain Wall Grid */}
-                          <g stroke="#38bdf8" strokeOpacity="0.22" strokeWidth="1">
-                            <line x1="40" y1="0" x2="40" y2="56" />
-                            <line x1="90" y1="0" x2="90" y2="56" />
-                            <line x1="140" y1="0" x2="140" y2="56" />
-                            <line x1="190" y1="0" x2="190" y2="56" />
-                            <line x1="0" y1="28" x2="220" y2="28" />
-                          </g>
-                          {/* Dual Studio Monitors & War Room Desk */}
-                          <rect x="18" y="14" width="32" height="20" rx="3" fill="#0284c7" stroke="#7dd3fc" strokeWidth="1.2" />
-                          <rect x="22" y="18" width="18" height="3" rx="1" fill="#bae6fd" />
-                          <rect x="22" y="23" width="24" height="3" rx="1" fill="#34d399" />
-                          <rect x="54" y="16" width="28" height="18" rx="3" fill="#1e293b" stroke="#60a5fa" strokeWidth="1.2" />
-                          <rect x="58" y="20" width="16" height="3" rx="1" fill="#a78bfa" />
-                          <rect x="12" y="38" width="84" height="4" rx="2" fill="#475569" />
-                          {/* Micro-Kitchen Espresso Badge */}
-                          <circle cx="114" cy="26" r="10" fill="#10b981" fillOpacity="0.25" stroke="#34d399" strokeWidth="1" />
-                          <text x="114" y="30" textAnchor="middle" fontSize="11">🏢</text>
-                        </svg>
-                      )}
-
-                      {shiftMode === 'wfh' && (
-                        <svg viewBox="0 0 360 56" className="h-full w-full">
-                          <defs>
-                            <linearGradient id="wfhGrad" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#1e1b4b" />
-                              <stop offset="55%" stopColor="#312e81" />
-                              <stop offset="100%" stopColor="#047857" />
-                            </linearGradient>
-                          </defs>
-                          <rect width="360" height="56" fill="url(#wfhGrad)" />
-                          {/* Apartment Window + Warm Lamp */}
-                          <rect x="16" y="8" width="38" height="34" rx="4" fill="#0f172a" stroke="#818cf8" strokeWidth="1.2" />
-                          <circle cx="28" cy="18" r="4" fill="#fde047" opacity="0.85" />
-                          {/* Standing Desk + Ultrawide + Pour-over Coffee */}
-                          <rect x="64" y="14" width="36" height="20" rx="3" fill="#1e293b" stroke="#34d399" strokeWidth="1.2" />
-                          <rect x="68" y="19" width="22" height="3" rx="1" fill="#6ee7b7" />
-                          <rect x="68" y="24" width="16" height="3" rx="1" fill="#93c5fd" />
-                          <rect x="58" y="37" width="52" height="4" rx="2" fill="#a16207" />
-                          <circle cx="124" cy="26" r="10" fill="#818cf8" fillOpacity="0.25" stroke="#a5b4fc" strokeWidth="1" />
-                          <text x="124" y="30" textAnchor="middle" fontSize="11">🏠</text>
-                        </svg>
-                      )}
-
-                      {shiftMode === 'wfa' && (
-                        <svg viewBox="0 0 360 56" className="h-full w-full">
-                          <defs>
-                            <linearGradient id="wfaGrad" x1="0" y1="0" x2="1" y2="1">
-                              <stop offset="0%" stopColor="#064e3b" />
-                              <stop offset="50%" stopColor="#0f766e" />
-                              <stop offset="100%" stopColor="#0369a1" />
-                            </linearGradient>
-                          </defs>
-                          <rect width="360" height="56" fill="url(#wfaGrad)" />
-                          {/* Bay Area Cafe / Park Trees & Laptop + Wi-Fi Waves */}
-                          <circle cx="26" cy="24" r="12" fill="#10b981" opacity="0.45" />
-                          <circle cx="42" cy="20" r="14" fill="#34d399" opacity="0.35" />
-                          <path d="M 66,34 L 94,34 L 90,18 L 70,18 Z" fill="#0f172a" stroke="#5eead4" strokeWidth="1.2" />
-                          <rect x="62" y="34" width="36" height="3.5" rx="1.5" fill="#cbd5e1" />
-                          {/* Wi-Fi Signal Arcs */}
-                          <path d="M 108,28 Q 114,22 120,28" fill="none" stroke="#fde047" strokeWidth="1.5" strokeLinecap="round" />
-                          <path d="M 105,24 Q 114,15 123,24" fill="none" stroke="#fde047" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
-                          <circle cx="114" cy="31" r="1.8" fill="#fde047" />
-                        </svg>
-                      )}
-
-                      {/* Overlay Mode Status & Lock Pill */}
-                      <div className=" inset-0 absolute flex items-center justify-between gap-2 px-3 py-1.5">
-                        <div className="ml-auto flex flex-col items-end text-right">
-                          <div className="flex flex-wrap items-center justify-end gap-1.5">
-                            <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-extrabold text-amber-300 ring-1 ring-amber-400/40 backdrop-blur-xs">
-                              🔒 On the Clock (Travel Locked)
-                            </span>
-                            <span className="rounded-full bg-white/20 px-2 py-0.5 font-mono text-[10px] font-extrabold text-white backdrop-blur-xs">
-                              {shiftMode === 'office'
-                                ? `Office Days: ${job.officeDaysThisWeek || 1}/3 req`
-                                : shiftMode === 'wfh'
-                                ? `WFH: ${job.wfhDaysThisWeek || 1}/2 wk`
-                                : `${job.wfaDaysRemaining ?? 3}/4 WFA left`}
-                            </span>
-                          </div>
-                          <div className="mt-1 text-[11px] font-extrabold text-white drop-shadow-xs">
-                            {shiftMode === 'office'
-                              ? '🏢 In-Office Badge-In · +20% Promo Velocity'
-                              : shiftMode === 'wfh'
-                              ? `🏠 Remote WFH · Hybrid Policy (${job.wfhDaysThisWeek || 1}/2 wk)`
-                              : `🌍 WFA Pass Active at ${currentPlaceName} · ${job.wfaDaysRemaining ?? 3}/4 WFA left`}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Header Row */}
+                  {/* Header Row (Always visible, with Compact/Expand toggle) */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <span className="grid size-10 place-items-center rounded-2xl bg-[#007AFF]/15 text-xl">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-2xl bg-[#007AFF]/15 text-lg">
                         {careerDef.emoji}
                       </span>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-sm font-extrabold">{careerDef.company}</span>
+                          <span className="truncate text-sm font-extrabold">{careerDef.company}</span>
                           <span className="rounded-full bg-[#007AFF] px-2 py-0.5 text-[10px] font-bold text-white">
                             {levelDef.code}
                           </span>
@@ -918,169 +902,324 @@ export const AppleHUD: React.FC = () => {
                           )}
                         </div>
                         <div className="text-[11px] text-[var(--ink-soft)]">
-                          Ends {formatTime(workShift.endsAt)}
+                          Ends {formatTime(workShift.endsAt)} ·{' '}
+                          <span className="font-mono font-bold text-[#007AFF]">{shiftPct}%</span>
                           {shiftBonusEarned > 0 && (
-                            <span className="ml-1.5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                              · +{formatCurrency(shiftBonusEarned)} sprint bonus
+                            <span className="ml-1 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              · +{formatCurrency(shiftBonusEarned)}
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="text-right font-mono">
-                      <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                        +{formatCurrency(levelDef.shiftPay)}
+
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <div className="text-right font-mono">
+                        <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                          +{formatCurrency(levelDef.shiftPay)}
+                        </div>
+                        <div className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
+                          +{formatCurrency(levelDef.rsuPerShift)} RSU
+                        </div>
                       </div>
-                      <div className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
-                        +{formatCurrency(levelDef.rsuPerShift)} RSU
-                      </div>
+                      <button
+                        onClick={() => setIsWorkCardCollapsed((c) => !c)}
+                        title={
+                          isWorkCardCollapsed
+                            ? 'Expand Work Shift Sprint Card'
+                            : 'Minimize Work Shift Card to see more of the room'
+                        }
+                        className="btn-press grid size-7 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                      >
+                        {isWorkCardCollapsed ? (
+                          <ChevronDown className="size-4" />
+                        ) : (
+                          <ChevronUp className="size-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
-                  {/* Dual Compact Progress Bars: Shift & Multi-Gate Promo Packet */}
-                  <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-                    <div>
-                      <div className="flex justify-between text-[10px] font-bold text-[var(--ink-soft)]">
-                        <span>Shift Progress</span>
-                        <span className="font-mono text-[var(--ink)]">
-                          {Math.round((workShift.elapsedMinutes / workShift.totalMinutes) * 100)}%
-                        </span>
-                      </div>
-                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  {isWorkCardCollapsed ? (
+                    /* Minimized Single-Bar View */
+                    <div className="mt-2 space-y-2">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                         <div
                           className="h-full rounded-full bg-[#007AFF] transition-all"
-                          style={{
-                            width: `${Math.min(
-                              100,
-                              (workShift.elapsedMinutes / workShift.totalMinutes) * 100
-                            )}%`,
-                          }}
+                          style={{ width: `${shiftPct}%` }}
                         />
                       </div>
-                      <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
-                        Shifts: {job.shiftsAtLevel || 0}/{nextLevel?.minShiftsForPromo || 3} req
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-[10px] font-bold text-[var(--ink-soft)]">
-                        <span>Calibration</span>
-                        <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                          {Math.round(job.performance)}%
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:text-amber-300">
+                          🔒 On the Clock ({shiftMode.toUpperCase()})
                         </span>
-                      </div>
-                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-emerald-500 transition-all"
-                          style={{ width: `${job.performance}%` }}
-                        />
-                      </div>
-                      <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
-                        Deliverables {job.deliverablesCompleted || 0}/
-                        {nextLevel?.requiredDeliverables || 1} · Shifts {job.shiftsAtLevel || 0}/
-                        {nextLevel?.minShiftsForPromo || 3}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setActiveModal('career')}
+                            className="btn-press rounded-full bg-[#007AFF] px-2.5 py-0.5 text-[10px] font-extrabold text-white"
+                          >
+                            🔬 Career Hub
+                          </button>
+                          <button
+                            onClick={leaveWorkEarly}
+                            className="btn-press rounded-full bg-rose-500/12 px-2.5 py-0.5 text-[10px] font-bold text-rose-600 dark:text-rose-400"
+                          >
+                            Leave Early
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Custom SVG Work Environment Illustration Banner */}
+                      <div className="mt-2.5 overflow-hidden rounded-2xl border border-black/10 bg-slate-900/90 text-white shadow-inner dark:border-white/10">
+                        <div className="relative h-12 w-full overflow-hidden">
+                          {shiftMode === 'office' && (
+                            <svg viewBox="0 0 360 56" className="h-full w-full">
+                              <defs>
+                                <linearGradient id="officeGrad" x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor="#0f172a" />
+                                  <stop offset="50%" stopColor="#1e3a8a" />
+                                  <stop offset="100%" stopColor="#0284c7" />
+                                </linearGradient>
+                              </defs>
+                              <rect width="360" height="56" fill="url(#officeGrad)" />
+                              {/* Glass Campus Curtain Wall Grid */}
+                              <g stroke="#38bdf8" strokeOpacity="0.22" strokeWidth="1">
+                                <line x1="40" y1="0" x2="40" y2="56" />
+                                <line x1="90" y1="0" x2="90" y2="56" />
+                                <line x1="140" y1="0" x2="140" y2="56" />
+                                <line x1="190" y1="0" x2="190" y2="56" />
+                                <line x1="0" y1="28" x2="220" y2="28" />
+                              </g>
+                              {/* Dual Studio Monitors & War Room Desk */}
+                              <rect x="18" y="14" width="32" height="20" rx="3" fill="#0284c7" stroke="#7dd3fc" strokeWidth="1.2" />
+                              <rect x="22" y="18" width="18" height="3" rx="1" fill="#bae6fd" />
+                              <rect x="22" y="23" width="24" height="3" rx="1" fill="#34d399" />
+                              <rect x="54" y="16" width="28" height="18" rx="3" fill="#1e293b" stroke="#60a5fa" strokeWidth="1.2" />
+                              <rect x="58" y="20" width="16" height="3" rx="1" fill="#a78bfa" />
+                              <rect x="12" y="38" width="84" height="4" rx="2" fill="#475569" />
+                              {/* Micro-Kitchen Espresso Badge */}
+                              <circle cx="114" cy="26" r="10" fill="#10b981" fillOpacity="0.25" stroke="#34d399" strokeWidth="1" />
+                              <text x="114" y="30" textAnchor="middle" fontSize="11">🏢</text>
+                            </svg>
+                          )}
 
-                  {/* Active Work Exploration Project Bar + 1-Tap Career Hub CTA */}
-                  <div className="mt-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#007AFF]/25 bg-[#007AFF]/8 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold">
-                        <span className="truncate text-[var(--ink)]">
-                          {activeProj ? `${activeProj.emoji} ${activeProj.title}` : '🔬 Active R&D Milestone'}
-                        </span>
-                        <span className="shrink-0 font-mono text-[#007AFF]">{projPct}%</span>
+                          {shiftMode === 'wfh' && (
+                            <svg viewBox="0 0 360 56" className="h-full w-full">
+                              <defs>
+                                <linearGradient id="wfhGrad" x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor="#1e1b4b" />
+                                  <stop offset="55%" stopColor="#312e81" />
+                                  <stop offset="100%" stopColor="#047857" />
+                                </linearGradient>
+                              </defs>
+                              <rect width="360" height="56" fill="url(#wfhGrad)" />
+                              {/* Apartment Window + Warm Lamp */}
+                              <rect x="16" y="8" width="38" height="34" rx="4" fill="#0f172a" stroke="#818cf8" strokeWidth="1.2" />
+                              <circle cx="28" cy="18" r="4" fill="#fde047" opacity="0.85" />
+                              {/* Standing Desk + Ultrawide + Pour-over Coffee */}
+                              <rect x="64" y="14" width="36" height="20" rx="3" fill="#1e293b" stroke="#34d399" strokeWidth="1.2" />
+                              <rect x="68" y="19" width="22" height="3" rx="1" fill="#6ee7b7" />
+                              <rect x="68" y="24" width="16" height="3" rx="1" fill="#93c5fd" />
+                              <rect x="58" y="37" width="52" height="4" rx="2" fill="#a16207" />
+                              <circle cx="124" cy="26" r="10" fill="#818cf8" fillOpacity="0.25" stroke="#a5b4fc" strokeWidth="1" />
+                              <text x="124" y="30" textAnchor="middle" fontSize="11">🏠</text>
+                            </svg>
+                          )}
+
+                          {shiftMode === 'wfa' && (
+                            <svg viewBox="0 0 360 56" className="h-full w-full">
+                              <defs>
+                                <linearGradient id="wfaGrad" x1="0" y1="0" x2="1" y2="1">
+                                  <stop offset="0%" stopColor="#064e3b" />
+                                  <stop offset="50%" stopColor="#0f766e" />
+                                  <stop offset="100%" stopColor="#0369a1" />
+                                </linearGradient>
+                              </defs>
+                              <rect width="360" height="56" fill="url(#wfaGrad)" />
+                              {/* Bay Area Cafe / Park Trees & Laptop + Wi-Fi Waves */}
+                              <circle cx="26" cy="24" r="12" fill="#10b981" opacity="0.45" />
+                              <circle cx="42" cy="20" r="14" fill="#34d399" opacity="0.35" />
+                              <path d="M 66,34 L 94,34 L 90,18 L 70,18 Z" fill="#0f172a" stroke="#5eead4" strokeWidth="1.2" />
+                              <rect x="62" y="34" width="36" height="3.5" rx="1.5" fill="#cbd5e1" />
+                              {/* Wi-Fi Signal Arcs */}
+                              <path d="M 108,28 Q 114,22 120,28" fill="none" stroke="#fde047" strokeWidth="1.5" strokeLinecap="round" />
+                              <path d="M 105,24 Q 114,15 123,24" fill="none" stroke="#fde047" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+                              <circle cx="114" cy="31" r="1.8" fill="#fde047" />
+                            </svg>
+                          )}
+
+                          {/* Overlay Mode Status & Lock Pill */}
+                          <div className="inset-0 absolute flex items-center justify-between gap-2 px-3 py-1">
+                            <div className="ml-auto flex flex-col items-end text-right">
+                              <div className="flex flex-wrap items-center justify-end gap-1">
+                                <span className="rounded-full bg-black/55 px-2 py-0.5 text-[9.5px] font-extrabold text-amber-300 ring-1 ring-amber-400/40 backdrop-blur-xs">
+                                  🔒 On the Clock (Travel Locked)
+                                </span>
+                                <span className="rounded-full bg-white/20 px-2 py-0.5 font-mono text-[9.5px] font-extrabold text-white backdrop-blur-xs">
+                                  {shiftMode === 'office'
+                                    ? `Office: ${job.officeDaysThisWeek || 1}/3 req`
+                                    : shiftMode === 'wfh'
+                                    ? `WFH: ${job.wfhDaysThisWeek || 1}/2 wk`
+                                    : `${job.wfaDaysRemaining ?? 3}/4 WFA left`}
+                                </span>
+                              </div>
+                              <div className="mt-0.5 text-[10px] font-extrabold text-white drop-shadow-xs">
+                                {shiftMode === 'office'
+                                  ? '🏢 In-Office Badge-In · +20% Promo Velocity'
+                                  : shiftMode === 'wfh'
+                                  ? `🏠 Remote WFH · Hybrid Policy (${job.wfhDaysThisWeek || 1}/2 wk)`
+                                  : `🌍 WFA Pass at ${currentPlaceName}`}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-indigo-500 transition-all"
-                          style={{ width: `${projPct}%` }}
-                        />
+
+                      {/* Dual Compact Progress Bars: Shift & Multi-Gate Promo Packet */}
+                      <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                        <div>
+                          <div className="flex justify-between text-[10px] font-bold text-[var(--ink-soft)]">
+                            <span>Shift Progress</span>
+                            <span className="font-mono text-[var(--ink)]">{shiftPct}%</span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-[#007AFF] transition-all"
+                              style={{ width: `${shiftPct}%` }}
+                            />
+                          </div>
+                          <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
+                            Shifts: {job.shiftsAtLevel || 0}/{nextLevel?.minShiftsForPromo || 3} req
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-[10px] font-bold text-[var(--ink-soft)]">
+                            <span>Calibration</span>
+                            <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                              {Math.round(job.performance)}%
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-emerald-500 transition-all"
+                              style={{ width: `${job.performance}%` }}
+                            />
+                          </div>
+                          <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
+                            Deliverables {job.deliverablesCompleted || 0}/
+                            {nextLevel?.requiredDeliverables || 1} · Shifts {job.shiftsAtLevel || 0}/
+                            {nextLevel?.minShiftsForPromo || 3}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <button
-                      onClick={() => setActiveModal('career')}
-                      className="btn-press shrink-0 rounded-xl bg-[#007AFF] px-2.5 py-1.5 text-[10px] font-extrabold text-white shadow-xs hover:bg-[#0066CC]"
-                    >
-                      🔬 Explore / Career Hub
-                    </button>
-                  </div>
+
+                      {/* Active Work Exploration Project Bar + 1-Tap Career Hub CTA */}
+                      <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-[#007AFF]/25 bg-[#007AFF]/8 px-3 py-1.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold">
+                            <span className="truncate text-[var(--ink)]">
+                              {activeProj ? `${activeProj.emoji} ${activeProj.title}` : '🔬 Active R&D Milestone'}
+                            </span>
+                            <span className="shrink-0 font-mono text-[#007AFF]">{projPct}%</span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-indigo-500 transition-all"
+                              style={{ width: `${projPct}%` }}
+                            />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setActiveModal('career')}
+                          className="btn-press shrink-0 rounded-xl bg-[#007AFF] px-2.5 py-1.5 text-[10px] font-extrabold text-white shadow-xs hover:bg-[#0066CC]"
+                        >
+                          🔬 Career Hub
+                        </button>
+                      </div>
+
+                      {/* Interactive Live Code Sprint & Bug Squash Arena */}
+                      <div className="mt-2.5 rounded-2xl border border-black/8 bg-black/[0.03] p-2 dark:border-white/10 dark:bg-white/[0.04]">
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#007AFF]">
+                            ⚡ Live Code Sprint — Tap to Ship
+                          </span>
+                          <span className="text-[9.5px] font-medium text-[var(--ink-soft)]">
+                            Instant cash & promo boosts
+                          </span>
+                        </div>
+
+                        <div className="grid min-h-[42px] grid-cols-3 gap-1.5">
+                          {sprintTargets.map((target) => (
+                            <button
+                              key={target.id}
+                              onClick={() => handleClickSprintTarget(target)}
+                              className={`animate-target-pop btn-press flex flex-col items-start justify-between rounded-xl border px-2 py-1.5 text-left shadow-xs ${target.accent}`}
+                            >
+                              <div className="flex w-full items-center justify-between gap-1">
+                                <span className="text-sm leading-none">{target.emoji}</span>
+                                <span className="font-mono text-[9px] font-extrabold">{target.badge}</span>
+                              </div>
+                              <div className="mt-1 w-full text-[10px] font-bold leading-tight text-[var(--ink)]">
+                                {target.title}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Ultra-Clean Compact Work Tone Icon Pills */}
+                      <div className="mt-2 flex items-center justify-between gap-1.5">
+                        <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
+                          {WORK_TONES.map((wt) => {
+                            const active = workShift.tone === wt.id;
+                            return (
+                              <button
+                                key={wt.id}
+                                onClick={() => setWorkTone(wt.id)}
+                                title={`${wt.label} — ${wt.desc}`}
+                                className={`btn-press flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10.5px] font-bold ${
+                                  active
+                                    ? 'bg-[#007AFF] text-white shadow-xs'
+                                    : 'bg-[var(--mist)] text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                                }`}
+                              >
+                                <span>{wt.emoji}</span>
+                                <span>{COMPACT_TONE_LABELS[wt.id]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          onClick={leaveWorkEarly}
+                          title="Badge out early and collect partial shift pay"
+                          className="btn-press shrink-0 rounded-full bg-rose-500/12 px-2.5 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
+                        >
+                          Leave Early
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </>
               );
             })()}
-
-            {/* Interactive Live Code Sprint & Bug Squash Arena */}
-            <div className="mt-3 rounded-2xl border border-black/8 bg-black/[0.03] p-2.5 dark:border-white/10 dark:bg-white/[0.04]">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#007AFF]">
-                  ⚡ Live Code Sprint — Tap to Ship
-                </span>
-                <span className="text-[10px] font-medium text-[var(--ink-soft)]">
-                  Instant cash & promo boosts
-                </span>
-              </div>
-
-              <div className="grid min-h-[44px] grid-cols-3 gap-1.5">
-                {sprintTargets.map((target) => (
-                  <button
-                    key={target.id}
-                    onClick={() => handleClickSprintTarget(target)}
-                    className={`animate-target-pop btn-press flex flex-col items-start justify-between rounded-xl border px-2.5 py-1.5 text-left shadow-xs ${target.accent}`}
-                  >
-                    <div className="flex w-full items-center justify-between gap-1">
-                      <span className="text-sm leading-none">{target.emoji}</span>
-                      <span className="font-mono text-[9px] font-extrabold">{target.badge}</span>
-                    </div>
-                    <div className="mt-1 w-full text-[10px] font-bold leading-tight text-[var(--ink)]">
-                      {target.title}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Ultra-Clean Compact Work Tone Icon Pills */}
-            <div className="mt-2.5 flex items-center justify-between gap-1.5">
-              <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
-                {WORK_TONES.map((wt) => {
-                  const active = workShift.tone === wt.id;
-                  return (
-                    <button
-                      key={wt.id}
-                      onClick={() => setWorkTone(wt.id)}
-                      title={`${wt.label} — ${wt.desc}`}
-                      className={`btn-press flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                        active
-                          ? 'bg-[#007AFF] text-white shadow-xs'
-                          : 'bg-[var(--mist)] text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                      }`}
-                    >
-                      <span>{wt.emoji}</span>
-                      <span>{COMPACT_TONE_LABELS[wt.id]}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={leaveWorkEarly}
-                title="Badge out early and collect partial shift pay"
-                className="btn-press shrink-0 rounded-full bg-rose-500/12 px-2.5 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
-              >
-                Leave Early
-              </button>
-            </div>
           </div>
         </div>
       )}
 
       {/* ACTIVE COMMUTE / TRANSIT OVERLAY CARD */}
-      {travel && (
+      {view === 'live' && !activeModal && travel && (
         <div className="fixed top-24 left-1/2 z-30 w-[calc(100%-24px)] max-w-md -translate-x-1/2">
           <div className="apple-glass-heavy rounded-3xl p-4 shadow-xl">
             {(() => {
               const modeDef = COMMUTE_MODES.find((m) => m.id === travel.mode);
+              const activeVehicle =
+                travel.mode === 'tesla' ? getActiveVehicle({ ownedCars, activeCarId }) : null;
+              const transitEmoji = activeVehicle?.emoji || modeDef?.emoji || '🚆';
+              const transitName = activeVehicle?.name || modeDef?.name || 'Transit';
               const destName =
                 travel.to === 'home'
                   ? homeDef.name
@@ -1093,12 +1232,12 @@ export const AppleHUD: React.FC = () => {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <span className="grid size-10 place-items-center rounded-2xl bg-[#007AFF]/15 text-2xl">
-                        {modeDef?.emoji || '🚆'}
+                        {transitEmoji}
                       </span>
                       <div>
                         <div className="text-sm font-extrabold">En Route to {destName}</div>
                         <div className="text-xs text-[var(--ink-soft)]">
-                          {modeDef?.name} · ETA {formatTime(travel.arriveAt)}
+                          {transitName} · ETA {formatTime(travel.arriveAt)}
                         </div>
                       </div>
                     </div>
@@ -1219,6 +1358,7 @@ export const AppleHUD: React.FC = () => {
       )}
 
       {/* BOTTOM FLOATING APPLE DOCK */}
+      {view !== 'buy' && (
       <div className="pointer-events-none fixed right-0 bottom-0 left-0 z-30 flex flex-wrap items-end justify-between gap-2 p-3 sm:px-5">
         {/* Left: Sim Badge + Glanceable Apple Watch Activity Rings for Needs (1-Tap Auto-Fix) */}
         <div className="apple-glass-heavy pointer-events-auto flex items-center gap-3 rounded-3xl p-2 pr-4 text-[var(--ink)]">
@@ -1348,9 +1488,14 @@ export const AppleHUD: React.FC = () => {
             </div>
           </button>
 
-          {locationId !== 'home' ? (
+          {locationId !== 'home' && view === 'live' && !workShift ? (
             <button
-              onClick={() => travelTo('home', job?.preferredCommute || 'caltrain')}
+              onClick={() =>
+                travelTo(
+                  'home',
+                  hasPersonalCar({ ownedCars }) ? 'tesla' : job?.preferredCommute || 'caltrain'
+                )
+              }
               title="Travel back to your apartment"
               className="btn-press flex flex-col items-center gap-0.5 rounded-2xl bg-emerald-500/15 px-3 py-1.5 text-[10px] font-extrabold text-emerald-600 hover:bg-emerald-500/25 dark:text-emerald-400"
             >
@@ -1365,9 +1510,14 @@ export const AppleHUD: React.FC = () => {
                   ? 'bg-[#007AFF] text-white'
                   : 'text-[var(--ink)] hover:bg-[var(--mist)]'
               }`}
+              title={
+                locationId === 'home'
+                  ? 'View Apartment Room'
+                  : `View ${currentPlaceName}`
+              }
             >
-              <Home className="size-4" />
-              <span>Room</span>
+              {locationId === 'home' ? <Home className="size-4" /> : <Compass className="size-4" />}
+              <span>{locationId === 'home' ? 'Room' : 'Venue'}</span>
             </button>
           )}
 
@@ -1387,24 +1537,117 @@ export const AppleHUD: React.FC = () => {
             </div>
           </button>
 
-          {/* Furnish Icon ONLY visible when at Home */}
+          {/* Furnish & Computer Icons ONLY visible when at Home */}
           {locationId === 'home' && (
-            <button
-              onClick={() => setView(view === 'buy' ? 'live' : 'buy')}
-              className={`btn-press flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold ${
-                view === 'buy'
-                  ? 'bg-[#007AFF] text-white'
-                  : 'text-[var(--ink)] hover:bg-[var(--mist)]'
-              }`}
-              title="Furnish Apartment (Shortcut: B)"
-            >
-              <ShoppingBag className="size-4" />
-              <div className="flex items-center gap-1">
-                <span>Furnish</span>
-                <span className="keycap-hint">B</span>
-              </div>
-            </button>
+            <>
+              <button
+                onClick={() => setView('buy')}
+                className="btn-press flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold text-[var(--ink)] hover:bg-[var(--mist)]"
+                title="Furnish Apartment (Shortcut: B)"
+              >
+                <ShoppingBag className="size-4" />
+                <div className="flex items-center gap-1">
+                  <span>Furnish</span>
+                  <span className="keycap-hint">B</span>
+                </div>
+              </button>
+
+              {(() => {
+                const hasPC = Boolean(getInstalledHomeComputer({ objects }));
+                return (
+                  <button
+                    onClick={() =>
+                      setActiveModal(activeModal === 'computer' ? null : 'computer')
+                    }
+                    className={`btn-press relative flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold ${
+                      activeModal === 'computer'
+                        ? 'bg-[#007AFF] text-white'
+                        : hasPC
+                        ? 'text-[var(--ink)] hover:bg-[var(--mist)]'
+                        : 'bg-sky-500/12 text-sky-600 hover:bg-sky-500/20 dark:text-sky-300'
+                    }`}
+                    title={
+                      hasPC
+                        ? 'Open Interactive Home Computer OS (Shortcut: C)'
+                        : 'Optional Purchase: Install Home Computer Rig (Shortcut: C)'
+                    }
+                  >
+                    <Monitor className="size-4" />
+                    <div className="flex items-center gap-1">
+                      <span>{hasPC ? 'PC / IDE' : '+Install PC'}</span>
+                      <span className="keycap-hint">C</span>
+                    </div>
+                  </button>
+                );
+              })()}
+            </>
           )}
+
+          {/* Backpack / Everyday Carry Inventory (Shortcut: K) */}
+          <button
+            onClick={() => setActiveModal(activeModal === 'backpack' ? null : 'backpack')}
+            className={`btn-press relative flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold ${
+              activeModal === 'backpack'
+                ? 'bg-[#007AFF] text-white'
+                : 'text-[var(--ink)] hover:bg-[var(--mist)]'
+            }`}
+            title="Open Backpack & Everyday Carry Inventory — Use snacks, tech gear & stored furniture anywhere (Shortcut: K)"
+          >
+            <span
+              className={`-mt-1 rounded-full px-1.5 py-0.2 font-mono text-[8px] font-extrabold ${
+                activeModal === 'backpack'
+                  ? 'bg-white/25 text-white'
+                  : 'bg-[#007AFF]/15 text-[#007AFF]'
+              }`}
+            >
+              {totalPackCount}🎒
+            </span>
+            <div className="flex items-center gap-1">
+              <Backpack
+                className={`size-3.5 ${activeModal === 'backpack' ? 'text-white' : 'text-[#007AFF]'}`}
+              />
+              <span>Pack</span>
+              <span className="keycap-hint">K</span>
+            </div>
+          </button>
+
+          {/* Apple CarPlay & EV Garage (Shortcut: G) */}
+          <button
+            onClick={() => setActiveModal(activeModal === 'garage' ? null : 'garage')}
+            className={`btn-press relative flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold ${
+              activeModal === 'garage'
+                ? 'bg-[#007AFF] text-white'
+                : activeVehicle
+                ? 'text-[var(--ink)] hover:bg-[var(--mist)]'
+                : 'bg-emerald-500/12 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300'
+            }`}
+            title={
+              activeVehicle
+                ? `Apple CarPlay & EV Garage (${activeVehicle.shortName}) — 1-Tap Drives & Joyrides (Shortcut: G)`
+                : 'Open EV Garage — Buy Prius ($4.2k), Tesla FSD ($12.5k) or Taycan ($18.5k) for $0 Fares & Fast HOV Drives (Shortcut: G)'
+            }
+          >
+            <span
+              className={`-mt-1 rounded-full px-1.5 py-0.2 font-mono text-[8px] font-extrabold ${
+                activeModal === 'garage'
+                  ? 'bg-white/25 text-white'
+                  : activeVehicle
+                  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+              }`}
+            >
+              {activeVehicle ? '$0 HOV' : '+EV'}
+            </span>
+            <div className="flex items-center gap-1">
+              <Car
+                className={`size-3.5 ${
+                  activeModal === 'garage' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'
+                }`}
+              />
+              <span>{activeVehicle ? 'CarPlay' : 'Car'}</span>
+              <span className="keycap-hint">G</span>
+            </div>
+          </button>
 
           <button
             onClick={() => setActiveModal(activeModal === 'career' ? null : 'career')}
@@ -1446,6 +1689,7 @@ export const AppleHUD: React.FC = () => {
           </button>
         </div>
       </div>
+      )}
     </>
   );
 };

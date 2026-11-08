@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { getHourOfDay, useGameStore } from './store/useGameStore';
+import { getDayNumber, getHourOfDay, useGameStore } from './store/useGameStore';
+import { useAuthSaveStore } from './store/useAuthSaveStore';
 import { TitleScreen } from './components/TitleScreen';
 import { CreateSimScreen } from './components/CreateSimScreen';
 import { IsometricScene } from './components/IsometricScene';
@@ -9,6 +10,10 @@ import { AppleHUD } from './components/AppleHUD';
 import { BayPhoneModal } from './components/BayPhoneModal';
 import { SimInspectorSheet } from './components/SimInspectorSheet';
 import { WorkCareerModal } from './components/WorkCareerModal';
+import { HomeComputerModal } from './components/HomeComputerModal';
+import { BackpackModal } from './components/BackpackModal';
+import { CarGarageModal } from './components/CarGarageModal';
+import { AccountSaveModal } from './components/AccountSaveModal';
 
 function getBaySkyGradient(hour: number, isDarkTheme: boolean): string {
   if (hour >= 7 && hour < 17.5) {
@@ -34,8 +39,10 @@ export const App: React.FC = () => {
   const lastToast = useGameStore((s) => s.lastToast);
   const tick = useGameStore((s) => s.tick);
   const dismissToast = useGameStore((s) => s.dismissToast);
+  const setActiveModal = useGameStore((s) => s.setActiveModal);
 
   const hour = getHourOfDay(time);
+  const dayNumber = getDayNumber(time);
   const isDark =
     nightMode === 'dark' || (nightMode === 'auto' && (hour < 6 || hour >= 19.5));
 
@@ -48,6 +55,12 @@ export const App: React.FC = () => {
       root.classList.remove('dark');
     }
   }, [isDark]);
+
+  // Automatic Cloud/Local Autosave Checkpoint on Day Rollover
+  useEffect(() => {
+    if (screen !== 'play') return;
+    useAuthSaveStore.getState().autoCheckpointCurrentRun(`Day ${dayNumber} Autosave`);
+  }, [dayNumber, screen]);
 
   // Main Simulation Tick Loop
   useEffect(() => {
@@ -81,7 +94,7 @@ export const App: React.FC = () => {
     >
       {/* Main View Layer */}
       <div className="absolute inset-0">
-        {view === 'live' && <IsometricScene />}
+        {(view === 'live' || view === 'buy') && <IsometricScene />}
         {view === 'map' && <WorldMapModal />}
         {view === 'buy' && <BuyFurnishModal />}
       </div>
@@ -93,6 +106,10 @@ export const App: React.FC = () => {
       {activeModal === 'phone' && <BayPhoneModal />}
       {activeModal === 'sim' && <SimInspectorSheet />}
       {activeModal === 'career' && <WorkCareerModal />}
+      {activeModal === 'computer' && <HomeComputerModal />}
+      {activeModal === 'backpack' && <BackpackModal />}
+      {activeModal === 'garage' && <CarGarageModal />}
+      {activeModal === 'account' && <AccountSaveModal onClose={() => setActiveModal(null)} />}
     </div>
   );
 };

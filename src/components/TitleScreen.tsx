@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CAREER_BY_ID, HOMES } from '../data/worldData';
+import { useAuthSaveStore } from '../store/useAuthSaveStore';
 import {
   calculateNetWorth,
   formatCurrency,
@@ -8,8 +9,21 @@ import {
   useGameStore,
 } from '../store/useGameStore';
 import { SimProfile } from '../types/game';
+import {
+  AccountSaveModal,
+  formatRelativeTimestamp,
+  GoogleLogoSvg,
+} from './AccountSaveModal';
 import { Portrait } from './Portrait';
-import { Play, Sparkles, Zap, SlidersHorizontal, ArrowRight } from 'lucide-react';
+import {
+  Play,
+  Sparkles,
+  Zap,
+  SlidersHorizontal,
+  ArrowRight,
+  Cloud,
+  FolderOpen,
+} from 'lucide-react';
 
 interface QuickArchetype {
   id: string;
@@ -145,13 +159,23 @@ export const TitleScreen: React.FC = () => {
   const applyJob = useGameStore((s) => s.applyJob);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
 
+  const user = useAuthSaveStore((s) => s.user);
+  const slots = useAuthSaveStore((s) => s.slots);
+  const lastSavedAtMs = useAuthSaveStore((s) => s.lastSavedAtMs);
+  const autoCheckpointCurrentRun = useAuthSaveStore((s) => s.autoCheckpointCurrentRun);
+
+  const [showAccountModal, setShowAccountModal] = useState(false);
+
   const state = useGameStore.getState();
   const netWorth = calculateNetWorth(state);
   const homeDef = HOMES.find((h) => h.id === homeId) || HOMES[1];
   const careerDef = job ? CAREER_BY_ID[job.careerId] : null;
   const levelDef = careerDef && job ? careerDef.levels[job.levelIndex] : null;
+  const savedSlotCount = Object.keys(slots).length;
 
   const handleQuickStart = (arch: QuickArchetype) => {
+    // Auto-backup existing progress into Autosave before starting a new archetype
+    autoCheckpointCurrentRun('Pre-QuickStart Autosave');
     startNewGame(arch.profile, arch.homeId);
     triggerMicroReward({
       cashDelta: arch.rewardPatch.cashDelta,
@@ -162,10 +186,57 @@ export const TitleScreen: React.FC = () => {
       emoji: arch.emoji,
     });
     applyJob(arch.careerId);
+    // Also checkpoint the newly launched archetype
+    setTimeout(() => {
+      useAuthSaveStore.getState().autoCheckpointCurrentRun(`Quick Start: ${arch.title}`);
+    }, 50);
   };
 
   return (
     <div className="relative flex h-dvh w-screen flex-col justify-between overflow-y-auto overflow-x-hidden bg-[linear-gradient(180deg,#bae6fd_0%,#e0f2fe_45%,#f1f5f9_100%)] px-4 py-6 sm:px-6 sm:py-8 dark:bg-[linear-gradient(180deg,#0f172a_0%,#1e1b4b_55%,#0f172a_100%)]">
+      {/* Top-Right Google Sign-In & Cloud Save Pill */}
+      <div className="relative z-20 flex w-full items-center justify-between gap-2">
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-white/75 px-3 py-1 text-[11px] font-bold text-slate-700 shadow-xs backdrop-blur-md dark:bg-white/10 dark:text-slate-200">
+          <Cloud className="size-3.5 text-[#007AFF]" />
+          <span>
+            {user
+              ? `Cloud Synced · ${formatRelativeTimestamp(lastSavedAtMs)}`
+              : `Auto-Save Ready · ${formatRelativeTimestamp(lastSavedAtMs)}`}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAccountModal(true)}
+            className="apple-pill btn-press inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-extrabold text-[var(--ink)] shadow-sm hover:border-[#007AFF]/50"
+          >
+            {user ? (
+              <>
+                <span className="grid size-5 place-items-center rounded-full bg-[#007AFF] text-[10px] font-extrabold text-white">
+                  {user.name[0]?.toUpperCase() || 'G'}
+                </span>
+                <span>{user.givenName || user.name}</span>
+                <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                  Synced
+                </span>
+              </>
+            ) : (
+              <>
+                <GoogleLogoSvg className="size-3.5" />
+                <span>Sign in with Google</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => setShowAccountModal(true)}
+            className="apple-pill btn-press inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-[var(--ink)]"
+          >
+            <FolderOpen className="size-3.5 text-[#007AFF]" />
+            <span>Saves ({savedSlotCount}/4)</span>
+          </button>
+        </div>
+      </div>
       {/* Subtle Golden Gate & Bay Area Isometric Backdrop Illustration */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-90">
         <svg viewBox="0 0 800 500" className="h-full w-full max-w-5xl object-cover">
@@ -301,7 +372,7 @@ export const TitleScreen: React.FC = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col gap-2 sm:w-52">
+            <div className="flex flex-col gap-2 sm:w-56">
               <button
                 onClick={() => setScreen('play')}
                 className="btn-press flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#007AFF] px-4 text-xs font-bold text-white shadow-md shadow-[#007AFF]/25 hover:bg-[#0066CC]"
@@ -310,17 +381,31 @@ export const TitleScreen: React.FC = () => {
                 Continue Saved Game
               </button>
 
-              <button
-                onClick={() => setScreen('create')}
-                className="btn-press flex h-10 w-full items-center justify-center gap-1.5 rounded-2xl bg-[var(--mist)] px-4 text-xs font-bold text-[var(--ink)] hover:bg-black/10 dark:hover:bg-white/15"
-              >
-                <SlidersHorizontal className="size-3.5 text-[#007AFF]" />
-                Custom Engineer Studio
-              </button>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => setScreen('create')}
+                  className="btn-press flex h-9 items-center justify-center gap-1 rounded-xl bg-[var(--mist)] px-2.5 text-[11px] font-bold text-[var(--ink)] hover:bg-black/10 dark:hover:bg-white/15"
+                >
+                  <SlidersHorizontal className="size-3.5 text-[#007AFF]" />
+                  <span>Custom Sim</span>
+                </button>
+
+                <button
+                  onClick={() => setShowAccountModal(true)}
+                  className="btn-press flex h-9 items-center justify-center gap-1 rounded-xl bg-[var(--mist)] px-2.5 text-[11px] font-bold text-[var(--ink)] hover:bg-black/10 dark:hover:bg-white/15"
+                >
+                  <FolderOpen className="size-3.5 text-emerald-500" />
+                  <span>Save Slots</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {showAccountModal && (
+        <AccountSaveModal onClose={() => setShowAccountModal(false)} />
+      )}
     </div>
   );
 };

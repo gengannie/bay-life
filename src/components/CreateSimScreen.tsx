@@ -564,27 +564,37 @@ export const CreateSimScreen: React.FC = () => {
                             : 'border-transparent bg-[var(--mist)]'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-start gap-2.5">
                           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/60 text-xl dark:bg-white/10">
                             {h.emoji}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-extrabold leading-snug">{h.name}</div>
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="rounded-md bg-amber-500/15 px-1.5 py-0.2 text-[9px] font-extrabold text-amber-700 dark:text-amber-300">
+                                {h.tierLabel}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 text-xs font-extrabold leading-snug">{h.name}</div>
                             <div className="text-[10px] font-medium leading-snug text-[var(--ink-soft)]">
-                              {meta.tag}
+                              {h.commuteSummary || meta.tag}
                             </div>
                           </div>
                         </div>
-                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                        <div className="mt-2.5 flex flex-wrap items-center gap-1">
                           <span className="rounded-lg bg-[#007AFF]/15 px-2 py-0.5 text-[10px] font-extrabold text-[#007AFF]">
-                            🏠 {h.gridSize}×{h.gridSize} Grid
+                            🏠 {h.gridSize}×{h.gridSize}
                           </span>
                           <span className="rounded-lg bg-white/70 px-2 py-0.5 text-[10px] font-extrabold dark:bg-white/10">
                             💸 {formatCurrency(h.weeklyRent)}/wk
                           </span>
-                          <span className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
-                            {meta.perk}
-                          </span>
+                          {h.perks.slice(0, 2).map((p, idx) => (
+                            <span
+                              key={idx}
+                              className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300"
+                            >
+                              {p.emoji} {p.label}
+                            </span>
+                          ))}
                         </div>
                       </button>
                     );

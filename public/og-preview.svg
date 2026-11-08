@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="50%" stop-color="#1E1B4B" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#F97316" stop-opacity="0.1" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#sky)" />
+  <circle cx="600" cy="310" r="240" fill="url(#glow)" />
+  <g stroke="#EA580C" stroke-width="8" fill="none" opacity="0.65">
+    <line x1="360" y1="480" x2="360" y2="190" />
+    <line x1="840" y1="480" x2="840" y2="190" />
+    <path d="M120 430 Q240 420 360 200" stroke-width="6" />
+    <path d="M360 200 Q600 440 840 200" stroke-width="6" />
+    <path d="M840 200 Q960 420 1080 430" stroke-width="6" />
+    <line x1="90" y1="435" x2="1110" y2="435" stroke-width="10" />
+  </g>
+  <text x="600" y="275" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="88" font-weight="800">Bay Life</text>
+  <text x="600" y="340" text-anchor="middle" fill="#BAE6FD" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="32" font-weight="600">Ship code. Raise capital. Own the Bay.</text>
+</svg>
