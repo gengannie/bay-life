@@ -51,7 +51,7 @@ function getPinCoords(id: string, fallback?: { x: number; y: number }): { x: num
  */
 function getNpcsAtLocation(locId: string, time: number): NPCDef[] {
   if (locId === 'home') {
-    return NPCS.slice(0, 1);
+    return [];
   }
   const bucket = Math.floor(time / 240) % 3;
   return NPCS.filter(

@@ -501,37 +501,37 @@ export const AppleHUD: React.FC = () => {
       {/* TOP BAR HUD */}
       <div className="pointer-events-none fixed top-0 right-0 left-0 z-30 flex flex-wrap items-center justify-between gap-2 p-3 sm:px-5">
         {/* Left Status Pill: Location, Clock, Weather, Speed Controls */}
-        <div className="apple-pill pointer-events-auto flex flex-wrap items-center gap-2 rounded-full px-3 py-1.5 text-xs">
+        <div className="apple-pill pointer-events-auto flex flex-wrap items-center gap-2.5 rounded-full px-3.5 py-2 text-xs text-[var(--ink)] sm:text-[13px]">
           <button
             onClick={() => setView(view === 'map' ? 'live' : 'map')}
-            className="btn-press flex items-center gap-1.5 font-bold hover:text-[#007AFF]"
+            className="btn-press flex items-center gap-1.5 font-extrabold text-[var(--ink)] hover:text-[#007AFF]"
             title="Toggle Bay Map (M)"
           >
-            <span>{currentPlaceEmoji}</span>
+            <span className="text-base">{currentPlaceEmoji}</span>
             <span>{currentPlaceName}</span>
           </button>
 
           <span className="text-slate-300 dark:text-slate-600">|</span>
 
-          <div className="font-mono text-[11px] font-bold">
+          <div className="font-mono text-xs font-extrabold text-[var(--ink)]">
             D{getDayNumber(time)} · {getDayOfWeekName(time).slice(0, 3)} {formatTime(time)}
           </div>
 
-          <span className="hidden text-[11px] text-[var(--ink-soft)] md:inline">
+          <span className="hidden text-xs font-semibold text-[var(--ink-soft)] md:inline">
             {weatherLabel}
           </span>
 
           {/* PG&E Power Status */}
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
               powered
                 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                 : 'animate-pulse bg-rose-500/20 text-rose-500'
             }`}
             title={powered ? 'Grid & Fiber Online' : 'PG&E Power Shutoff'}
           >
-            {powered ? <Zap className="size-3" /> : <ZapOff className="size-3" />}
-            <span className="hidden sm:inline">{powered ? 'Grid' : 'Outage'}</span>
+            {powered ? <Zap className="size-3.5" /> : <ZapOff className="size-3.5" />}
+            <span>{powered ? 'Grid' : 'Outage'}</span>
           </span>
 
           {/* Speed Segmented Control */}
@@ -543,7 +543,7 @@ export const AppleHUD: React.FC = () => {
               <button
                 key={sp}
                 onClick={() => setSpeed(sp)}
-                className={`btn-press flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[10px] font-extrabold ${
+                className={`btn-press flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-extrabold ${
                   speed === sp
                     ? 'bg-[#007AFF] text-white shadow-xs'
                     : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
@@ -556,15 +556,15 @@ export const AppleHUD: React.FC = () => {
         </div>
 
         {/* Right Status Pill: Cash, RSU, Karma, Theme & Sound */}
-        <div className="apple-pill pointer-events-auto flex items-center gap-2 rounded-full px-3 py-1.5 text-xs">
+        <div className="apple-pill pointer-events-auto flex items-center gap-2 rounded-full px-3.5 py-2 text-xs text-[var(--ink)] sm:text-[13px]">
           <button
             onClick={() => setActiveModal('phone', 'wealth')}
-            className="btn-press flex items-center gap-1.5 font-mono font-extrabold text-emerald-600 dark:text-emerald-400"
+            className="btn-press flex items-center gap-1.5 font-mono text-xs font-extrabold text-emerald-600 sm:text-[13px] dark:text-emerald-400"
             title="Open Schwab & Net Worth"
           >
             <span>{formatCurrency(cash)}</span>
             {vestedRsu > 0 && (
-              <span className="hidden rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-600 sm:inline dark:text-purple-400">
+              <span className="hidden rounded-full bg-purple-500/15 px-2 py-0.5 text-[11px] font-bold text-purple-600 sm:inline dark:text-purple-400">
                 +{formatCurrency(vestedRsu)} RSU
               </span>
             )}
@@ -572,7 +572,7 @@ export const AppleHUD: React.FC = () => {
 
           <button
             onClick={() => setActiveModal('sim', 'perks')}
-            className="btn-press rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-extrabold text-amber-600 dark:text-amber-400"
+            className="btn-press rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-extrabold text-amber-600 dark:text-amber-400"
             title="Karma Points — Spend on Perks"
           >
             ⚡ {karma}
@@ -580,7 +580,7 @@ export const AppleHUD: React.FC = () => {
 
           <button
             onClick={toggleSound}
-            className="btn-press grid size-6 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+            className="btn-press grid size-7 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink)]"
             aria-label="Toggle sound"
           >
             {soundOn ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
@@ -588,7 +588,7 @@ export const AppleHUD: React.FC = () => {
 
           <button
             onClick={toggleNightMode}
-            className="btn-press grid size-6 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+            className="btn-press grid size-7 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink)]"
             title={`Theme: ${nightMode}`}
           >
             {nightMode === 'dark' ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
@@ -596,7 +596,7 @@ export const AppleHUD: React.FC = () => {
 
           <button
             onClick={() => setScreen('title')}
-            className="btn-press rounded-full bg-[var(--mist)] px-2 py-0.5 text-[10px] font-bold text-[var(--ink-soft)]"
+            className="btn-press rounded-full bg-[var(--mist)] px-2.5 py-1 text-[11px] font-bold text-[var(--ink)]"
           >
             Menu
           </button>
@@ -605,47 +605,51 @@ export const AppleHUD: React.FC = () => {
 
       {/* DYNAMIC ISLAND TOAST NOTIFICATION */}
       {lastToast && (
-        <div className="pointer-events-none fixed top-14 left-1/2 z-40 w-[calc(100%-32px)] max-w-lg -translate-x-1/2">
-          <div className="apple-glass-heavy pointer-events-auto flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5 shadow-lg">
+        <div className="pointer-events-none fixed top-16 left-1/2 z-40 w-[calc(100%-32px)] max-w-lg -translate-x-1/2">
+          <div className="apple-glass-heavy pointer-events-auto flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-[var(--ink)] shadow-lg">
             <div className="flex min-w-0 items-center gap-2.5">
-              <span className="shrink-0 text-base">{lastToast.emoji}</span>
-              <span className="text-xs font-semibold leading-snug">{lastToast.text}</span>
+              <span className="shrink-0 text-lg">{lastToast.emoji}</span>
+              <span className="text-xs font-bold leading-snug text-[var(--ink)] sm:text-[13px]">
+                {lastToast.text}
+              </span>
             </div>
             <button
               onClick={dismissToast}
-              className="btn-press grid size-5 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+              className="btn-press grid size-6 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
             >
-              <X className="size-3" />
+              <X className="size-3.5" />
             </button>
           </div>
         </div>
       )}
 
-      {/* SUB-HEADER: COMPACT MILESTONE PILL & CLEAR LIVE ACTION STATUS */}
+      {/* SUB-HEADER: COMPACT LEFT RAIL FOR MILESTONE & LIVE ACTION QUEUE (NEVER OVERLAPS CENTER ROOM) */}
       {view === 'live' && (
-        <div className="pointer-events-none fixed top-15 left-3 z-20 flex max-w-[calc(100vw-24px)] flex-col items-start gap-2 sm:left-5">
+        <div className="pointer-events-none fixed top-16 left-3 z-20 flex w-72 flex-col items-stretch gap-2 sm:left-5 sm:w-80">
           {currentGoal && (
             <button
               onClick={() => setActiveModal('sim', 'wishes')}
-              className="apple-pill btn-press pointer-events-auto flex items-center gap-2.5 rounded-2xl px-3.5 py-2 text-left"
+              className="apple-glass-heavy btn-press pointer-events-auto flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[var(--ink)]"
               title={currentGoal.desc}
             >
-              <span className="grid size-7 shrink-0 place-items-center rounded-xl bg-[#007AFF]/15 text-sm">
+              <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-[#007AFF]/15 text-base">
                 {currentGoal.emoji}
               </span>
-              <div>
-                <div className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-wider text-[#007AFF]">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#007AFF]">
                   <span>Next Milestone</span>
                   <span>· +{formatCurrency(currentGoal.rewardCash)}</span>
                 </div>
-                <div className="text-xs font-bold leading-snug">{currentGoal.title}</div>
+                <div className="mt-0.5 text-xs font-extrabold leading-snug text-[var(--ink)]">
+                  {currentGoal.title}
+                </div>
               </div>
             </button>
           )}
 
-          {/* Crystal-Clear Active Action Status Card & Up-Next Queue (No Cut-Off Text) */}
+          {/* Crystal-Clear Active Action Status Card & Contained Up-Next Stack */}
           {queue.length > 0 && (
-            <div className="pointer-events-auto flex flex-col items-start gap-1.5">
+            <div className="apple-glass-heavy pointer-events-auto flex flex-col gap-2 rounded-2xl px-3.5 py-3 text-[var(--ink)] shadow-md">
               {(() => {
                 const activeItem = queue[0];
                 const pct = Math.min(
@@ -661,19 +665,19 @@ export const AppleHUD: React.FC = () => {
                 );
 
                 return (
-                  <div className="apple-glass-heavy flex min-w-[240px] max-w-sm flex-col gap-1.5 rounded-2xl px-3.5 py-2.5 shadow-md">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="grid size-7 shrink-0 place-items-center rounded-xl bg-[#007AFF]/15 text-base">
+                  <>
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-[#007AFF]/15 text-lg">
                           {activeItem.emoji}
                         </span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${
                                 isWalkingToTarget
-                                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                                  : 'bg-[#007AFF]/15 text-[#007AFF]'
+                                  ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300'
+                                  : 'bg-[#007AFF]/20 text-[#007AFF] dark:text-[#5AC8FA]'
                               }`}
                             >
                               {isWalkingToTarget
@@ -681,12 +685,12 @@ export const AppleHUD: React.FC = () => {
                                 : `⚡ Active · ${remainingMins}m left`}
                             </span>
                             {!isWalkingToTarget && (
-                              <span className="font-mono text-[10px] font-extrabold text-[#007AFF]">
+                              <span className="font-mono text-[11px] font-extrabold text-[#007AFF] dark:text-[#5AC8FA]">
                                 {pct}%
                               </span>
                             )}
                           </div>
-                          <div className="mt-0.5 text-xs font-extrabold leading-snug text-[var(--ink)]">
+                          <div className="mt-0.5 text-[13px] font-extrabold leading-snug text-[var(--ink)]">
                             {activeItem.label}
                           </div>
                         </div>
@@ -695,15 +699,15 @@ export const AppleHUD: React.FC = () => {
                       <button
                         onClick={() => cancelQueuedAction(activeItem.uid)}
                         title="Stop / Cancel current action"
-                        className="btn-press flex shrink-0 items-center gap-1 rounded-full bg-rose-500/12 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
+                        className="btn-press flex shrink-0 items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-1 text-[11px] font-extrabold text-rose-600 hover:bg-rose-500/25 dark:text-rose-400"
                       >
-                        <X className="size-3" />
+                        <X className="size-3.5" />
                         <span>Stop</span>
                       </button>
                     </div>
 
                     {/* Full-Width Progress Bar */}
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/15">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${
                           isWalkingToTarget ? 'w-1/4 animate-pulse bg-amber-500' : 'bg-[#007AFF]'
@@ -711,28 +715,38 @@ export const AppleHUD: React.FC = () => {
                         style={isWalkingToTarget ? undefined : { width: `${pct}%` }}
                       />
                     </div>
-                  </div>
+                  </>
                 );
               })()}
 
-              {/* Queued Follow-Up Actions */}
+              {/* Contained Vertical Stack for Queued Follow-Up Actions (Never bleeds across screen) */}
               {queue.length > 1 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white backdrop-blur-xs">
-                    Up Next:
-                  </span>
-                  {queue.slice(1).map((item) => (
+                <div className="mt-0.5 border-t border-black/10 pt-2 dark:border-white/10">
+                  <div className="mb-1 flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
+                    <span>Up Next ({queue.length - 1})</span>
                     <button
-                      key={item.uid}
-                      onClick={() => cancelQueuedAction(item.uid)}
-                      title="Click to remove from queue"
-                      className="apple-pill btn-press group flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                      onClick={() => queue.slice(1).forEach((q) => cancelQueuedAction(q.uid))}
+                      className="text-[10px] font-bold text-rose-500 hover:underline"
                     >
-                      <span>{item.emoji}</span>
-                      <span>{item.label}</span>
-                      <X className="size-3 opacity-60 group-hover:text-rose-500 group-hover:opacity-100" />
+                      Clear Queue
                     </button>
-                  ))}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {queue.slice(1, 4).map((item) => (
+                      <button
+                        key={item.uid}
+                        onClick={() => cancelQueuedAction(item.uid)}
+                        title="Click to remove from queue"
+                        className="btn-press group flex w-full items-center justify-between gap-2 rounded-xl bg-[var(--mist)] px-2.5 py-1.5 text-left text-xs font-bold text-[var(--ink)] hover:bg-rose-500/10"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">{item.emoji}</span>
+                          <span className="leading-tight text-[var(--ink)]">{item.label}</span>
+                        </div>
+                        <X className="size-3.5 shrink-0 text-[var(--ink-soft)] group-hover:text-rose-500" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1044,21 +1058,23 @@ export const AppleHUD: React.FC = () => {
       {/* BOTTOM FLOATING APPLE DOCK */}
       <div className="pointer-events-none fixed right-0 bottom-0 left-0 z-30 flex flex-wrap items-end justify-between gap-2 p-3 sm:px-5">
         {/* Left: Sim Badge + Glanceable Apple Watch Activity Rings for Needs (1-Tap Auto-Fix) */}
-        <div className="apple-glass-heavy pointer-events-auto flex items-center gap-2.5 rounded-3xl p-2 pr-3.5">
+        <div className="apple-glass-heavy pointer-events-auto flex items-center gap-3 rounded-3xl p-2 pr-4 text-[var(--ink)]">
           {/* Sim Portrait & Mood Inspector Button */}
           <button
             onClick={() => setActiveModal(activeModal === 'sim' ? null : 'sim', 'needs')}
             className="btn-press flex items-center gap-2.5 rounded-2xl pr-1 text-left"
             title="Open Sim Inspector (Shortcut: I)"
           >
-            <Portrait appearance={sim.appearance} size={44} ringColor={moodInfo.color} />
+            <Portrait appearance={sim.appearance} size={46} ringColor={moodInfo.color} />
             <div className="hidden sm:block">
               <div className="flex items-center gap-1">
-                <span className="text-xs font-extrabold">{sim.name.split(' ')[0]}</span>
+                <span className="text-xs font-extrabold text-[var(--ink)]">
+                  {sim.name.split(' ')[0]}
+                </span>
                 <span className="keycap-hint">I</span>
               </div>
               <span
-                className="mt-0.5 inline-block rounded-full px-2 py-0.5 text-[9px] font-extrabold text-white"
+                className="mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white"
                 style={{ backgroundColor: moodInfo.color }}
               >
                 {moodInfo.label}
@@ -1066,13 +1082,13 @@ export const AppleHUD: React.FC = () => {
             </div>
           </button>
 
-          <div className="h-8 w-px bg-black/10 dark:bg-white/10" />
+          <div className="h-9 w-px bg-black/10 dark:bg-white/15" />
 
-          {/* 6 Circular SVG Progress Rings (1-Tap Auto-Fix) */}
-          <div className="flex items-center gap-1.5">
+          {/* 6 Enlarged Circular SVG Progress Rings + Visible Percentage (1-Tap Auto-Fix) */}
+          <div className="flex items-center gap-2">
             {NEEDS_META.map((n) => {
               const v = Math.round(needs[n.key]);
-              const radius = 14.5;
+              const radius = 17;
               const circumference = 2 * Math.PI * radius;
               const offset = circumference * (1 - Math.max(0, Math.min(100, v)) / 100);
               const ringColor = v < 30 ? '#FF3B30' : v < 50 ? '#FF9500' : n.color;
@@ -1082,44 +1098,56 @@ export const AppleHUD: React.FC = () => {
                   key={n.key}
                   onClick={() => autoFixNeed(n.key)}
                   aria-label={`${n.label} ${v}% — Tap to Auto-Fix`}
-                  className="btn-press group relative grid size-9 place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+                  className="btn-press group relative flex flex-col items-center gap-0.5 rounded-2xl px-1 py-0.5 hover:bg-black/5 dark:hover:bg-white/10"
                 >
-                  <svg className="size-9 -rotate-90" viewBox="0 0 36 36">
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r={radius}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3.2"
-                      className="text-black/10 dark:text-white/15"
-                    />
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r={radius}
-                      fill="none"
-                      stroke={ringColor}
-                      strokeWidth="3.2"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={offset}
-                      strokeLinecap="round"
-                      className="transition-all duration-300"
-                    />
-                  </svg>
-                  <span className="pointer-events-none absolute text-[13px] leading-none">
-                    {n.emoji}
+                  <div className="relative grid size-10 place-items-center">
+                    <svg className="size-10 -rotate-90" viewBox="0 0 42 42">
+                      <circle
+                        cx="21"
+                        cy="21"
+                        r={radius}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3.6"
+                        className="text-black/10 dark:text-white/15"
+                      />
+                      <circle
+                        cx="21"
+                        cy="21"
+                        r={radius}
+                        fill="none"
+                        stroke={ringColor}
+                        strokeWidth="3.6"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        strokeLinecap="round"
+                        className="transition-all duration-300"
+                      />
+                    </svg>
+                    <span className="pointer-events-none absolute text-base leading-none">
+                      {n.emoji}
+                    </span>
+                    {v < 30 && (
+                      <span className="pointer-events-none absolute -top-0.5 -right-0.5 size-2.5 animate-ping rounded-full bg-rose-500" />
+                    )}
+                  </div>
+
+                  {/* Always-Visible Mini Label & Percentage */}
+                  <span
+                    className="font-mono text-[9px] leading-none font-extrabold"
+                    style={{ color: ringColor }}
+                  >
+                    {v}%
                   </span>
-                  {v < 30 && (
-                    <span className="pointer-events-none absolute -top-0.5 -right-0.5 size-2.5 animate-ping rounded-full bg-rose-500" />
-                  )}
 
                   {/* Crisp Hover Tooltip: Tap to Auto-Fix */}
-                  <div className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-xl bg-black/88 px-2.5 py-1 text-center text-[10px] font-bold text-white opacity-0 shadow-lg backdrop-blur-md transition-all group-hover:visible group-hover:opacity-100">
+                  <div className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-xl bg-black/90 px-3 py-1.5 text-center text-[11px] font-bold text-white opacity-0 shadow-lg backdrop-blur-md transition-all group-hover:visible group-hover:opacity-100">
                     <div>
-                      {n.shortLabel}: <span className="font-mono">{v}%</span>
+                      {n.emoji} {n.shortLabel}: <span className="font-mono">{v}%</span>
                     </div>
-                    <div className="text-[9px] font-extrabold text-[#5AC8FA]">⚡ Tap to Auto-Fix</div>
+                    <div className="text-[10px] font-extrabold text-[#5AC8FA]">
+                      ⚡ Tap to Auto-Fix
+                    </div>
                   </div>
                 </button>
               );

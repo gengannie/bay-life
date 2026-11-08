@@ -257,14 +257,23 @@ export const IsometricScene: React.FC = () => {
     y: number;
     emoji: string;
     label: string;
+    title?: string;
+    subtitle?: string;
   } | null>(null);
 
-  const triggerSparkle = (x: number, y: number, emoji: string, label: string) => {
+  const triggerSparkle = (
+    x: number,
+    y: number,
+    emoji: string,
+    label: string,
+    title?: string,
+    subtitle?: string
+  ) => {
     const id = Date.now();
-    setSparkleBurst({ id, x, y, emoji, label });
+    setSparkleBurst({ id, x, y, emoji, label, title, subtitle });
     window.setTimeout(() => {
       setSparkleBurst((curr) => (curr?.id === id ? null : curr));
-    }, 1400);
+    }, 3200);
   };
 
   // Smooth autonomous Matic AI Bot patrol loop
@@ -332,9 +341,9 @@ export const IsometricScene: React.FC = () => {
     return null;
   }, [needs]);
 
-  // NPCs present at this venue (or visiting hacker house)
+  // NPCs present at this venue (none inside your private apartment)
   const npcsHere = isHome
-    ? NPCS.slice(0, 1)
+    ? []
     : NPCS.filter(
         (n) =>
           n.favoriteSpot === locationId ||
@@ -634,7 +643,9 @@ export const IsometricScene: React.FC = () => {
                 backCorner.sx - 92,
                 backCorner.sy - 38,
                 '🌉',
-                '+16% Peace'
+                '🎮 +16% Peace & Clarity',
+                'Golden Gate Panorama',
+                'Watched Karl the Fog drift across the Marin Headlands'
               );
             }}
           >
@@ -765,25 +776,25 @@ export const IsometricScene: React.FC = () => {
               </g>
             </g>
 
-            {/* Hover Prompt Badge on Window */}
+            {/* Hover Prompt Badge on Window (Enlarged & Crisp) */}
             {windowHovered && (
-              <g transform={`translate(${backCorner.sx - 92}, ${backCorner.sy - 56})`}>
+              <g transform={`translate(${backCorner.sx - 92}, ${backCorner.sy - 58})`}>
                 <rect
-                  x="-56"
-                  y="-11"
-                  width="112"
-                  height="18"
-                  rx="9"
-                  fill="rgba(15,23,42,0.9)"
+                  x="-76"
+                  y="-14"
+                  width="152"
+                  height="24"
+                  rx="12"
+                  fill="rgba(15,23,42,0.94)"
                   stroke="#38BDF8"
-                  strokeWidth="1"
+                  strokeWidth="1.5"
                 />
                 <text
                   x="0"
-                  y="1"
+                  y="2"
                   fill="#FFFFFF"
-                  fontSize="8.5"
-                  fontWeight="700"
+                  fontSize="10.5"
+                  fontWeight="800"
                   textAnchor="middle"
                 >
                   🌉 Gaze (+16% Peace)
@@ -795,17 +806,17 @@ export const IsometricScene: React.FC = () => {
           {/* Right Wall Sign / Location Header (translated to sign center before skewY!) */}
           <g>
             <polygon
-              points={`${backCorner.sx + 40},${backCorner.sy + 20 - 84} ${backCorner.sx + 165},${backCorner.sy + 82 - 84} ${backCorner.sx + 165},${backCorner.sy + 82 - 44} ${backCorner.sx + 40},${backCorner.sy + 20 - 44}`}
+              points={`${backCorner.sx + 36},${backCorner.sy + 18 - 86} ${backCorner.sx + 172},${backCorner.sy + 86 - 86} ${backCorner.sx + 172},${backCorner.sy + 86 - 42} ${backCorner.sx + 36},${backCorner.sy + 18 - 42}`}
               fill={isNight ? '#0F172A' : '#1E293B'}
-              stroke="rgba(255,255,255,0.22)"
+              stroke="rgba(255,255,255,0.28)"
               strokeWidth="1.5"
             />
-            <g transform={`translate(${backCorner.sx + 102.5}, ${backCorner.sy - 13}) skewY(26.5)`}>
+            <g transform={`translate(${backCorner.sx + 104}, ${backCorner.sy - 12}) skewY(26.5)`}>
               <text
                 x="0"
-                y="3"
+                y="3.5"
                 fill="#F8FAFC"
-                fontSize="8.5"
+                fontSize="10"
                 fontWeight="800"
                 textAnchor="middle"
               >
@@ -817,10 +828,10 @@ export const IsometricScene: React.FC = () => {
           </g>
         </g>
 
-        {/* Floating Waymo / Prime Air Delivery Drone Outside Balcony */}
+        {/* Floating Waymo / Prime Air Delivery Drone Outside Balcony (Enlarged & Readable) */}
         {droneAvailable && (
           <g
-            transform={`translate(${backCorner.sx + 205}, ${backCorner.sy - 68})`}
+            transform={`translate(${backCorner.sx + 210}, ${backCorner.sy - 62})`}
             className="cursor-pointer"
             onMouseEnter={() => setDroneHovered(true)}
             onMouseLeave={() => setDroneHovered(false)}
@@ -839,10 +850,12 @@ export const IsometricScene: React.FC = () => {
                   emoji: '🚁',
                 });
                 triggerSparkle(
-                  backCorner.sx + 205,
-                  backCorner.sy - 68,
+                  backCorner.sx + 210,
+                  backCorner.sy - 62,
                   '🚁',
-                  '+$140 & +18% Fuel'
+                  '💵 +$140 Cash · 🍔 +18% Fuel · ⚡ +2 Karma',
+                  'Prime Air Care Drop Claimed!',
+                  'Blue Bottle Cold Brew + YC Founder AWS Credits Rebate'
                 );
               } else {
                 triggerMicroReward({
@@ -854,10 +867,12 @@ export const IsometricScene: React.FC = () => {
                   emoji: '📦',
                 });
                 triggerSparkle(
-                  backCorner.sx + 205,
-                  backCorner.sy - 68,
+                  backCorner.sx + 210,
+                  backCorner.sy - 62,
                   '📦',
-                  '+22% Focus'
+                  '⚡ +22% Focus · ✨ +3 Karma',
+                  'Philz & Tartine Care Drop!',
+                  'Iced Mint Mojito + Warm Morning Bun delivered by drone'
                 );
               }
               setDroneAvailable(false);
@@ -876,61 +891,61 @@ export const IsometricScene: React.FC = () => {
               <circle
                 cx="0"
                 cy="4"
-                r={droneHovered ? '28' : '22'}
-                fill="rgba(56,189,248,0.16)"
-                stroke={droneHovered ? '#38BDF8' : 'rgba(56,189,248,0.35)'}
-                strokeWidth="1.2"
+                r={droneHovered ? '34' : '28'}
+                fill="rgba(56,189,248,0.2)"
+                stroke={droneHovered ? '#38BDF8' : 'rgba(56,189,248,0.45)'}
+                strokeWidth="1.6"
               />
               {/* Spinning Rotor Disks */}
-              <ellipse cx="-16" cy="-8" rx="9" ry="3" fill="rgba(148,163,184,0.65)" />
-              <ellipse cx="16" cy="-8" rx="9" ry="3" fill="rgba(148,163,184,0.65)" />
+              <ellipse cx="-20" cy="-10" rx="11" ry="3.5" fill="rgba(148,163,184,0.75)" />
+              <ellipse cx="20" cy="-10" rx="11" ry="3.5" fill="rgba(148,163,184,0.75)" />
               {/* Drone Struts & Body */}
-              <line x1="-16" y1="-6" x2="16" y2="-6" stroke="#334155" strokeWidth="2.5" />
+              <line x1="-20" y1="-7" x2="20" y2="-7" stroke="#334155" strokeWidth="3" />
               <rect
-                x="-11"
-                y="-10"
-                width="22"
-                height="9"
-                rx="4.5"
+                x="-13"
+                y="-12"
+                width="26"
+                height="11"
+                rx="5.5"
                 fill="#F8FAFC"
                 stroke="#0284C7"
-                strokeWidth="1.5"
+                strokeWidth="1.8"
               />
-              <circle cx="0" cy="-5.5" r="2.2" fill="#38BDF8" />
+              <circle cx="0" cy="-6.5" r="2.6" fill="#38BDF8" />
               {/* Dangling Care Package Box */}
-              <line x1="-4" y1="-1" x2="-4" y2="7" stroke="#64748B" strokeWidth="1.2" />
-              <line x1="4" y1="-1" x2="4" y2="7" stroke="#64748B" strokeWidth="1.2" />
+              <line x1="-5" y1="-1" x2="-5" y2="8" stroke="#64748B" strokeWidth="1.5" />
+              <line x1="5" y1="-1" x2="5" y2="8" stroke="#64748B" strokeWidth="1.5" />
               <rect
-                x="-9"
-                y="6"
-                width="18"
-                height="14"
-                rx="3"
+                x="-11"
+                y="7"
+                width="22"
+                height="17"
+                rx="4"
                 fill="#F59E0B"
                 stroke="#B45309"
-                strokeWidth="1.2"
+                strokeWidth="1.5"
               />
-              <text x="0" y="16" fontSize="10" textAnchor="middle">
+              <text x="0" y="19" fontSize="12" textAnchor="middle">
                 ☕
               </text>
-              {/* Pill Label */}
-              <g transform="translate(0, -24)">
+              {/* Enlarged, Crisp Pill Label */}
+              <g transform="translate(0, -29)">
                 <rect
-                  x="-52"
-                  y="-10"
-                  width="104"
-                  height="16"
-                  rx="8"
-                  fill="rgba(15,23,42,0.88)"
+                  x="-70"
+                  y="-13"
+                  width="140"
+                  height="23"
+                  rx="11.5"
+                  fill="rgba(15,23,42,0.94)"
                   stroke="#38BDF8"
-                  strokeWidth="1"
+                  strokeWidth="1.5"
                 />
                 <text
                   x="0"
-                  y="1"
+                  y="2"
                   fill="#FFFFFF"
-                  fontSize="8"
-                  fontWeight="700"
+                  fontSize="10.5"
+                  fontWeight="800"
                   textAnchor="middle"
                 >
                   🚁 Tap Care Drop
@@ -993,66 +1008,73 @@ export const IsometricScene: React.FC = () => {
                 toastText: 'Matic Bot sanitized the floor! +12% Bio & +2 Karma',
                 emoji: '🤖',
               });
-              triggerSparkle(botScreen.sx, botScreen.sy - 18, '🤖', '+12% Bio · +2 Karma');
+              triggerSparkle(
+                botScreen.sx,
+                botScreen.sy - 18,
+                '🤖',
+                '🫧 +12% Bio · ⚡ +2 Karma',
+                'Matic AI Robot Vacuum',
+                'LiDAR floor sanitization complete — studio is spotless!'
+              );
             }}
           >
             {/* Cleaning Sweep Aura */}
             <ellipse
               cx="0"
               cy="2"
-              rx={botHovered ? '18' : '14'}
-              ry={botHovered ? '9' : '7'}
-              fill="rgba(56,189,248,0.22)"
-              stroke={botHovered ? '#007AFF' : 'rgba(56,189,248,0.45)'}
-              strokeWidth="1.2"
+              rx={botHovered ? '22' : '16'}
+              ry={botHovered ? '11' : '8'}
+              fill="rgba(56,189,248,0.24)"
+              stroke={botHovered ? '#007AFF' : 'rgba(56,189,248,0.5)'}
+              strokeWidth="1.5"
             />
             {/* Isometric Robot Body Cylinder */}
             <ellipse
               cx="0"
               cy="1"
-              rx="11"
-              ry="5.8"
+              rx="13"
+              ry="7"
               fill="#CBD5E1"
               stroke="#475569"
-              strokeWidth="1"
+              strokeWidth="1.2"
             />
             <ellipse
               cx="0"
-              cy="-2.5"
-              rx="10.5"
-              ry="5.5"
+              cy="-3"
+              rx="12.5"
+              ry="6.5"
               fill="#F8FAFC"
               stroke="#64748B"
-              strokeWidth="1"
+              strokeWidth="1.2"
             />
             {/* LiDAR Sensor Turret */}
             <circle
               cx="0"
-              cy="-3.5"
-              r="3"
+              cy="-4"
+              r="3.6"
               fill="#0284C7"
               stroke="#E0F2FE"
-              strokeWidth="0.8"
+              strokeWidth="1"
             />
-            <circle cx="2" cy="-4" r="1" fill="#34D399" />
+            <circle cx="2" cy="-4.5" r="1.2" fill="#34D399" />
             {botHovered && (
-              <g transform="translate(0, -18)">
+              <g transform="translate(0, -24)">
                 <rect
-                  x="-52"
-                  y="-10"
-                  width="104"
-                  height="16"
-                  rx="8"
-                  fill="rgba(15,23,42,0.9)"
+                  x="-72"
+                  y="-13"
+                  width="144"
+                  height="22"
+                  rx="11"
+                  fill="rgba(15,23,42,0.94)"
                   stroke="#38BDF8"
-                  strokeWidth="1"
+                  strokeWidth="1.5"
                 />
                 <text
                   x="0"
-                  y="1"
+                  y="1.5"
                   fill="#FFFFFF"
-                  fontSize="8"
-                  fontWeight="700"
+                  fontSize="10"
+                  fontWeight="800"
                   textAnchor="middle"
                 >
                   🤖 Matic (+12% Bio)
@@ -1077,7 +1099,7 @@ export const IsometricScene: React.FC = () => {
               const shortLabel = getShortFurnitureLabel(def);
               const powerOffBadge = !powered && def.requiresPower ? ' 🔌' : '';
               const fullBadgeText = `${shortLabel}${hasUpgrade ? ' ⬆️' : ''}${powerOffBadge}`;
-              const pillW = Math.max(82, fullBadgeText.length * 5.4 + 18);
+              const pillW = Math.max(96, fullBadgeText.length * 6.2 + 22);
 
               return (
                 <g
@@ -1098,8 +1120,8 @@ export const IsometricScene: React.FC = () => {
                     <ellipse
                       cx="0"
                       cy="4"
-                      rx="30"
-                      ry="16"
+                      rx="32"
+                      ry="17"
                       fill={isInUse ? 'rgba(52,199,89,0.28)' : 'rgba(0,122,255,0.28)'}
                       stroke={isInUse ? '#34C759' : '#007AFF'}
                       strokeWidth="2"
@@ -1128,26 +1150,26 @@ export const IsometricScene: React.FC = () => {
                   />
 
                   {/* Icon & Dynamic Width Label */}
-                  <text x="0" y="-8" fontSize="20" textAnchor="middle">
+                  <text x="0" y="-8" fontSize="22" textAnchor="middle">
                     {def.emoji}
                   </text>
-                  <g transform="translate(0, -34)">
+                  <g transform="translate(0, -35)">
                     <rect
                       x={-pillW / 2}
-                      y="-11"
+                      y="-12"
                       width={pillW}
-                      height="16"
-                      rx="8"
-                      fill="rgba(15,23,42,0.82)"
-                      stroke={isSelected ? '#38BDF8' : 'rgba(255,255,255,0.18)'}
-                      strokeWidth="1"
+                      height="20"
+                      rx="10"
+                      fill="rgba(15,23,42,0.88)"
+                      stroke={isSelected ? '#38BDF8' : 'rgba(255,255,255,0.24)'}
+                      strokeWidth="1.2"
                     />
                     <text
                       x="0"
-                      y="0.5"
+                      y="1.5"
                       fill="#FFFFFF"
-                      fontSize="8.5"
-                      fontWeight="700"
+                      fontSize="9.5"
+                      fontWeight="800"
                       textAnchor="middle"
                     >
                       {fullBadgeText}
@@ -1163,7 +1185,7 @@ export const IsometricScene: React.FC = () => {
             const center = isoToScreen(st.x + 0.5, st.y + 0.5);
             const isSelected = selectedStation?.id === st.id;
             const isInUse = activeQueued?.targetStationId === st.id;
-            const stPillW = Math.max(94, st.label.length * 5.4 + 20);
+            const stPillW = Math.max(108, st.label.length * 6.2 + 24);
             return (
               <g
                 key={st.id}
@@ -1208,26 +1230,26 @@ export const IsometricScene: React.FC = () => {
                   stroke="rgba(15,23,42,0.2)"
                   strokeWidth="1.2"
                 />
-                <text x="0" y="-8" fontSize="22" textAnchor="middle">
+                <text x="0" y="-8" fontSize="23" textAnchor="middle">
                   {st.emoji}
                 </text>
-                <g transform="translate(0, -36)">
+                <g transform="translate(0, -37)">
                   <rect
                     x={-stPillW / 2}
-                    y="-12"
+                    y="-13"
                     width={stPillW}
-                    height="17"
-                    rx="8.5"
-                    fill="rgba(15,23,42,0.85)"
-                    stroke={isSelected ? '#38BDF8' : 'rgba(255,255,255,0.2)'}
-                    strokeWidth="1"
+                    height="20"
+                    rx="10"
+                    fill="rgba(15,23,42,0.9)"
+                    stroke={isSelected ? '#38BDF8' : 'rgba(255,255,255,0.25)'}
+                    strokeWidth="1.2"
                   />
                   <text
                     x="0"
-                    y="-0.5"
+                    y="1"
                     fill="#FFFFFF"
-                    fontSize="8.5"
-                    fontWeight="700"
+                    fontSize="9.5"
+                    fontWeight="800"
                     textAnchor="middle"
                   >
                     {st.label}
@@ -1245,8 +1267,8 @@ export const IsometricScene: React.FC = () => {
           const npcNameText = `💬 ${npc.name}${rel && rel.score >= 38 ? ' ★' : ''}`;
           const npcRoleText = `${npc.role} · ${npc.company}`;
           const npcTagW = Math.max(
-            98,
-            Math.max(npcNameText.length * 5.3, npcRoleText.length * 4.7) + 20
+            114,
+            Math.max(npcNameText.length * 6.0, npcRoleText.length * 5.3) + 24
           );
 
           return (
@@ -1280,22 +1302,22 @@ export const IsometricScene: React.FC = () => {
               <path d="M-8,-28 Q0,-37 8,-28" fill={npc.appearance.hairColor} />
 
               {/* Crisp Name & Role Tag Under NPC's Feet */}
-              <g transform="translate(0, 21)">
+              <g transform="translate(0, 22)">
                 <rect
                   x={-npcTagW / 2}
-                  y="-9"
+                  y="-10"
                   width={npcTagW}
-                  height="25"
-                  rx="8"
-                  fill="rgba(255,255,255,0.94)"
-                  stroke="rgba(0,122,255,0.45)"
-                  strokeWidth="1.2"
+                  height="28"
+                  rx="9"
+                  fill="rgba(255,255,255,0.96)"
+                  stroke="rgba(0,122,255,0.5)"
+                  strokeWidth="1.4"
                 />
                 <text
                   x="0"
                   y="1"
                   fill="#0F172A"
-                  fontSize="8.5"
+                  fontSize="9.5"
                   fontWeight="800"
                   textAnchor="middle"
                 >
@@ -1303,10 +1325,10 @@ export const IsometricScene: React.FC = () => {
                 </text>
                 <text
                   x="0"
-                  y="11"
+                  y="12"
                   fill="#475569"
-                  fontSize="7.5"
-                  fontWeight="600"
+                  fontSize="8.5"
+                  fontWeight="700"
                   textAnchor="middle"
                 >
                   {npcRoleText}
@@ -1374,24 +1396,24 @@ export const IsometricScene: React.FC = () => {
           {/* Crisp "YOU" Name Tag Under the Sim's Feet */}
           {(() => {
             const youLabel = `${sim.name} (You)`;
-            const youPillW = Math.max(92, youLabel.length * 5.5 + 22);
+            const youPillW = Math.max(106, youLabel.length * 6.2 + 24);
             return (
-              <g transform="translate(0, 22)">
+              <g transform="translate(0, 23)">
                 <rect
                   x={-youPillW / 2}
-                  y="-10"
+                  y="-11"
                   width={youPillW}
-                  height="17"
-                  rx="8.5"
+                  height="20"
+                  rx="10"
                   fill="#007AFF"
                   stroke="#FFFFFF"
-                  strokeWidth="1.4"
+                  strokeWidth="1.5"
                 />
                 <text
                   x="0"
-                  y="1.5"
+                  y="2"
                   fill="#FFFFFF"
-                  fontSize="8.5"
+                  fontSize="9.5"
                   fontWeight="800"
                   textAnchor="middle"
                 >
@@ -1436,7 +1458,7 @@ export const IsometricScene: React.FC = () => {
                     <text
                       x="0"
                       y="0"
-                      fontSize="11"
+                      fontSize="12"
                       fontWeight="800"
                       fill="#007AFF"
                       textAnchor="middle"
@@ -1448,29 +1470,31 @@ export const IsometricScene: React.FC = () => {
               );
             })}
 
-          {/* Clean On-Canvas Sim Action / Walking Status Pill (Dynamic Width, Never Cut Off) */}
+          {/* Clean On-Canvas Sim Action / Walking Status Pill (Clamped Horizontally so it Never Clips or Overlaps Left HUD) */}
           {(isWalking || activeQueued) &&
             (() => {
+              const clampedX = Math.max(240 - simScreen.sx, Math.min(735 - simScreen.sx, 0));
+
               if (isWalking && activeQueued) {
                 const walkText = `🚶 Walking to ${activeQueued.label}...`;
-                const walkPillW = Math.max(144, walkText.length * 5.6 + 26);
+                const walkPillW = Math.max(168, walkText.length * 6.4 + 32);
                 return (
-                  <g transform="translate(0, -78)">
+                  <g transform={`translate(${clampedX}, -82)`}>
                     <rect
                       x={-walkPillW / 2}
-                      y="-13"
+                      y="-15"
                       width={walkPillW}
-                      height="22"
-                      rx="11"
-                      fill="rgba(15,23,42,0.92)"
+                      height="25"
+                      rx="12.5"
+                      fill="rgba(15,23,42,0.95)"
                       stroke="#38BDF8"
-                      strokeWidth="1.5"
+                      strokeWidth="1.6"
                     />
                     <text
                       x="0"
-                      y="1"
+                      y="1.5"
                       fill="#FFFFFF"
-                      fontSize="9"
+                      fontSize="10.5"
                       fontWeight="800"
                       textAnchor="middle"
                     >
@@ -1482,24 +1506,24 @@ export const IsometricScene: React.FC = () => {
 
               if (isWalking && !activeQueued) {
                 const walkText = '🚶 Walking...';
-                const walkPillW = 104;
+                const walkPillW = 118;
                 return (
-                  <g transform="translate(0, -78)">
+                  <g transform={`translate(${clampedX}, -82)`}>
                     <rect
                       x={-walkPillW / 2}
-                      y="-13"
+                      y="-15"
                       width={walkPillW}
-                      height="22"
-                      rx="11"
-                      fill="rgba(15,23,42,0.92)"
+                      height="25"
+                      rx="12.5"
+                      fill="rgba(15,23,42,0.95)"
                       stroke="#38BDF8"
-                      strokeWidth="1.5"
+                      strokeWidth="1.6"
                     />
                     <text
                       x="0"
-                      y="1"
+                      y="1.5"
                       fill="#FFFFFF"
-                      fontSize="9"
+                      fontSize="10.5"
                       fontWeight="800"
                       textAnchor="middle"
                     >
@@ -1510,27 +1534,27 @@ export const IsometricScene: React.FC = () => {
               }
 
               if (activeQueued) {
-                const statusText = `${activeQueued.emoji} ${activeQueued.label} (${actionPct}%)`;
-                const statusPillW = Math.max(154, statusText.length * 5.7 + 28);
-                const barW = statusPillW - 24;
+                const statusText = `${activeQueued.emoji} ${activeQueued.label} · ${actionPct}%`;
+                const statusPillW = Math.max(176, statusText.length * 6.5 + 34);
+                const barW = statusPillW - 28;
                 const fillW = Math.max(6, (barW * actionPct) / 100);
                 return (
-                  <g transform="translate(0, -80)">
+                  <g transform={`translate(${clampedX}, -84)`}>
                     <rect
                       x={-statusPillW / 2}
-                      y="-16"
+                      y="-18"
                       width={statusPillW}
-                      height="27"
-                      rx="13.5"
-                      fill="rgba(15,23,42,0.94)"
+                      height="30"
+                      rx="15"
+                      fill="rgba(15,23,42,0.96)"
                       stroke="#007AFF"
-                      strokeWidth="1.5"
+                      strokeWidth="1.8"
                     />
                     <text
                       x="0"
-                      y="-2.5"
+                      y="-3"
                       fill="#FFFFFF"
-                      fontSize="9"
+                      fontSize="10.5"
                       fontWeight="800"
                       textAnchor="middle"
                     >
@@ -1539,18 +1563,18 @@ export const IsometricScene: React.FC = () => {
                     {/* Embedded Progress Bar inside Status Pill */}
                     <rect
                       x={-barW / 2}
-                      y="4"
+                      y="4.5"
                       width={barW}
-                      height="3.5"
-                      rx="1.75"
-                      fill="rgba(255,255,255,0.22)"
+                      height="4"
+                      rx="2"
+                      fill="rgba(255,255,255,0.24)"
                     />
                     <rect
                       x={-barW / 2}
-                      y="4"
+                      y="4.5"
                       width={fillW}
-                      height="3.5"
-                      rx="1.75"
+                      height="4"
+                      rx="2"
                       fill="#34C759"
                     />
                   </g>
@@ -1559,16 +1583,17 @@ export const IsometricScene: React.FC = () => {
               return null;
             })()}
 
-          {/* Clickable Sim Low-Need Thought Bubble (Positioned cleanly above so it NEVER collides) */}
+          {/* Clickable Sim Low-Need Thought Bubble (Enlarged & Clamped Horizontally so it NEVER Collides) */}
           {lowestAlertNeed &&
             (() => {
               const alertText = NEED_BADGE_META[lowestAlertNeed.key].alertText;
-              const alertPillW = Math.max(162, alertText.length * 5.6 + 26);
+              const alertPillW = Math.max(182, alertText.length * 6.4 + 32);
               const hasLowerPill = Boolean(isWalking || activeQueued);
-              const yOffset = hasLowerPill ? -112 : -78;
+              const yOffset = hasLowerPill ? -120 : -82;
+              const clampedX = Math.max(240 - simScreen.sx, Math.min(735 - simScreen.sx, 0));
               return (
                 <g
-                  transform={`translate(0, ${yOffset})`}
+                  transform={`translate(${clampedX}, ${yOffset})`}
                   className="cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1578,46 +1603,27 @@ export const IsometricScene: React.FC = () => {
                       simScreen.sx,
                       simScreen.sy - 64,
                       NEED_BADGE_META[lowestAlertNeed.key].emoji,
-                      `Auto-Fixing ${NEED_BADGE_META[lowestAlertNeed.key].shortLabel}!`
+                      `⚡ Restoring ${NEED_BADGE_META[lowestAlertNeed.key].shortLabel}`,
+                      `Auto-Fixing ${NEED_BADGE_META[lowestAlertNeed.key].shortLabel}!`,
+                      `Queued best restorative action for ${NEED_BADGE_META[lowestAlertNeed.key].shortLabel}`
                     );
                   }}
                 >
-                  {/* Thought bubble connector dots when idle */}
-                  {!hasLowerPill && (
-                    <>
-                      <circle
-                        cx="-4"
-                        cy="12"
-                        r="2"
-                        fill="#FFFFFF"
-                        stroke="#F59E0B"
-                        strokeWidth="1"
-                      />
-                      <circle
-                        cx="-1"
-                        cy="7"
-                        r="2.8"
-                        fill="#FFFFFF"
-                        stroke="#F59E0B"
-                        strokeWidth="1"
-                      />
-                    </>
-                  )}
                   <rect
                     x={-alertPillW / 2}
-                    y="-14"
+                    y="-15"
                     width={alertPillW}
-                    height="22"
-                    rx="11"
-                    fill="rgba(255,255,255,0.97)"
+                    height="25"
+                    rx="12.5"
+                    fill="rgba(255,255,255,0.98)"
                     stroke="#F59E0B"
-                    strokeWidth="1.8"
+                    strokeWidth="2"
                   />
                   <text
                     x="0"
-                    y="0"
+                    y="1.5"
                     fill="#B45309"
-                    fontSize="9"
+                    fontSize="10.5"
                     fontWeight="800"
                     textAnchor="middle"
                   >
@@ -1628,49 +1634,51 @@ export const IsometricScene: React.FC = () => {
             })()}
         </g>
 
-        {/* Visual Sparkle Burst Feedback Overlay */}
+        {/* Visual Sparkle Burst Feedback Overlay on SVG */}
         {sparkleBurst &&
           (() => {
             const burstText = `✨ ${sparkleBurst.emoji} ${sparkleBurst.label}`;
-            const burstW = Math.max(124, burstText.length * 5.6 + 24);
+            const burstW = Math.max(156, burstText.length * 6.4 + 30);
+            const clampedBurstX = Math.max(150, Math.min(750, sparkleBurst.x));
+            const clampedBurstY = Math.max(70, Math.min(500, sparkleBurst.y));
             return (
               <g
                 key={sparkleBurst.id}
-                transform={`translate(${sparkleBurst.x}, ${sparkleBurst.y})`}
+                transform={`translate(${clampedBurstX}, ${clampedBurstY})`}
                 pointerEvents="none"
               >
                 <g>
                   <animateTransform
                     attributeName="transform"
                     type="translate"
-                    values="0,0; 0,-28"
-                    dur="1.3s"
+                    values="0,0; 0,-30"
+                    dur="1.8s"
                     fill="freeze"
                   />
                   <animate
                     attributeName="opacity"
                     values="1;1;0"
-                    dur="1.3s"
+                    dur="1.8s"
                     fill="freeze"
                   />
-                  <circle cx="-18" cy="-6" r="2.5" fill="#FBBF24" />
-                  <circle cx="20" cy="-8" r="2.5" fill="#38BDF8" />
-                  <circle cx="0" cy="-20" r="3" fill="#34D399" />
+                  <circle cx="-22" cy="-8" r="3" fill="#FBBF24" />
+                  <circle cx="24" cy="-10" r="3" fill="#38BDF8" />
+                  <circle cx="0" cy="-24" r="3.5" fill="#34D399" />
                   <rect
                     x={-burstW / 2}
-                    y="-14"
+                    y="-16"
                     width={burstW}
-                    height="20"
-                    rx="10"
-                    fill="rgba(15,23,42,0.92)"
+                    height="25"
+                    rx="12.5"
+                    fill="rgba(15,23,42,0.95)"
                     stroke="#34D399"
-                    strokeWidth="1.4"
+                    strokeWidth="1.6"
                   />
                   <text
                     x="0"
-                    y="-1"
+                    y="0.5"
                     fill="#ECFDF5"
-                    fontSize="9"
+                    fontSize="10.5"
                     fontWeight="800"
                     textAnchor="middle"
                   >
@@ -1694,54 +1702,101 @@ export const IsometricScene: React.FC = () => {
         )}
       </svg>
 
-      {/* Ambient Venue Vibes Strip (Stacked above Camera Controls on non-home venues) */}
+      {/* Full-Size Apple Glass Care Drop / Micro-Reward Popup Window (Top-Right) */}
+      {sparkleBurst && (
+        <div
+          className="fixed top-20 right-4 z-40 w-[calc(100%-32px)] max-w-sm animate-target-pop"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="apple-glass-heavy flex items-start justify-between gap-3 rounded-3xl border border-emerald-500/35 p-4 text-[var(--ink)] shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-3xl shadow-inner">
+                {sparkleBurst.emoji}
+              </div>
+              <div>
+                <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  <span>✨ Instant Bonus Claimed</span>
+                </div>
+                <h4 className="mt-1 text-sm font-extrabold text-[var(--ink)]">
+                  {sparkleBurst.title || 'Care Drop Claimed!'}
+                </h4>
+                {sparkleBurst.subtitle && (
+                  <p className="mt-0.5 text-xs leading-snug text-[var(--ink-soft)]">
+                    {sparkleBurst.subtitle}
+                  </p>
+                )}
+                <div className="mt-2 inline-flex flex-wrap items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1 font-mono text-xs font-extrabold text-emerald-600 dark:text-emerald-300">
+                  {sparkleBurst.label}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setSparkleBurst(null)}
+              className="btn-press grid size-7 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Ambient Venue Vibes Strip + 1-Tap Return Home Button (Stacked above Camera Controls on non-home venues) */}
       {!isHome && venueDef && (
-        <div className="pointer-events-none absolute bottom-36 left-4 z-10 hidden max-w-xs sm:block">
-          <div className="apple-pill rounded-2xl px-3.5 py-2 text-xs">
-            <div className="font-semibold text-[#007AFF]">
-              {venueDef.emoji} {venueDef.name} · {venueDef.district}
+        <div className="pointer-events-auto absolute bottom-36 left-4 z-20 max-w-sm">
+          <div className="apple-glass-heavy flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5 text-xs text-[var(--ink)] shadow-lg">
+            <div>
+              <div className="font-extrabold text-[#007AFF]">
+                {venueDef.emoji} {venueDef.name} · {venueDef.district}
+              </div>
+              <div className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
+                {venueDef.vibes[Math.floor(time / 60) % venueDef.vibes.length]}
+              </div>
             </div>
-            <div className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
-              {venueDef.vibes[Math.floor(time / 60) % venueDef.vibes.length]}
-            </div>
+            <button
+              onClick={handleGoHome}
+              className="btn-press shrink-0 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm"
+            >
+              🏠 Go Home
+            </button>
           </div>
         </div>
       )}
 
       {/* Interactive Camera Zoom & Pan Controls Pill (Bottom-Left) */}
       <div
-        className=" absolute bottom-24 left-4 z-20 flex items-center gap-1 rounded-full px-2 py-1 apple-pill shadow-sm"
+        className="apple-pill absolute bottom-24 left-4 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[var(--ink)] shadow-sm"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={() => setZoom((z) => Math.max(0.75, +(z - 0.1).toFixed(2)))}
           title="Zoom Out"
-          className="btn-press grid size-6 place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+          className="btn-press grid size-7 place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
         >
-          <Minus className="size-3.5" />
+          <Minus className="size-4" />
         </button>
         <button
           onClick={() => setZoom(1)}
           title="Reset Zoom"
-          className="btn-press min-w-[42px] px-1 text-center text-[11px] font-bold tabular-nums"
+          className="btn-press min-w-[46px] px-1 text-center text-xs font-extrabold tabular-nums text-[var(--ink)]"
         >
           {Math.round(zoom * 100)}%
         </button>
         <button
           onClick={() => setZoom((z) => Math.min(1.45, +(z + 0.1).toFixed(2)))}
           title="Zoom In"
-          className="btn-press grid size-6 place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+          className="btn-press grid size-7 place-items-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
         >
-          <Plus className="size-3.5" />
+          <Plus className="size-4" />
         </button>
-        <div className="mx-0.5 h-3.5 w-px bg-black/10 dark:bg-white/15" />
+        <div className="mx-0.5 h-4 w-px bg-black/10 dark:bg-white/15" />
         <button
           onClick={resetCamera}
           title="Center Room Camera"
-          className="btn-press flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-[#007AFF] hover:bg-[#007AFF]/10"
+          className="btn-press flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold text-[#007AFF] hover:bg-[#007AFF]/10"
         >
-          <Compass className="size-3" />
+          <Compass className="size-3.5" />
           <span>🏠 Center</span>
         </button>
       </div>
@@ -1749,52 +1804,52 @@ export const IsometricScene: React.FC = () => {
       {/* Backup Battery Active Pill */}
       {isHome && backupActive && (
         <div className="pointer-events-none absolute top-20 left-1/2 z-10 -translate-x-1/2">
-          <div className="apple-pill flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-            <Zap className="size-3.5 fill-current" />
+          <div className="apple-pill flex items-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+            <Zap className="size-4 fill-current" />
             PG&E Grid Down · Backup Battery 100%
           </div>
         </div>
       )}
 
-      {/* Ultra-Clean Apple visionOS Action Popover (Furniture or Venue Station) */}
+      {/* Enlarged, Unclipped Apple visionOS Action Popover (Furniture or Venue Station) */}
       {(selectedObject || selectedStation) && (
         <div
-          className="absolute bottom-24 left-1/2 z-30 w-[calc(100%-24px)] max-w-sm -translate-x-1/2"
+          className="absolute bottom-24 left-1/2 z-30 w-[calc(100%-24px)] max-w-md -translate-x-1/2"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="apple-glass-heavy rounded-3xl p-3.5 shadow-2xl">
-            {/* Compact Header: Big Emoji + Concise Title + Tier Badge */}
-            <div className="flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[var(--mist)] text-2xl shadow-inner">
+          <div className="apple-glass-heavy rounded-3xl p-4 text-[var(--ink)] shadow-2xl">
+            {/* Header: Big Emoji + Full Unclipped Title + Tier Badge */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--mist)] text-3xl shadow-inner">
                   {selectedFurnitureDef ? selectedFurnitureDef.emoji : selectedStation?.emoji}
                 </span>
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <h3 className="truncate text-sm font-bold">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-extrabold leading-snug text-[var(--ink)]">
                       {selectedFurnitureDef ? selectedFurnitureDef.name : selectedStation?.label}
                     </h3>
                     {selectedFurnitureDef ? (
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                        className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${
                           getFurnitureTier(selectedFurnitureDef.quality).badgeClass
                         }`}
                       >
                         {getFurnitureTier(selectedFurnitureDef.quality).label}
                       </span>
                     ) : (
-                      <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-300">
-                        Tier 2 · Venue
+                      <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold text-sky-600 dark:text-sky-300">
+                        Venue Station
                       </span>
                     )}
                   </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[var(--ink-soft)]">
+                  <div className="mt-0.5 flex items-center gap-2 text-xs font-medium text-[var(--ink-soft)]">
                     {selectedFurnitureDef ? (
-                      <span>{'★'.repeat(selectedFurnitureDef.quality)} Quality</span>
+                      <span>{'★'.repeat(selectedFurnitureDef.quality)} Quality Rating</span>
                     ) : (
                       <span>
-                        {venueDef?.emoji} {venueDef?.shortName}
+                        {venueDef?.emoji} {venueDef?.name}
                       </span>
                     )}
                   </div>
@@ -1806,14 +1861,14 @@ export const IsometricScene: React.FC = () => {
                   setSelectedObject(null);
                   setSelectedStation(null);
                 }}
-                className="btn-press grid size-7 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+                className="btn-press grid size-8 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
               >
                 <X className="size-4" />
               </button>
             </div>
 
-            {/* Compact Action Pills with Visual Stat Impact Badges */}
-            <div className="mt-3 grid gap-1.5">
+            {/* Action Buttons with Full Unclipped Labels & Clear Stat Impact Badges */}
+            <div className="mt-3.5 grid gap-2">
               {(selectedFurnitureDef
                 ? selectedFurnitureDef.actions
                 : selectedStation?.actionIds || []
@@ -1826,12 +1881,28 @@ export const IsometricScene: React.FC = () => {
                     key: k,
                     val: act.needsDelta[k] || 0,
                     emoji: NEED_BADGE_META[k].emoji,
+                    shortLabel: NEED_BADGE_META[k].shortLabel,
                   }))
                   .filter((item) => item.val !== 0);
+
+                const skillNames: Record<string, string> = {
+                  coding: 'Coding',
+                  systemDesign: 'SysDesign',
+                  aiResearch: 'AI/LLM',
+                  charisma: 'Charisma',
+                  fitness: 'Fitness',
+                  cooking: 'Cooking',
+                  hustle: 'Hustle',
+                  investing: 'Investing',
+                };
+
+                const noPower = isHome && act.requiresPower && !powered;
+                const cantAfford = Boolean(act.cost && cash < act.cost);
 
                 return (
                   <button
                     key={act.id}
+                    disabled={noPower || cantAfford}
                     onClick={() => {
                       enqueueAction(act.id, {
                         objectUid: selectedObject?.uid,
@@ -1840,50 +1911,64 @@ export const IsometricScene: React.FC = () => {
                       setSelectedObject(null);
                       setSelectedStation(null);
                     }}
-                    className="btn-press flex items-center justify-between gap-2 rounded-2xl bg-[var(--mist)] px-3 py-2 text-left transition-colors hover:bg-[#007AFF]/12"
+                    className="btn-press flex flex-col gap-1.5 rounded-2xl bg-[var(--mist)] px-3.5 py-2.5 text-left transition-colors hover:bg-[#007AFF]/15 disabled:opacity-50"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-lg shrink-0">{act.emoji}</span>
-                      <span className="truncate text-xs font-bold">{act.label}</span>
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl shrink-0">{act.emoji}</span>
+                        <span className="text-[13px] font-extrabold leading-snug text-[var(--ink)]">
+                          {act.label}
+                        </span>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-black/10 px-2 py-0.5 font-mono text-[11px] font-bold text-[var(--ink-soft)] dark:bg-white/10">
+                        ⏱ {act.durationMinutes}m
+                      </span>
                     </div>
 
-                    {/* Visual Stat Impact Badges */}
-                    <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
-                      {needBadges.slice(0, 2).map((nb) => (
+                    {/* Visual Stat Impact Badges Row (Full Width, Never Squeezes Action Title) */}
+                    <div className="flex flex-wrap items-center gap-1.5 pl-7">
+                      {noPower && (
+                        <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] font-extrabold text-rose-500">
+                          🔌 PG&E Outage (Needs Power)
+                        </span>
+                      )}
+                      {cantAfford && (
+                        <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] font-extrabold text-rose-500">
+                          Need ${act.cost}
+                        </span>
+                      )}
+                      {needBadges.map((nb) => (
                         <span
                           key={nb.key}
-                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                             nb.val > 0
                               ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300'
                               : 'bg-amber-500/15 text-amber-600 dark:text-amber-300'
                           }`}
                         >
-                          {nb.emoji} {nb.val > 0 ? `+${nb.val}` : nb.val}
+                          {nb.emoji} {nb.val > 0 ? `+${nb.val}` : nb.val} {nb.shortLabel}
                         </span>
                       ))}
                       {act.earn && (
-                        <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-300">
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-300">
                           💵 +${act.earn[1]}
                         </span>
                       )}
-                      {act.cost && (
-                        <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-bold text-rose-600 dark:text-rose-300">
+                      {act.cost && !cantAfford && (
+                        <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-bold text-rose-600 dark:text-rose-300">
                           💳 -${act.cost}
                         </span>
                       )}
                       {act.skillGain && (
-                        <span className="rounded-full bg-[#007AFF]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#007AFF]">
-                          🧠 +{act.skillGain.skill.slice(0, 6)}
+                        <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[11px] font-bold text-[#007AFF] dark:text-[#5AC8FA]">
+                          🧠 +{skillNames[act.skillGain.skill] || act.skillGain.skill} XP
                         </span>
                       )}
                       {act.startupProgress && (
-                        <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-300">
-                          🚀 +{act.startupProgress}%
+                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-300">
+                          🚀 +{act.startupProgress}% MVP
                         </span>
                       )}
-                      <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-soft)] dark:bg-white/10">
-                        ⏱ {act.durationMinutes}m
-                      </span>
                     </div>
                   </button>
                 );
@@ -1892,16 +1977,16 @@ export const IsometricScene: React.FC = () => {
 
             {/* 1-Click Furniture Upgrade & Sell Footer */}
             {selectedObject && (upgradeTargetDef || objects.length > 3) && (
-              <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-black/5 pt-2.5 dark:border-white/10">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/10 pt-3 dark:border-white/10">
                 {upgradeTargetDef ? (
                   <button
                     onClick={handleUpgradeFurniture}
-                    className="btn-press flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#007AFF] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-95"
+                    className="btn-press flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#007AFF] px-3.5 py-2 text-xs font-extrabold text-white shadow-sm hover:opacity-95"
                   >
-                    <ArrowUpCircle className="size-3.5" />
+                    <ArrowUpCircle className="size-4 shrink-0" />
                     <span>
                       ⬆️ Upgrade ({formatCurrency(upgradeNetCost)}) · {upgradeTargetDef.emoji}{' '}
-                      {upgradeTargetDef.name.split(' ').slice(0, 2).join(' ')}
+                      {upgradeTargetDef.name}
                     </span>
                   </button>
                 ) : (
@@ -1915,10 +2000,10 @@ export const IsometricScene: React.FC = () => {
                       setSelectedObject(null);
                     }}
                     title="Sell Furniture"
-                    className="btn-press flex items-center gap-1 rounded-2xl px-2.5 py-1.5 text-[11px] font-semibold text-rose-500 hover:bg-rose-500/10"
+                    className="btn-press flex items-center gap-1 rounded-2xl px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/10"
                   >
                     <Trash2 className="size-3.5" />
-                    <span>+{formatCurrency(resaleValue)}</span>
+                    <span>Sell +{formatCurrency(resaleValue)}</span>
                   </button>
                 )}
               </div>
@@ -1927,48 +2012,50 @@ export const IsometricScene: React.FC = () => {
         </div>
       )}
 
-      {/* Ultra-Clean Apple visionOS NPC Popover */}
+      {/* Enlarged, Unclipped Apple visionOS NPC Popover */}
       {selectedNpc && (
         <div
-          className="absolute bottom-24 left-1/2 z-30 w-[calc(100%-24px)] max-w-sm -translate-x-1/2"
+          className="absolute bottom-24 left-1/2 z-30 w-[calc(100%-24px)] max-w-md -translate-x-1/2"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="apple-glass-heavy rounded-3xl p-3.5 shadow-2xl">
-            <div className="flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Portrait appearance={selectedNpc.appearance} size={44} ringColor="#007AFF" />
+          <div className="apple-glass-heavy rounded-3xl p-4 text-[var(--ink)] shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Portrait appearance={selectedNpc.appearance} size={48} ringColor="#007AFF" />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <h3 className="truncate text-sm font-bold">{selectedNpc.name}</h3>
-                    <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[10px] font-bold text-[#007AFF]">
+                    <h3 className="text-base font-extrabold text-[var(--ink)]">
+                      {selectedNpc.name}
+                    </h3>
+                    <span className="rounded-full bg-[#007AFF]/15 px-2.5 py-0.5 text-[11px] font-bold text-[#007AFF]">
                       {relationships[selectedNpc.id]?.status || 'Stranger'} ·{' '}
                       {relationships[selectedNpc.id]?.score || 10}
                     </span>
                   </div>
-                  <p className="truncate text-[11px] font-medium text-[var(--ink-soft)]">
+                  <p className="mt-0.5 text-xs font-medium text-[var(--ink-soft)]">
                     {selectedNpc.role} · {selectedNpc.company}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedNpc(null)}
-                className="btn-press grid size-7 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+                className="btn-press grid size-8 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
               >
                 <X className="size-4" />
               </button>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-1.5">
+            <div className="mt-3.5 grid grid-cols-2 gap-2">
               <button
                 onClick={() => {
                   interactWithNpc(selectedNpc.id, 'linkedin');
                   setSelectedNpc(null);
                 }}
-                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-2.5 py-2 text-xs font-bold hover:bg-[#007AFF]/15"
+                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
               >
-                <span>🤝 LinkedIn</span>
-                <span className="rounded-full bg-[#007AFF]/15 px-1.5 py-0.5 text-[10px] text-[#007AFF]">
+                <span>🤝 LinkedIn Sync</span>
+                <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[11px] text-[#007AFF]">
                   💬 +10
                 </span>
               </button>
@@ -1977,11 +2064,11 @@ export const IsometricScene: React.FC = () => {
                   interactWithNpc(selectedNpc.id, 'coffeeChat');
                   setSelectedNpc(null);
                 }}
-                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-2.5 py-2 text-xs font-bold hover:bg-[#007AFF]/15"
+                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
               >
-                <span>☕ Cortado</span>
-                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-300">
-                  🗣️ +Cha
+                <span>☕ Cortado Chat</span>
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-300">
+                  🗣️ +Charisma
                 </span>
               </button>
               <button
@@ -1989,11 +2076,11 @@ export const IsometricScene: React.FC = () => {
                   interactWithNpc(selectedNpc.id, 'whiteboard');
                   setSelectedNpc(null);
                 }}
-                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-2.5 py-2 text-xs font-bold hover:bg-[#007AFF]/15"
+                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
               >
                 <span>📐 Arch Jam</span>
-                <span className="rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-600 dark:text-indigo-300">
-                  🧠 +Sys
+                <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] text-indigo-600 dark:text-indigo-300">
+                  🧠 +SysDesign
                 </span>
               </button>
               <button
@@ -2001,11 +2088,11 @@ export const IsometricScene: React.FC = () => {
                   interactWithNpc(selectedNpc.id, 'pitch');
                   setSelectedNpc(null);
                 }}
-                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-2.5 py-2 text-xs font-bold hover:bg-[#007AFF]/15"
+                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
               >
                 <span>🚀 Pitch MVP</span>
-                <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-300">
-                  🚀 +10%
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-600 dark:text-emerald-300">
+                  🚀 +10% MVP
                 </span>
               </button>
               <button
@@ -2013,11 +2100,11 @@ export const IsometricScene: React.FC = () => {
                   interactWithNpc(selectedNpc.id, 'flirt');
                   setSelectedNpc(null);
                 }}
-                className="btn-press col-span-2 flex items-center justify-between rounded-2xl bg-pink-500/12 px-3 py-2 text-xs font-bold text-pink-600 dark:text-pink-400"
+                className="btn-press col-span-2 flex items-center justify-between rounded-2xl bg-pink-500/15 px-3.5 py-2.5 text-xs font-extrabold text-pink-600 dark:text-pink-400"
               >
                 <span>💖 Single-Origin Matcha Date</span>
-                <span className="rounded-full bg-pink-500/20 px-2 py-0.5 text-[10px] font-bold">
-                  ❤️ +16 Bond · 🎮 +12
+                <span className="rounded-full bg-pink-500/20 px-2.5 py-0.5 text-[11px] font-bold">
+                  ❤️ +16 Bond · 🎮 +12 Peace
                 </span>
               </button>
             </div>
