@@ -618,6 +618,9 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
     activeModal: null,
     phoneApp: 'levels',
     simTab: 'needs',
+    computerTab: 'ide',
+    mapHouseHuntMode: false,
+    bluefinSelectedHomeId: null,
 
     sim: profile,
     needs: { ...BASE_NEEDS },
@@ -742,9 +745,11 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
 interface GameActions {
   setScreen: (screen: GameState['screen']) => void;
   setView: (view: GameState['view']) => void;
+  openBluefinMap: (homeIdToInspect?: string) => void;
+  setMapHouseHuntMode: (enabled: boolean, homeIdToInspect?: string) => void;
   setActiveModal: (
     modal: GameState['activeModal'],
-    sub?: GameState['phoneApp'] | GameState['simTab']
+    sub?: GameState['phoneApp'] | GameState['simTab'] | GameState['computerTab']
   ) => void;
   setSpeed: (speed: 0 | 1 | 2 | 3) => void;
   toggleNightMode: () => void;
@@ -849,7 +854,29 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
         sfx.play('open');
-        set({ view, activeModal: null });
+        set({
+          view,
+          activeModal: null,
+          ...(view === 'map' ? { mapHouseHuntMode: false, bluefinSelectedHomeId: null } : {}),
+        });
+      },
+
+      openBluefinMap: (homeIdToInspect) => {
+        sfx.play('open');
+        set({
+          view: 'map',
+          activeModal: null,
+          mapHouseHuntMode: true,
+          bluefinSelectedHomeId: homeIdToInspect || null,
+        });
+      },
+
+      setMapHouseHuntMode: (enabled, homeIdToInspect) => {
+        sfx.play('tap');
+        set({
+          mapHouseHuntMode: enabled,
+          bluefinSelectedHomeId: homeIdToInspect !== undefined ? homeIdToInspect : null,
+        });
       },
 
       setActiveModal: (modal, sub) => {
@@ -859,6 +886,8 @@ export const useGameStore = create<GameState & GameActions>()(
           patch.phoneApp = sub as GameState['phoneApp'];
         } else if (modal === 'sim' && sub) {
           patch.simTab = sub as GameState['simTab'];
+        } else if (modal === 'computer' && sub) {
+          patch.computerTab = sub as GameState['computerTab'];
         }
         set(patch);
       },

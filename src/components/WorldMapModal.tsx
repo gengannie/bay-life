@@ -124,6 +124,9 @@ export const WorldMapModal: React.FC = () => {
   const commuteToOfficeAndWork = useGameStore((s) => s.commuteToOfficeAndWork);
   const leaveWorkEarly = useGameStore((s) => s.leaveWorkEarly);
   const setActiveModal = useGameStore((s) => s.setActiveModal);
+  const mapHouseHuntMode = useGameStore((s) => Boolean(s.mapHouseHuntMode));
+  const bluefinSelectedHomeId = useGameStore((s) => s.bluefinSelectedHomeId);
+  const setMapHouseHuntMode = useGameStore((s) => s.setMapHouseHuntMode);
 
   const careerDef = job ? CAREER_BY_ID[job.careerId] : null;
   const homeDef = HOME_BY_ID[homeId] || HOMES[2];
@@ -140,6 +143,9 @@ export const WorldMapModal: React.FC = () => {
   const currentPlaceArea = currentVenueDef ? currentVenueDef.area : homeDef.area;
 
   const [selectedTarget, setSelectedTarget] = useState<SelectedMapTarget>(() => {
+    if (mapHouseHuntMode && bluefinSelectedHomeId && HOME_BY_ID[bluefinSelectedHomeId]) {
+      return { kind: 'home', home: HOME_BY_ID[bluefinSelectedHomeId] };
+    }
     if (locationId === 'home') {
       return { kind: 'venue', loc: LOCATIONS[0] };
     }
@@ -147,6 +153,16 @@ export const WorldMapModal: React.FC = () => {
     if (foundVenue) return { kind: 'venue', loc: foundVenue };
     return { kind: 'home', home: homeDef };
   });
+
+  useEffect(() => {
+    if (mapHouseHuntMode && bluefinSelectedHomeId && HOME_BY_ID[bluefinSelectedHomeId]) {
+      setSelectedTarget({ kind: 'home', home: HOME_BY_ID[bluefinSelectedHomeId] });
+      return;
+    }
+    if (!mapHouseHuntMode && selectedTarget.kind === 'home' && selectedTarget.home.id !== homeId) {
+      setSelectedTarget({ kind: 'home', home: homeDef });
+    }
+  }, [mapHouseHuntMode, bluefinSelectedHomeId, homeId, homeDef, selectedTarget]);
 
   const hasCar = hasPersonalCar({ ownedCars });
   const activeVehicle = getActiveVehicle({ ownedCars, activeCarId });
@@ -412,40 +428,43 @@ export const WorldMapModal: React.FC = () => {
           )}
         </div>
 
-        {/* Pin Layer Filter + District Filter Pills + Close Map */}
+        {/* Bluefin House-Hunt Toggle + District Filter Pills + Close Map */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <div className="flex items-center rounded-full bg-white/80 p-0.5 shadow-xs dark:bg-slate-900/80">
+          <button
+            onClick={() => {
+              const nextMode = !mapHouseHuntMode;
+              const nextInspectId = nextMode
+                ? HOMES.find((h) => h.id !== homeId)?.id || homeId
+                : undefined;
+              setMapHouseHuntMode(nextMode, nextInspectId);
+              if (!nextMode) {
+                setPinLayerFilter('all');
+              }
+            }}
+            className={`btn-press flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold shadow-sm transition-all ${
+              mapHouseHuntMode
+                ? 'bg-[#0284C7] text-white ring-2 ring-sky-300'
+                : 'border border-sky-400/50 bg-white/90 text-[#0284C7] hover:bg-sky-50 dark:bg-slate-900/90 dark:text-sky-300'
+            }`}
+            title="Show all 5 Bay Area residences on the map when house hunting via Bluefin"
+          >
+            <span>🐟</span>
+            <span>
+              {mapHouseHuntMode
+                ? 'Bluefin House Hunt: ON (Exit)'
+                : 'House Hunt on Bluefin'}
+            </span>
+          </button>
+
+          {mapHouseHuntMode && (
             <button
-              onClick={() => setPinLayerFilter('all')}
-              className={`btn-press rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                pinLayerFilter === 'all'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                  : 'text-[var(--ink-soft)]'
-              }`}
+              onClick={() => setActiveModal('phone', 'bluefin')}
+              className="btn-press rounded-full bg-sky-500/15 px-2.5 py-1.5 text-[11px] font-extrabold text-[#0284C7] hover:bg-sky-500/25 dark:text-sky-300"
+              title="Open the Bluefin Real Estate app on your BayOS phone"
             >
-              All ({LOCATIONS.length + HOMES.length})
+              📱 Open Bluefin App
             </button>
-            <button
-              onClick={() => setPinLayerFilter('venues')}
-              className={`btn-press rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                pinLayerFilter === 'venues'
-                  ? 'bg-[#007AFF] text-white'
-                  : 'text-[var(--ink-soft)]'
-              }`}
-            >
-              🏢 Venues ({LOCATIONS.length})
-            </button>
-            <button
-              onClick={() => setPinLayerFilter('homes')}
-              className={`btn-press rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                pinLayerFilter === 'homes'
-                  ? 'bg-amber-500 text-white'
-                  : 'text-[var(--ink-soft)]'
-              }`}
-            >
-              🏡 Homes ({HOMES.length})
-            </button>
-          </div>
+          )}
 
           {districts.map((d) => (
             <button
@@ -497,53 +516,75 @@ export const WorldMapModal: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Residences & NPC Spotter Strip */}
+      {/* Sub-Header Strip: Bluefin Residences (ONLY shown when looking for new homes) + NPC Spotter Strip */}
       <div className="relative z-20 flex items-center gap-1.5 overflow-x-auto px-4 pb-2">
-        <span className="shrink-0 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-extrabold tracking-wide text-white uppercase shadow-xs">
-          🏡 5 Residences:
-        </span>
-        {HOMES.map((h) => {
-          const isCurrent = h.id === homeId;
-          const isOwned = ownedHomes.includes(h.id);
-          const isSelected =
-            selectedTarget.kind === 'home' && selectedTarget.home.id === h.id;
-          return (
-            <button
-              key={h.id}
-              onClick={() => {
-                setDistrictFilter('All');
-                setSelectedTarget({ kind: 'home', home: h });
-              }}
-              className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${
-                isSelected
-                  ? 'border-amber-500 bg-amber-500 text-white shadow-sm'
-                  : isCurrent
-                  ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
-                  : 'border-white/50 bg-white/85 text-slate-800 hover:bg-white dark:border-white/10 dark:bg-slate-900/85 dark:text-slate-200'
-              }`}
-            >
-              <span>{h.emoji}</span>
-              <span>{h.shortName}</span>
-              <span
-                className={`rounded-full px-1.5 py-0.2 text-[9px] font-extrabold ${
-                  isSelected
-                    ? 'bg-white/25 text-white'
-                    : isCurrent
-                    ? 'bg-emerald-600 text-white'
-                    : isOwned
-                    ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                    : 'bg-black/5 text-slate-600 dark:bg-white/10 dark:text-slate-300'
-                }`}
-              >
-                {isCurrent
-                  ? 'YOUR HOME'
-                  : isOwned
-                  ? '🔑 OWNED'
-                  : `T${h.tier} · $${(h.weeklyRent / 1000).toFixed(1)}k`}
-              </span>
-            </button>
-          );
-        })}
+        {mapHouseHuntMode ? (
+          <>
+            <span className="shrink-0 rounded-full bg-[#0284C7] px-2.5 py-1 text-[10px] font-extrabold tracking-wide text-white uppercase shadow-xs">
+              🐟 Bluefin 5 Listings:
+            </span>
+            {HOMES.map((h) => {
+              const isCurrent = h.id === homeId;
+              const isOwned = ownedHomes.includes(h.id);
+              const isSelected =
+                selectedTarget.kind === 'home' && selectedTarget.home.id === h.id;
+              return (
+                <button
+                  key={h.id}
+                  onClick={() => {
+                    setDistrictFilter('All');
+                    setSelectedTarget({ kind: 'home', home: h });
+                  }}
+                  className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${
+                    isSelected
+                      ? 'border-[#0284C7] bg-[#0284C7] text-white shadow-sm'
+                      : isCurrent
+                      ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+                      : 'border-white/50 bg-white/85 text-slate-800 hover:bg-white dark:border-white/10 dark:bg-slate-900/85 dark:text-slate-200'
+                  }`}
+                >
+                  <span>{h.emoji}</span>
+                  <span>{h.shortName}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[9px] font-extrabold ${
+                      isSelected
+                        ? 'bg-white/25 text-white'
+                        : isCurrent
+                        ? 'bg-emerald-600 text-white'
+                        : isOwned
+                        ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                        : 'bg-sky-500/15 text-[#0284C7] dark:text-sky-300'
+                    }`}
+                  >
+                    {isCurrent
+                      ? 'YOUR HOME'
+                      : isOwned
+                      ? '🔑 OWNED'
+                      : `T${h.tier} · $${(h.weeklyRent / 1000).toFixed(1)}k/wk`}
+                  </span>
+                </button>
+              );
+            })}
+          </>
+        ) : (
+          <button
+            onClick={() => {
+              setDistrictFilter('All');
+              setSelectedTarget({ kind: 'home', home: homeDef });
+            }}
+            className={`btn-press flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-all ${
+              selectedTarget.kind === 'home' && selectedTarget.home.id === homeId
+                ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                : 'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+            }`}
+          >
+            <span>🏠</span>
+            <span>Your Home: {homeDef.shortName}</span>
+            <span className="rounded-full bg-emerald-600/20 px-1.5 py-0.2 text-[9px] font-extrabold">
+              T{homeDef.tier}
+            </span>
+          </button>
+        )}
 
         <div className="mx-1 h-4 w-px shrink-0 bg-slate-400/30" />
 
@@ -616,13 +657,22 @@ export const WorldMapModal: React.FC = () => {
               <span className="size-2 rounded-full bg-[#007AFF]" />
               🏢 Venue
             </span>
-            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-              <span className="size-2 rounded-full bg-amber-500" />
-              🏡 Home (T1–T5)
-            </span>
+            {mapHouseHuntMode ? (
+              <span className="inline-flex items-center gap-1 text-[#0284C7] dark:text-sky-400">
+                <span className="size-2 rounded-full bg-[#0284C7]" />
+                🐟 Bluefin Homes (T1–T5)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <span className="size-2 rounded-full bg-emerald-600" />
+                🏠 Your Home
+              </span>
+            )}
             <span className="hidden text-slate-400 xl:inline">·</span>
             <span className="hidden text-[9px] font-bold text-slate-500 xl:inline dark:text-slate-400">
-              Click to Inspect · Double-Click Pin to Travel
+              {mapHouseHuntMode
+                ? 'Click Any Home Pin to Compare Commutes & Leases'
+                : 'Click Venue to Inspect · Use Bluefin to House Hunt'}
             </span>
           </div>
 
@@ -1046,9 +1096,9 @@ export const WorldMapModal: React.FC = () => {
               </div>
             )}
 
-            {/* ALL 5 RESIDENCE PINS ON THE MAP CANVAS */}
+            {/* RESIDENCE PINS ON THE MAP CANVAS (Only Your Current Home by Default; All 5 Homes When House-Hunting via Bluefin) */}
             {pinLayerFilter !== 'venues' &&
-              HOMES.map((h) => {
+              (mapHouseHuntMode ? HOMES : [homeDef]).map((h) => {
                 const isCurrentHome = h.id === homeId;
                 const isHomeHere = isCurrentHome && locationId === 'home';
                 const isOwned = ownedHomes.includes(h.id);
@@ -1087,8 +1137,8 @@ export const WorldMapModal: React.FC = () => {
                         <span>🏠 YOUR HOME · T{h.tier}</span>
                       </div>
                     ) : isSelected ? (
-                      <div className="mb-0.5 flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black tracking-wide text-white uppercase shadow-md ring-1 ring-white">
-                        <span>🏡 INSPECTING · T{h.tier}</span>
+                      <div className="mb-0.5 flex items-center gap-1 whitespace-nowrap rounded-full bg-[#0284C7] px-2 py-0.5 text-[9px] font-black tracking-wide text-white uppercase shadow-md ring-1 ring-white">
+                        <span>🐟 BLUEFIN LISTING · T{h.tier}</span>
                       </div>
                     ) : null}
 
@@ -1103,10 +1153,10 @@ export const WorldMapModal: React.FC = () => {
                         isHomeHere
                           ? 'bg-emerald-500 p-1 text-white shadow-xl ring-4 ring-emerald-300'
                           : isSelected
-                          ? 'scale-110 bg-amber-500 px-2.5 py-1.5 text-white shadow-lg ring-4 ring-amber-400/45'
+                          ? 'scale-110 bg-[#0284C7] px-2.5 py-1.5 text-white shadow-lg ring-4 ring-sky-400/50'
                           : isCurrentHome
                           ? 'bg-emerald-600 px-2.5 py-1 text-white shadow-md ring-2 ring-white'
-                          : 'bg-amber-50/95 px-2 py-1 text-amber-950 shadow-md ring-2 ring-amber-400/80 hover:scale-105 dark:bg-slate-900/95 dark:text-amber-200'
+                          : 'bg-sky-50/95 px-2 py-1 text-sky-950 shadow-md ring-2 ring-[#0284C7]/80 hover:scale-105 dark:bg-slate-900/95 dark:text-sky-200'
                       }`}
                     >
                       {isHomeHere && (
@@ -1137,18 +1187,18 @@ export const WorldMapModal: React.FC = () => {
                         isHomeHere
                           ? 'bg-emerald-700 text-white ring-1 ring-emerald-300'
                           : isSelected
-                          ? 'bg-amber-500 text-white ring-1 ring-white/80'
+                          ? 'bg-[#0284C7] text-white ring-1 ring-white/80'
                           : isCurrentHome
                           ? 'bg-emerald-700 text-white ring-1 ring-white/80'
-                          : 'bg-amber-50/95 text-amber-950 ring-1 ring-amber-400/60 dark:bg-slate-900/95 dark:text-amber-100'
+                          : 'bg-sky-50/95 text-sky-950 ring-1 ring-[#0284C7]/60 dark:bg-slate-900/95 dark:text-sky-100'
                       }`}
                     >
-                      <span>{isCurrentHome ? `🏠 ${h.shortName}` : h.shortName}</span>
+                      <span>{isCurrentHome ? `🏠 ${h.shortName}` : `🐟 ${h.shortName}`}</span>
                       <span
                         className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-black ${
                           isHomeHere || isSelected || isCurrentHome
                             ? 'bg-white/25 text-white'
-                            : 'bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                            : 'bg-[#0284C7]/15 text-[#0284C7] dark:text-sky-300'
                         }`}
                       >
                         {isCurrentHome
@@ -1510,6 +1560,26 @@ export const WorldMapModal: React.FC = () => {
                           className="btn-press rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-indigo-700"
                         >
                           🏠 Start WFH Shift ({job.wfhDaysThisWeek || 0}/2 wk)
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Bluefin House-Hunt Prompt when Inspecting Current Home */}
+                    {isCurrent && !mapHouseHuntMode && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#0284C7]/35 bg-[#0284C7]/10 p-3">
+                        <div className="text-xs font-bold text-[var(--ink)]">
+                          🐟 Looking for a bigger floor plan, better window view, or shorter commute?
+                        </div>
+                        <button
+                          onClick={() =>
+                            setMapHouseHuntMode(
+                              true,
+                              HOMES.find((other) => other.id !== homeId)?.id || homeId
+                            )
+                          }
+                          className="btn-press rounded-xl bg-[#0284C7] px-3 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-[#0369A1]"
+                        >
+                          🐟 House Hunt on Bluefin
                         </button>
                       </div>
                     )}

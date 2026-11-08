@@ -545,88 +545,68 @@ export const AppleHUD: React.FC = () => {
       {/* TOP BAR HUD */}
       <div className="pointer-events-none fixed top-0 right-0 left-0 z-30 flex flex-wrap items-center justify-between gap-2 p-3 sm:px-5">
         {/* Left Status Pill: Location, Clock, Weather, Speed Controls */}
-        <div className="apple-pill pointer-events-auto flex flex-wrap items-center gap-2.5 rounded-full px-3.5 py-2 text-xs text-[var(--ink)] sm:text-[13px]">
+        <div className="apple-pill pointer-events-auto flex flex-wrap items-center gap-2 rounded-full px-3 py-1.5 text-xs text-[var(--ink)] sm:text-[13px]">
           <button
             onClick={() => setView(view === 'map' ? 'live' : 'map')}
-            className="btn-press flex items-center gap-1.5 font-extrabold text-[var(--ink)] hover:text-[#007AFF]"
+            className="btn-press flex items-center gap-1.5 font-bold text-[var(--ink)] hover:text-[#007AFF]"
             title="Toggle Bay Map (M)"
           >
-            <span className="text-base">{currentPlaceEmoji}</span>
+            <span className="text-sm">{currentPlaceEmoji}</span>
             <span>{currentPlaceName}</span>
           </button>
 
-          <span className="text-slate-300 dark:text-slate-600">|</span>
+          <span className="text-slate-300 dark:text-slate-600">·</span>
 
-          <div className="font-mono text-xs font-extrabold text-[var(--ink)]">
+          <div className="font-mono text-xs font-semibold text-[var(--ink)]">
             D{getDayNumber(time)} · {getDayOfWeekName(time).slice(0, 3)} {formatTime(time)}
           </div>
 
-          <span className="hidden text-xs font-semibold text-[var(--ink-soft)] md:inline">
+          <span className="hidden text-xs font-medium text-[var(--ink-soft)] md:inline">
             {weatherLabel}
           </span>
 
-          {/* PG&E Power Status */}
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
-              powered
-                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                : 'animate-pulse bg-rose-500/20 text-rose-500'
-            }`}
-            title={powered ? 'Grid & Fiber Online' : 'PG&E Power Shutoff'}
-          >
-            {powered ? <Zap className="size-3.5" /> : <ZapOff className="size-3.5" />}
-            <span>{powered ? 'Grid' : 'Outage'}</span>
-          </span>
-
-          {/* Apple CarPlay / EV Status Pill */}
-          <button
-            onClick={() => setActiveModal(activeModal === 'garage' ? null : 'garage')}
-            className={`btn-press inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold transition ${
-              activeVehicle
-                ? 'bg-[#007AFF]/15 text-[#007AFF] hover:bg-[#007AFF]/25'
-                : 'bg-indigo-500/12 text-indigo-700 hover:bg-indigo-500/20 dark:text-indigo-300'
-            }`}
-            title={
-              activeVehicle
-                ? `Apple CarPlay (${activeVehicle.name}) — $0 Fares, ${activeVehicle.baseMinutes}m HOV Drives & Scenic Joyrides (Shortcut: G)`
-                : 'Open EV Garage — Unlock $0 Commute Fares, Fast HOV Autopilot & Scenic Joyrides (Shortcut: G)'
-            }
-          >
-            <span>{activeVehicle ? activeVehicle.emoji : '🚗'}</span>
-            <span>{activeVehicle ? `${activeVehicle.shortName} · $0` : 'EV Garage'}</span>
-          </button>
+          {/* PG&E Power Alert (Only surfaced when outage occurs) */}
+          {!powered && (
+            <span
+              className="inline-flex animate-pulse items-center gap-1 rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] font-bold text-rose-500"
+              title="PG&E Power Shutoff"
+            >
+              <ZapOff className="size-3" />
+              <span>Outage</span>
+            </span>
+          )}
 
           {/* Speed Segmented Control */}
           <div
-            className="flex items-center gap-0.5 rounded-full bg-[var(--mist)] p-0.5"
+            className="ml-0.5 flex items-center gap-0.5 rounded-full bg-[var(--mist)] p-0.5"
             title="Shortcuts: Space (Pause/Play) · 1 / 2 / 3 (Speed)"
           >
             {([0, 1, 2, 3] as const).map((sp) => (
               <button
                 key={sp}
                 onClick={() => setSpeed(sp)}
-                className={`btn-press flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-extrabold ${
+                className={`btn-press flex h-5.5 min-w-5.5 items-center justify-center rounded-full px-1.5 text-[10.5px] font-bold ${
                   speed === sp
                     ? 'bg-[#007AFF] text-white shadow-xs'
                     : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
                 }`}
               >
-                {sp === 0 ? <Pause className="size-3" /> : sp === 1 ? <Play className="size-3" /> : `${sp}×`}
+                {sp === 0 ? <Pause className="size-2.5" /> : sp === 1 ? <Play className="size-2.5" /> : `${sp}×`}
               </button>
             ))}
           </div>
         </div>
 
         {/* Right Status Pill: Cash, RSU, Karma, Theme & Sound */}
-        <div className="apple-pill pointer-events-auto flex items-center gap-2 rounded-full px-3.5 py-2 text-xs text-[var(--ink)] sm:text-[13px]">
+        <div className="apple-pill pointer-events-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-[var(--ink)] sm:text-[13px]">
           <button
             onClick={() => setActiveModal('phone', 'wealth')}
-            className="btn-press flex items-center gap-1.5 font-mono text-xs font-extrabold text-emerald-600 sm:text-[13px] dark:text-emerald-400"
+            className="btn-press flex items-center gap-1.5 font-mono text-xs font-bold text-emerald-600 sm:text-[13px] dark:text-emerald-400"
             title="Open Schwab & Net Worth"
           >
             <span>{formatCurrency(cash)}</span>
             {vestedRsu > 0 && (
-              <span className="hidden rounded-full bg-purple-500/15 px-2 py-0.5 text-[11px] font-bold text-purple-600 sm:inline dark:text-purple-400">
+              <span className="hidden rounded-full bg-purple-500/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-purple-600 sm:inline dark:text-purple-400">
                 +{formatCurrency(vestedRsu)} RSU
               </span>
             )}
@@ -634,15 +614,17 @@ export const AppleHUD: React.FC = () => {
 
           <button
             onClick={() => setActiveModal('sim', 'perks')}
-            className="btn-press rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-extrabold text-amber-600 dark:text-amber-400"
+            className="btn-press rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400"
             title="Karma Points — Spend on Perks"
           >
             ⚡ {karma}
           </button>
 
+          <div className="mx-0.5 h-3.5 w-px bg-black/10 dark:bg-white/15" />
+
           <button
             onClick={toggleSound}
-            className="btn-press grid size-7 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink)]"
+            className="btn-press grid size-6.5 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink)]"
             aria-label="Toggle sound"
           >
             {soundOn ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
@@ -650,36 +632,27 @@ export const AppleHUD: React.FC = () => {
 
           <button
             onClick={toggleNightMode}
-            className="btn-press grid size-7 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink)]"
+            className="btn-press grid size-6.5 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink)]"
             title={`Theme: ${nightMode}`}
           >
             {nightMode === 'dark' ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
           </button>
 
           <button
-            onClick={() => void quickSaveNow()}
-            className="btn-press grid size-7 place-items-center rounded-full bg-[#007AFF]/15 text-[#007AFF] hover:bg-[#007AFF]/25"
-            title="Quick Save Now (Cmd/Ctrl + S)"
-            aria-label="Quick Save Now"
-          >
-            <Save className="size-3.5" />
-          </button>
-
-          <button
             onClick={() => setActiveModal(activeModal === 'account' ? null : 'account')}
-            className="btn-press inline-flex items-center gap-1.5 rounded-full bg-[var(--mist)] px-2.5 py-1 text-[11px] font-extrabold text-[var(--ink)] hover:bg-black/10 dark:hover:bg-white/15"
-            title="Google Account & Save Slots (Shortcut: S)"
+            className="btn-press inline-flex items-center gap-1 rounded-full bg-[var(--mist)] px-2.5 py-1 text-[11px] font-bold text-[var(--ink)] hover:bg-black/10 dark:hover:bg-white/15"
+            title="Cloud Saves & Account (Shortcut: S · Quick Save: Cmd/Ctrl+S)"
           >
             {authUser ? (
               <>
-                <span className="grid size-4 place-items-center rounded-full bg-[#007AFF] text-[9px] font-extrabold text-white">
+                <span className="grid size-3.5 place-items-center rounded-full bg-[#007AFF] text-[8.5px] font-extrabold text-white">
                   {authUser.name[0]?.toUpperCase() || 'G'}
                 </span>
-                <span className="hidden sm:inline">{authUser.givenName || 'Cloud'}</span>
+                <span className="hidden sm:inline">{authUser.givenName || 'Saves'}</span>
               </>
             ) : (
               <>
-                <GoogleLogoSvg className="size-3.5" />
+                <Save className="size-3 text-[#007AFF]" />
                 <span>Saves</span>
               </>
             )}
@@ -687,7 +660,7 @@ export const AppleHUD: React.FC = () => {
 
           <button
             onClick={() => setScreen('title')}
-            className="btn-press rounded-full bg-[var(--mist)] px-2.5 py-1 text-[11px] font-bold text-[var(--ink)]"
+            className="btn-press rounded-full bg-[var(--mist)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-soft)] hover:text-[var(--ink)]"
           >
             Menu
           </button>
@@ -696,45 +669,38 @@ export const AppleHUD: React.FC = () => {
 
       {/* DYNAMIC ISLAND TOAST NOTIFICATION */}
       {lastToast && (
-        <div className="pointer-events-none fixed top-16 left-1/2 z-40 w-[calc(100%-32px)] max-w-lg -translate-x-1/2">
-          <div className="apple-glass-heavy pointer-events-auto flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-[var(--ink)] shadow-lg">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="shrink-0 text-lg">{lastToast.emoji}</span>
-              <span className="text-xs font-bold leading-snug text-[var(--ink)] sm:text-[13px]">
-                {lastToast.text}
-              </span>
-            </div>
+        <div className="pointer-events-none fixed top-14 left-1/2 z-40 w-fit max-w-[calc(100%-32px)] -translate-x-1/2">
+          <div className="apple-glass-heavy pointer-events-auto flex items-center gap-2.5 rounded-full px-4 py-2 text-[var(--ink)] shadow-lg">
+            <span className="shrink-0 text-sm">{lastToast.emoji}</span>
+            <span className="truncate text-xs font-semibold text-[var(--ink)]">
+              {lastToast.text}
+            </span>
             <button
               onClick={dismissToast}
-              className="btn-press grid size-6 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+              className="btn-press grid size-5 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
             >
-              <X className="size-3.5" />
+              <X className="size-3" />
             </button>
           </div>
         </div>
       )}
 
-      {/* SUB-HEADER: COMPACT LEFT RAIL FOR MILESTONE & LIVE ACTION QUEUE (NEVER OVERLAPS CENTER ROOM) */}
+      {/* SUB-HEADER: COMPACT LEFT RAIL FOR MILESTONE & LIVE ACTION QUEUE */}
       {view === 'live' && (
-        <div className="pointer-events-none fixed top-16 left-3 z-20 flex w-72 flex-col items-stretch gap-2 sm:left-5 sm:w-80">
+        <div className="pointer-events-none fixed top-15 left-3 z-20 flex w-68 flex-col items-start gap-2 sm:left-5 sm:w-72">
           {currentGoal && (
             <button
               onClick={() => setActiveModal('sim', 'wishes')}
-              className="apple-glass-heavy btn-press pointer-events-auto flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[var(--ink)]"
-              title={currentGoal.desc}
+              className="apple-pill btn-press pointer-events-auto flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-left text-xs text-[var(--ink)]"
+              title={`${currentGoal.title} — ${currentGoal.desc}`}
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-[#007AFF]/15 text-base">
-                {currentGoal.emoji}
+              <span className="shrink-0 text-sm">{currentGoal.emoji}</span>
+              <span className="truncate font-semibold text-[var(--ink)]">
+                {currentGoal.title}
               </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#007AFF]">
-                  <span>Next Milestone</span>
-                  <span>· +{formatCurrency(currentGoal.rewardCash)}</span>
-                </div>
-                <div className="mt-0.5 text-xs font-extrabold leading-snug text-[var(--ink)]">
-                  {currentGoal.title}
-                </div>
-              </div>
+              <span className="shrink-0 font-mono text-[10.5px] font-bold text-[#007AFF]">
+                +{formatCurrency(currentGoal.rewardCash)}
+              </span>
             </button>
           )}
 
@@ -971,110 +937,20 @@ export const AppleHUD: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      {/* Custom SVG Work Environment Illustration Banner */}
-                      <div className="mt-2.5 overflow-hidden rounded-2xl border border-black/10 bg-slate-900/90 text-white shadow-inner dark:border-white/10">
-                        <div className="relative h-12 w-full overflow-hidden">
-                          {shiftMode === 'office' && (
-                            <svg viewBox="0 0 360 56" className="h-full w-full">
-                              <defs>
-                                <linearGradient id="officeGrad" x1="0" y1="0" x2="1" y2="1">
-                                  <stop offset="0%" stopColor="#0f172a" />
-                                  <stop offset="50%" stopColor="#1e3a8a" />
-                                  <stop offset="100%" stopColor="#0284c7" />
-                                </linearGradient>
-                              </defs>
-                              <rect width="360" height="56" fill="url(#officeGrad)" />
-                              {/* Glass Campus Curtain Wall Grid */}
-                              <g stroke="#38bdf8" strokeOpacity="0.22" strokeWidth="1">
-                                <line x1="40" y1="0" x2="40" y2="56" />
-                                <line x1="90" y1="0" x2="90" y2="56" />
-                                <line x1="140" y1="0" x2="140" y2="56" />
-                                <line x1="190" y1="0" x2="190" y2="56" />
-                                <line x1="0" y1="28" x2="220" y2="28" />
-                              </g>
-                              {/* Dual Studio Monitors & War Room Desk */}
-                              <rect x="18" y="14" width="32" height="20" rx="3" fill="#0284c7" stroke="#7dd3fc" strokeWidth="1.2" />
-                              <rect x="22" y="18" width="18" height="3" rx="1" fill="#bae6fd" />
-                              <rect x="22" y="23" width="24" height="3" rx="1" fill="#34d399" />
-                              <rect x="54" y="16" width="28" height="18" rx="3" fill="#1e293b" stroke="#60a5fa" strokeWidth="1.2" />
-                              <rect x="58" y="20" width="16" height="3" rx="1" fill="#a78bfa" />
-                              <rect x="12" y="38" width="84" height="4" rx="2" fill="#475569" />
-                              {/* Micro-Kitchen Espresso Badge */}
-                              <circle cx="114" cy="26" r="10" fill="#10b981" fillOpacity="0.25" stroke="#34d399" strokeWidth="1" />
-                              <text x="114" y="30" textAnchor="middle" fontSize="11">🏢</text>
-                            </svg>
-                          )}
-
-                          {shiftMode === 'wfh' && (
-                            <svg viewBox="0 0 360 56" className="h-full w-full">
-                              <defs>
-                                <linearGradient id="wfhGrad" x1="0" y1="0" x2="1" y2="1">
-                                  <stop offset="0%" stopColor="#1e1b4b" />
-                                  <stop offset="55%" stopColor="#312e81" />
-                                  <stop offset="100%" stopColor="#047857" />
-                                </linearGradient>
-                              </defs>
-                              <rect width="360" height="56" fill="url(#wfhGrad)" />
-                              {/* Apartment Window + Warm Lamp */}
-                              <rect x="16" y="8" width="38" height="34" rx="4" fill="#0f172a" stroke="#818cf8" strokeWidth="1.2" />
-                              <circle cx="28" cy="18" r="4" fill="#fde047" opacity="0.85" />
-                              {/* Standing Desk + Ultrawide + Pour-over Coffee */}
-                              <rect x="64" y="14" width="36" height="20" rx="3" fill="#1e293b" stroke="#34d399" strokeWidth="1.2" />
-                              <rect x="68" y="19" width="22" height="3" rx="1" fill="#6ee7b7" />
-                              <rect x="68" y="24" width="16" height="3" rx="1" fill="#93c5fd" />
-                              <rect x="58" y="37" width="52" height="4" rx="2" fill="#a16207" />
-                              <circle cx="124" cy="26" r="10" fill="#818cf8" fillOpacity="0.25" stroke="#a5b4fc" strokeWidth="1" />
-                              <text x="124" y="30" textAnchor="middle" fontSize="11">🏠</text>
-                            </svg>
-                          )}
-
-                          {shiftMode === 'wfa' && (
-                            <svg viewBox="0 0 360 56" className="h-full w-full">
-                              <defs>
-                                <linearGradient id="wfaGrad" x1="0" y1="0" x2="1" y2="1">
-                                  <stop offset="0%" stopColor="#064e3b" />
-                                  <stop offset="50%" stopColor="#0f766e" />
-                                  <stop offset="100%" stopColor="#0369a1" />
-                                </linearGradient>
-                              </defs>
-                              <rect width="360" height="56" fill="url(#wfaGrad)" />
-                              {/* Bay Area Cafe / Park Trees & Laptop + Wi-Fi Waves */}
-                              <circle cx="26" cy="24" r="12" fill="#10b981" opacity="0.45" />
-                              <circle cx="42" cy="20" r="14" fill="#34d399" opacity="0.35" />
-                              <path d="M 66,34 L 94,34 L 90,18 L 70,18 Z" fill="#0f172a" stroke="#5eead4" strokeWidth="1.2" />
-                              <rect x="62" y="34" width="36" height="3.5" rx="1.5" fill="#cbd5e1" />
-                              {/* Wi-Fi Signal Arcs */}
-                              <path d="M 108,28 Q 114,22 120,28" fill="none" stroke="#fde047" strokeWidth="1.5" strokeLinecap="round" />
-                              <path d="M 105,24 Q 114,15 123,24" fill="none" stroke="#fde047" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
-                              <circle cx="114" cy="31" r="1.8" fill="#fde047" />
-                            </svg>
-                          )}
-
-                          {/* Overlay Mode Status & Lock Pill */}
-                          <div className="inset-0 absolute flex items-center justify-between gap-2 px-3 py-1">
-                            <div className="ml-auto flex flex-col items-end text-right">
-                              <div className="flex flex-wrap items-center justify-end gap-1">
-                                <span className="rounded-full bg-black/55 px-2 py-0.5 text-[9.5px] font-extrabold text-amber-300 ring-1 ring-amber-400/40 backdrop-blur-xs">
-                                  🔒 On the Clock (Travel Locked)
-                                </span>
-                                <span className="rounded-full bg-white/20 px-2 py-0.5 font-mono text-[9.5px] font-extrabold text-white backdrop-blur-xs">
-                                  {shiftMode === 'office'
-                                    ? `Office: ${job.officeDaysThisWeek || 1}/3 req`
-                                    : shiftMode === 'wfh'
-                                    ? `WFH: ${job.wfhDaysThisWeek || 1}/2 wk`
-                                    : `${job.wfaDaysRemaining ?? 3}/4 WFA left`}
-                                </span>
-                              </div>
-                              <div className="mt-0.5 text-[10px] font-extrabold text-white drop-shadow-xs">
-                                {shiftMode === 'office'
-                                  ? '🏢 In-Office Badge-In · +20% Promo Velocity'
-                                  : shiftMode === 'wfh'
-                                  ? `🏠 Remote WFH · Hybrid Policy (${job.wfhDaysThisWeek || 1}/2 wk)`
-                                  : `🌍 WFA Pass at ${currentPlaceName}`}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                      {/* Sleek Mode Status Pill Strip */}
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 rounded-xl bg-[var(--mist)] px-2.5 py-1.5 text-[10px] font-semibold text-[var(--ink-soft)]">
+                        <span className="font-bold text-[var(--ink)]">
+                          {shiftMode === 'office'
+                            ? '🏢 In-Office · +20% Promo'
+                            : shiftMode === 'wfh'
+                            ? `🏠 Remote WFH (${job.wfhDaysThisWeek || 1}/2 wk)`
+                            : `🌍 WFA Pass · ${currentPlaceName}`}
+                        </span>
+                        <span className="font-mono text-[9.5px] font-bold text-[#007AFF]">
+                          {shiftMode === 'office'
+                            ? `Office ${job.officeDaysThisWeek || 1}/3`
+                            : `${job.wfaDaysRemaining ?? 3} WFA left`}
+                        </span>
                       </div>
 
                       {/* Dual Compact Progress Bars: Shift & Multi-Gate Promo Packet */}

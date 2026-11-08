@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ACTIONS,
   CAREER_BY_ID,
   FURNITURE_CATALOG,
   HOMES,
+  HOME_BY_ID,
+  LOCATION_BY_ID,
+  calculateCommuteDetails,
 } from '../data/worldData';
 import {
   formatCurrency,
@@ -31,9 +34,13 @@ import {
   HardDrive,
   Monitor,
   ShieldCheck,
+  Home,
+  Building2,
+  Key,
+  Navigation,
 } from 'lucide-react';
 
-type DesktopAppTab = 'ide' | 'ai_lab' | 'bounties' | 'hardware';
+type DesktopAppTab = 'ide' | 'ai_lab' | 'bounties' | 'bluefin' | 'hardware';
 
 interface HardwareSpec {
   chip: string;
@@ -283,6 +290,9 @@ export const HomeComputerModal: React.FC = () => {
   const workShift = useGameStore((s) => s.workShift);
   const startup = useGameStore((s) => s.startup);
   const stats = useGameStore((s) => s.stats);
+  const ownedHomes = useGameStore((s) => s.ownedHomes);
+  const ownedCars = useGameStore((s) => s.ownedCars);
+  const computerTab = useGameStore((s) => s.computerTab);
 
   const setActiveModal = useGameStore((s) => s.setActiveModal);
   const enqueueAction = useGameStore((s) => s.enqueueAction);
@@ -292,6 +302,8 @@ export const HomeComputerModal: React.FC = () => {
   const buyFurniture = useGameStore((s) => s.buyFurniture);
   const pitchStartupVC = useGameStore((s) => s.pitchStartupVC);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
+  const moveHome = useGameStore((s) => s.moveHome);
+  const openBluefinMap = useGameStore((s) => s.openBluefinMap);
 
   const state = useGameStore.getState();
   const powered = isHomePowered(state);
@@ -305,8 +317,21 @@ export const HomeComputerModal: React.FC = () => {
     []
   );
 
-  const [activeTab, setActiveTab] = useState<DesktopAppTab>(
-    installedComputer ? 'ide' : 'hardware'
+  const [activeTab, setActiveTab] = useState<DesktopAppTab>(() => {
+    if (computerTab === 'bluefin') return 'bluefin';
+    return installedComputer ? computerTab || 'ide' : 'hardware';
+  });
+
+  useEffect(() => {
+    if (computerTab === 'bluefin') {
+      setActiveTab('bluefin');
+    } else if (computerTab && installedComputer) {
+      setActiveTab(computerTab);
+    }
+  }, [computerTab, installedComputer]);
+
+  const [selectedBluefinHomeId, setSelectedBluefinHomeId] = useState<string>(
+    () => HOMES.find((h) => h.id !== homeId)?.id || homeId
   );
 
   // IDE Interactive State
@@ -559,78 +584,495 @@ export const HomeComputerModal: React.FC = () => {
         </div>
 
         {/* =========================================================
-            DESKTOP NAVIGATION TABS (IF COMPUTER INSTALLED)
+            DESKTOP NAVIGATION TABS
         ========================================================= */}
-        {installedComputer && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 bg-[var(--mist)] px-5 py-2.5 dark:border-white/10">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                onClick={() => setActiveTab('ide')}
-                className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                  activeTab === 'ide'
-                    ? 'bg-[#007AFF] text-white shadow-xs'
-                    : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                }`}
-              >
-                <Terminal className="size-3.5" />
-                <span>💻 Cursor IDE & Terminal</span>
-              </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 bg-[var(--mist)] px-5 py-2.5 dark:border-white/10">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {installedComputer ? (
+              <>
+                <button
+                  onClick={() => setActiveTab('ide')}
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                    activeTab === 'ide'
+                      ? 'bg-[#007AFF] text-white shadow-xs'
+                      : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Terminal className="size-3.5" />
+                  <span>💻 Cursor IDE & Terminal</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('ai_lab')}
-                className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                  activeTab === 'ai_lab'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                }`}
-              >
-                <Cpu className="size-3.5" />
-                <span>🧠 Local AI & GPU Lab</span>
-              </button>
+                <button
+                  onClick={() => setActiveTab('ai_lab')}
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                    activeTab === 'ai_lab'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Cpu className="size-3.5" />
+                  <span>🧠 Local AI & GPU Lab</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('bounties')}
-                className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                  activeTab === 'bounties'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                }`}
-              >
-                <Rocket className="size-3.5" />
-                <span>🚀 Bounties & Startup</span>
-              </button>
+                <button
+                  onClick={() => setActiveTab('bounties')}
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                    activeTab === 'bounties'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Rocket className="size-3.5" />
+                  <span>🚀 Bounties & Startup</span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab('hardware')}
-                className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
-                  activeTab === 'hardware'
-                    ? 'bg-amber-500 text-white shadow-xs'
-                    : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-                }`}
-              >
-                <HardDrive className="size-3.5" />
-                <span>⚙️ WFH, Queue & Upgrade Rig</span>
-              </button>
-            </div>
+                <button
+                  onClick={() => setActiveTab('bluefin')}
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                    activeTab === 'bluefin'
+                      ? 'bg-[#0284C7] text-white shadow-xs'
+                      : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Home className="size-3.5" />
+                  <span>🐟 Bluefin Real Estate</span>
+                </button>
 
-            {currentSpec && (
-              <div className="hidden items-center gap-2 text-[11px] font-bold text-[var(--ink-soft)] lg:flex">
-                <span>⚡ {currentSpec.chip}</span>
-                <span>·</span>
-                <span className="font-mono text-[#007AFF] dark:text-[#5AC8FA]">
-                  {currentSpec.tokPerSec} tok/s
-                </span>
-              </div>
+                <button
+                  onClick={() => setActiveTab('hardware')}
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                    activeTab === 'hardware'
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <HardDrive className="size-3.5" />
+                  <span>⚙️ WFH, Queue & Upgrade Rig</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setActiveTab('hardware')}
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                    activeTab !== 'bluefin'
+                      ? 'bg-[#007AFF] text-white shadow-xs'
+                      : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <HardDrive className="size-3.5" />
+                  <span>🖥️ Hardware Showroom</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('bluefin')}
+                  className={`btn-press flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                    activeTab === 'bluefin'
+                      ? 'bg-[#0284C7] text-white shadow-xs'
+                      : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Home className="size-3.5" />
+                  <span>🐟 Bluefin Real Estate</span>
+                </button>
+              </>
             )}
           </div>
-        )}
+
+          {currentSpec && (
+            <div className="hidden items-center gap-2 text-[11px] font-bold text-[var(--ink-soft)] lg:flex">
+              <span>⚡ {currentSpec.chip}</span>
+              <span>·</span>
+              <span className="font-mono text-[#007AFF] dark:text-[#5AC8FA]">
+                {currentSpec.tokPerSec} tok/s
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* =========================================================
             MAIN WORKSTATION BODY
         ========================================================= */}
         <div className="flex-1 overflow-y-auto p-5">
-          {/* CASE 1: NO HOME COMPUTER INSTALLED YET -> OPTIONAL PURCHASE SHOWROOM */}
-          {!installedComputer ? (
+          {/* BLUEFIN DESKTOP REAL ESTATE PORTAL (Accessible Anytime) */}
+          {activeTab === 'bluefin' ? (
+            (() => {
+              const selectedHome =
+                HOME_BY_ID[selectedBluefinHomeId] || HOMES.find((h) => h.id !== homeId) || homeDef;
+              const isCurrent = selectedHome.id === homeId;
+              const isOwned = ownedHomes.includes(selectedHome.id);
+              const canAffordRent = cash >= selectedHome.weeklyRent;
+              const canAffordBuy = cash >= selectedHome.buyPrice;
+              const hqLocId = career?.locationId || 'soma_yc_loft';
+              const hqVenue = LOCATION_BY_ID[hqLocId];
+              const modeForEst = ownedCars.length > 0 ? 'tesla' : 'waymo';
+              const sampleHubIds = Array.from(
+                new Set([hqLocId, 'soma_yc_loft', 'sand_hill_vc', 'mountain_view_plex'])
+              ).slice(0, 4);
+
+              return (
+                <div className="space-y-4">
+                  {/* Bluefin Web Header Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-[#0284C7]/35 bg-gradient-to-r from-[#0284C7]/15 via-sky-500/10 to-indigo-500/15 px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#0284C7] text-2xl text-white shadow-sm">
+                        🐟
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-black tracking-tight">
+                            Bluefin Bay Area Real Estate & Commute Analyzer
+                          </h3>
+                          <span className="rounded-full bg-[#0284C7]/20 px-2.5 py-0.5 text-[10px] font-extrabold text-[#0284C7] dark:text-sky-300">
+                            5 Verified Listings · T1 to T5
+                          </span>
+                        </div>
+                        <p className="text-xs text-[var(--ink-soft)]">
+                          Compare Bay Area neighborhoods, custom window views, passive XP & need-drain shields, and commute times before signing a lease or buying a deed.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => openBluefinMap(selectedHome.id)}
+                      className="btn-press flex items-center gap-1.5 rounded-2xl bg-[#0284C7] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-[#0369A1]"
+                    >
+                      <Navigation className="size-3.5" />
+                      <span>🗺️ Open Fullscreen Bluefin Map</span>
+                    </button>
+                  </div>
+
+                  {/* Main Split-Screen Redfin/Bluefin Layout */}
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+                    {/* Left 5 Cols: Interactive Bay Area Property Radar Map + 5 Listings List */}
+                    <div className="space-y-3 lg:col-span-5">
+                      {/* Mini Interactive Bay Area Property Radar SVG */}
+                      <div className="relative h-52 w-full overflow-hidden rounded-3xl border border-sky-400/35 bg-[#dbeafe] shadow-inner dark:bg-slate-900">
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+                          <rect width="100" height="100" fill="#bae6fd" className="dark:fill-slate-900" />
+                          {/* Peninsula & East Bay Landmasses */}
+                          <path
+                            d="M 10,14 L 50,12 L 56,46 L 64,64 L 86,74 L 94,100 L 8,100 L 8,48 Z"
+                            fill="#ecfdf5"
+                            className="dark:fill-slate-800"
+                            stroke="#10b981"
+                            strokeWidth="0.6"
+                          />
+                          <path
+                            d="M 64,0 L 100,0 L 100,82 L 88,68 L 74,40 L 62,14 Z"
+                            fill="#ecfdf5"
+                            className="dark:fill-slate-800"
+                            stroke="#10b981"
+                            strokeWidth="0.6"
+                          />
+                          {/* Golden Gate & Bay Bridge */}
+                          <line x1="24" y1="9" x2="24" y2="14.5" stroke="#ea580c" strokeWidth="1.6" />
+                          <line
+                            x1="50"
+                            y1="18"
+                            x2="70"
+                            y2="15"
+                            stroke="#94a3b8"
+                            strokeWidth="0.9"
+                            strokeDasharray="1.5,1"
+                          />
+                          {/* Commute Line from Selected Listing to HQ */}
+                          {hqVenue && (
+                            <line
+                              x1={selectedHome.mapCoords.x}
+                              y1={selectedHome.mapCoords.y}
+                              x2={hqVenue.mapCoords.x}
+                              y2={hqVenue.mapCoords.y}
+                              stroke="#0284c7"
+                              strokeWidth="1.2"
+                              strokeDasharray="2,1.5"
+                            />
+                          )}
+                        </svg>
+
+                        {/* HQ Pin on Radar */}
+                        {hqVenue && (
+                          <div
+                            style={{
+                              left: `${hqVenue.mapCoords.x}%`,
+                              top: `${hqVenue.mapCoords.y}%`,
+                              transform: 'translate(-50%, -50%)',
+                            }}
+                            className="pointer-events-none absolute z-10 rounded-full bg-indigo-600 px-2 py-0.5 text-[9px] font-black text-white shadow-sm ring-1 ring-white"
+                          >
+                            🏢 HQ: {hqVenue.shortName}
+                          </div>
+                        )}
+
+                        {/* All 5 Bluefin Residence Pins on Radar */}
+                        {HOMES.map((h) => {
+                          const active = h.id === selectedHome.id;
+                          const current = h.id === homeId;
+                          return (
+                            <button
+                              key={h.id}
+                              onClick={() => setSelectedBluefinHomeId(h.id)}
+                              style={{
+                                left: `${h.mapCoords.x}%`,
+                                top: `${h.mapCoords.y}%`,
+                                transform: 'translate(-50%, -50%)',
+                              }}
+                              className={`btn-press absolute flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${
+                                active
+                                  ? 'z-30 scale-110 bg-[#0284C7] text-white ring-2 ring-white'
+                                  : current
+                                  ? 'z-20 bg-emerald-600 text-white ring-1 ring-white'
+                                  : 'z-15 bg-white/95 text-slate-900 ring-1 ring-[#0284C7]/50 hover:scale-105 dark:bg-slate-900/95 dark:text-white'
+                              }`}
+                            >
+                              <span>{h.emoji}</span>
+                              <span>${(h.weeklyRent / 1000).toFixed(1)}k</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* 5 Clickable Listing Cards */}
+                      <div className="space-y-2">
+                        {HOMES.map((h) => {
+                          const active = h.id === selectedHome.id;
+                          const current = h.id === homeId;
+                          const owned = ownedHomes.includes(h.id);
+                          return (
+                            <button
+                              key={h.id}
+                              onClick={() => setSelectedBluefinHomeId(h.id)}
+                              className={`btn-press flex w-full items-center justify-between gap-2.5 rounded-2xl border p-3 text-left transition-all ${
+                                active
+                                  ? 'border-[#0284C7] bg-[#0284C7]/12 shadow-xs'
+                                  : 'border-black/8 bg-[var(--mist)] hover:border-[#0284C7]/40 dark:border-white/10'
+                              }`}
+                            >
+                              <div className="flex min-w-0 items-center gap-2.5">
+                                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/80 text-xl shadow-2xs dark:bg-white/10">
+                                  {h.emoji}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="truncate text-xs font-black">{h.name}</span>
+                                    {current && (
+                                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-black text-emerald-600 dark:text-emerald-400">
+                                        YOUR HOME
+                                      </span>
+                                    )}
+                                    {!current && owned && (
+                                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-black text-amber-700 dark:text-amber-300">
+                                        🔑 OWNED
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
+                                    {h.tierLabel} · {h.area} ({h.gridSize}×{h.gridSize} Grid)
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 text-right font-mono">
+                                <div className="text-xs font-black text-[#0284C7] dark:text-sky-400">
+                                  {formatCurrency(h.weeklyRent)}/wk
+                                </div>
+                                <div className="text-[9.5px] font-semibold text-[var(--ink-soft)]">
+                                  {formatCurrency(h.buyPrice)}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Right 7 Cols: Selected Property Dossier, Perks & Commute Comparison Matrix */}
+                    <div className="flex flex-col justify-between rounded-3xl border border-black/8 bg-[var(--mist)] p-5 lg:col-span-7 dark:border-white/10">
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/85 text-3xl shadow-xs dark:bg-white/10">
+                              {selectedHome.emoji}
+                            </span>
+                            <div>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="rounded-full bg-[#0284C7]/20 px-2.5 py-0.5 text-[10px] font-extrabold text-[#0284C7] dark:text-sky-300">
+                                  {selectedHome.tierLabel}
+                                </span>
+                                <span className="rounded-full bg-black/5 px-2.5 py-0.5 font-mono text-[10px] font-bold text-[var(--ink-soft)] dark:bg-white/10">
+                                  {selectedHome.gridSize}×{selectedHome.gridSize} Floor Grid
+                                </span>
+                                {isCurrent && (
+                                  <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black text-white">
+                                    🏠 Current Active Residence
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="mt-1 text-lg font-black">{selectedHome.name}</h3>
+                              <p className="text-xs font-semibold text-[var(--ink-soft)]">
+                                {selectedHome.area} · {selectedHome.district}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl bg-white/80 px-3.5 py-2 text-right font-mono dark:bg-black/35">
+                            <div className="text-[10px] font-bold uppercase text-[var(--ink-soft)]">
+                              Weekly Lease / Bluefin Est.
+                            </div>
+                            <div className="text-sm font-black text-[#0284C7] dark:text-sky-400">
+                              {formatCurrency(selectedHome.weeklyRent)}/wk
+                            </div>
+                            <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                              Deed: {formatCurrency(selectedHome.buyPrice)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-xs leading-relaxed text-[var(--ink-soft)]">
+                          {selectedHome.tagline}
+                        </p>
+
+                        {/*Passive Luxury Perks & Multipliers */}
+                        <div className="rounded-2xl border border-[#0284C7]/25 bg-white/75 p-3.5 dark:bg-black/30">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-[10px] font-extrabold tracking-wider text-[#0284C7] uppercase dark:text-sky-300">
+                              <Sparkles className="size-3.5" />
+                              <span>Bluefin Verified Luxury Perks & Passive Multipliers</span>
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-[var(--ink-soft)]">
+                              100% Furniture Preserved on Move
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            {selectedHome.perks.map((perk, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between rounded-xl bg-[var(--mist)] px-3 py-2 text-xs"
+                              >
+                                <span className="font-bold text-[var(--ink)]">
+                                  {perk.emoji} {perk.label}
+                                </span>
+                                <span className="rounded-md bg-[#0284C7]/15 px-2 py-0.5 font-mono text-[10px] font-extrabold text-[#0284C7] dark:text-sky-300">
+                                  {perk.desc}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Multi-Hub Commute Comparison Matrix */}
+                        <div className="rounded-2xl bg-white/75 p-3.5 dark:bg-black/30">
+                          <div className="mb-2 text-[10px] font-extrabold tracking-wider text-[var(--ink-soft)] uppercase">
+                            🚆 Commute Comparison from {selectedHome.shortName} vs. Current Home ({homeDef.shortName})
+                          </div>
+                          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                            {sampleHubIds.map((hubId) => {
+                              const hub = LOCATION_BY_ID[hubId];
+                              if (!hub) return null;
+                              const fromSelected = calculateCommuteDetails(
+                                selectedHome.id,
+                                hubId,
+                                selectedHome.id,
+                                modeForEst
+                              );
+                              const fromCurrent = calculateCommuteDetails(
+                                homeId,
+                                hubId,
+                                homeId,
+                                modeForEst
+                              );
+                              const diff =
+                                fromSelected.durationMinutes - fromCurrent.durationMinutes;
+                              const isHq = hubId === career?.locationId;
+
+                              return (
+                                <div
+                                  key={hubId}
+                                  className="flex items-center justify-between rounded-xl bg-[var(--mist)] px-3 py-2 text-xs"
+                                >
+                                  <div className="flex items-center gap-1.5 font-bold">
+                                    <span>{hub.emoji}</span>
+                                    <span className="truncate">{hub.shortName}</span>
+                                    {isHq && (
+                                      <span className="rounded bg-indigo-500/20 px-1.5 py-0.2 text-[8.5px] font-black text-indigo-700 dark:text-indigo-300">
+                                        HQ
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 font-mono text-[11px] font-extrabold">
+                                    <span className="text-[var(--ink-soft)]">
+                                      {fromSelected.miles}mi
+                                    </span>
+                                    <span className="text-[#0284C7] dark:text-sky-400">
+                                      {fromSelected.durationMinutes}m
+                                    </span>
+                                    {!isCurrent && diff !== 0 && (
+                                      <span
+                                        className={`rounded px-1 py-0.2 text-[9.5px] ${
+                                          diff < 0
+                                            ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                            : 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
+                                        }`}
+                                      >
+                                        {diff < 0 ? `${diff}m` : `+${diff}m`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Lease / Buy Deed / Inspect on Map CTA Row */}
+                      <div className="mt-4 grid grid-cols-1 gap-2.5 pt-2 sm:grid-cols-3">
+                        <button
+                          disabled={isCurrent || (!isOwned && !canAffordRent)}
+                          onClick={() => moveHome(selectedHome.id, false)}
+                          className="btn-press flex items-center justify-center gap-1.5 rounded-2xl bg-[#007AFF] px-3 py-2.5 text-xs font-extrabold text-white shadow-sm disabled:opacity-40"
+                        >
+                          <Building2 className="size-4" />
+                          <span>
+                            {isCurrent
+                              ? '🏠 Current Home'
+                              : isOwned
+                              ? '🔑 Move In ($0/wk)'
+                              : canAffordRent
+                              ? `Sign Lease (${formatCurrency(selectedHome.weeklyRent)}/wk)`
+                              : `Need ${formatCurrency(selectedHome.weeklyRent)}/wk`}
+                          </span>
+                        </button>
+
+                        <button
+                          disabled={isOwned || !canAffordBuy}
+                          onClick={() => moveHome(selectedHome.id, true)}
+                          className="btn-press flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 px-3 py-2.5 text-xs font-extrabold text-white shadow-sm disabled:opacity-40"
+                        >
+                          <Key className="size-4" />
+                          <span>
+                            {isOwned
+                              ? '✓ Deed Owned ($0 Rent)'
+                              : canAffordBuy
+                              ? `Buy Deed (${formatCurrency(selectedHome.buyPrice)})`
+                              : `Deed ${formatCurrency(selectedHome.buyPrice)}`}
+                          </span>
+                        </button>
+
+                        <button
+                          onClick={() => openBluefinMap(selectedHome.id)}
+                          className="btn-press flex items-center justify-center gap-1.5 rounded-2xl bg-[#0284C7] px-3 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-[#0369A1]"
+                        >
+                          <Navigation className="size-4" />
+                          <span>📍 Pin on Bay Map</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          ) : !installedComputer ? (
             <div className="mx-auto max-w-4xl space-y-5">
               <div className="rounded-3xl border border-[#007AFF]/30 bg-gradient-to-r from-[#007AFF]/15 via-indigo-500/10 to-purple-500/15 p-5">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">

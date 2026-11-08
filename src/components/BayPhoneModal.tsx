@@ -132,7 +132,12 @@ const SPARKLINE_SERIES: Record<'1D' | '1W' | '1M' | 'ALL', { points: string; gai
 
 export const BayPhoneModal: React.FC = () => {
   const rawPhoneApp = useGameStore((s) => s.phoneApp);
-  const phoneApp = rawPhoneApp === 'messages' ? 'blind' : rawPhoneApp;
+  const phoneApp =
+    rawPhoneApp === 'messages'
+      ? 'blind'
+      : rawPhoneApp === 'zillow'
+      ? 'bluefin'
+      : rawPhoneApp;
   const setActiveModal = useGameStore((s) => s.setActiveModal);
   const cash = useGameStore((s) => s.cash);
   const vestedRsu = useGameStore((s) => s.vestedRsu);
@@ -194,6 +199,7 @@ export const BayPhoneModal: React.FC = () => {
   const renameStartup = useGameStore((s) => s.renameStartup);
   const moveHome = useGameStore((s) => s.moveHome);
   const setView = useGameStore((s) => s.setView);
+  const openBluefinMap = useGameStore((s) => s.openBluefinMap);
   const interactWithNpc = useGameStore((s) => s.interactWithNpc);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
 
@@ -214,6 +220,7 @@ export const BayPhoneModal: React.FC = () => {
   const [phCooldown, setPhCooldown] = useState(0);
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [blindTab, setBlindTab] = useState<'dm' | 'feed'>('dm');
+  const [bluefinFilter, setBluefinFilter] = useState<'all' | 'starter' | 'luxury' | 'owned'>('all');
 
   useEffect(() => {
     if (tradeCooldown <= 0 && phCooldown <= 0) return;
@@ -268,10 +275,10 @@ export const BayPhoneModal: React.FC = () => {
       badge: pantryMeals <= 1 ? '!' : undefined,
     },
     {
-      id: 'zillow',
-      label: 'Zillow',
+      id: 'bluefin',
+      label: 'Bluefin',
       icon: <Home className="size-4" />,
-      gradient: 'from-[#5856D6] to-[#7C3AED]',
+      gradient: 'from-[#0284C7] to-[#2563EB]',
     },
     {
       id: 'blind',
@@ -421,7 +428,7 @@ export const BayPhoneModal: React.FC = () => {
               {phoneApp === 'wealth' && '💎 Schwaab Private Wealth'}
               {phoneApp === 'startup' && '🦄 YC Startup Studio'}
               {phoneApp === 'doordash' && '🛵 DoorDash Express'}
-              {phoneApp === 'zillow' && '🏡 Zillow Bay Area'}
+              {phoneApp === 'bluefin' && '🐟 Bluefin Real Estate'}
               {phoneApp === 'blind' && '💬 Blind & iMessage'}
             </span>
           </div>
@@ -1374,51 +1381,99 @@ export const BayPhoneModal: React.FC = () => {
           )}
 
           {/* =========================================================
-              5. ZILLOW BAY AREA REAL ESTATE BENTO
+              5. BLUEFIN BAY AREA REAL ESTATE & HOUSE-HUNTING (REDFIN STYLE)
           ========================================================= */}
-          {phoneApp === 'zillow' && (
+          {phoneApp === 'bluefin' && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-2xl border border-[#5856D6]/25 bg-[#5856D6]/10 px-3.5 py-2.5">
-                <div>
-                  <div className="text-xs font-extrabold text-[var(--ink)]">
-                    🏡 Bay Area Luxury Real Estate & Leases
+              {/* Bluefin Hero Banner */}
+              <div className="rounded-3xl border border-[#0284C7]/35 bg-gradient-to-br from-[#0284C7]/18 via-sky-500/10 to-indigo-500/15 p-3.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="inline-flex items-center gap-1 rounded-full bg-[#0284C7] px-2 py-0.5 text-[9px] font-black tracking-wider text-white uppercase">
+                      <span>🐟 Bluefin Premier · Bay Area MLS</span>
+                    </div>
+                    <div className="mt-1 text-xs font-extrabold text-[var(--ink)]">
+                      Tour & Lease 5 Bay Area Residences
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-medium text-[var(--ink-soft)]">
+                      Residences only appear on the Bay Area Map when house hunting via Bluefin.
+                    </div>
                   </div>
-                  <div className="text-[10px] font-medium text-[var(--ink-soft)]">
-                    Higher tiers unlock custom window views, passive XP & need-drain shields, and keeps your upgraded furniture!
+                  <div className="flex flex-col items-end gap-1">
+                    <button
+                      onClick={() => openBluefinMap(homeId)}
+                      className="btn-press shrink-0 rounded-xl bg-[#0284C7] px-2.5 py-1.5 text-[10px] font-extrabold text-white shadow-xs hover:bg-[#0369A1]"
+                    >
+                      🗺️ House Hunt Map
+                    </button>
+                    <button
+                      onClick={() => setActiveModal('computer', 'bluefin')}
+                      className="btn-press shrink-0 rounded-lg bg-white/80 px-2 py-0.5 text-[9.5px] font-extrabold text-[#0284C7] dark:bg-black/40 dark:text-sky-300"
+                    >
+                      🖥️ Open on PC
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setActiveModal(null);
-                    setView('map');
-                  }}
-                  className="btn-press shrink-0 rounded-xl bg-[#5856D6] px-2.5 py-1.5 text-[10px] font-extrabold text-white shadow-xs"
-                >
-                  🗺️ View on Map
-                </button>
+
+                {/* Bluefin Filter Pills */}
+                <div className="mt-2.5 grid grid-cols-4 gap-1 rounded-2xl bg-white/70 p-1 dark:bg-black/35">
+                  {(
+                    [
+                      { id: 'all', label: `All (${HOMES.length})` },
+                      { id: 'starter', label: 'T1–T2' },
+                      { id: 'luxury', label: 'Luxury T3+' },
+                      { id: 'owned', label: `Owned (${ownedHomes.length})` },
+                    ] as const
+                  ).map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setBluefinFilter(f.id)}
+                      className={`rounded-xl py-1 text-[10px] font-extrabold transition-all ${
+                        bluefinFilter === f.id
+                          ? 'bg-[#0284C7] text-white shadow-xs'
+                          : 'text-[var(--ink-soft)]'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {HOMES.map((h) => {
+              {HOMES.filter((h) => {
+                if (bluefinFilter === 'starter') return h.tier <= 2;
+                if (bluefinFilter === 'luxury') return h.tier >= 3;
+                if (bluefinFilter === 'owned') return ownedHomes.includes(h.id) || h.id === homeId;
+                return true;
+              }).map((h) => {
                 const isCurrent = homeId === h.id;
                 const isOwned = ownedHomes.includes(h.id);
                 const canAffordRent = cash >= h.weeklyRent;
                 const canAffordBuy = cash >= h.buyPrice;
                 const hqId = currentCareer?.locationId || 'soma_yc_loft';
                 const hqVenue = LOCATION_BY_ID[hqId];
+                const modeForEst = ownedCars.length > 0 ? 'tesla' : 'waymo';
                 const hqCommute = calculateCommuteDetails(
                   h.id,
                   hqId,
                   h.id,
-                  ownedCars.length > 0 ? 'tesla' : 'waymo'
+                  modeForEst
                 );
+                const currentHqCommute = calculateCommuteDetails(
+                  homeId,
+                  hqId,
+                  homeId,
+                  modeForEst
+                );
+                const commuteDelta = hqCommute.durationMinutes - currentHqCommute.durationMinutes;
 
                 return (
                   <div
                     key={h.id}
-                    className={`rounded-3xl p-3.5 border transition-all ${
+                    className={`rounded-3xl border p-3.5 transition-all ${
                       isCurrent
-                        ? 'bg-[#5856D6]/12 border-[#5856D6]/50 ring-1 ring-[#5856D6]/30'
-                        : 'bg-[var(--mist)] border-black/5 dark:border-white/5'
+                        ? 'border-[#0284C7]/60 bg-[#0284C7]/12 ring-1 ring-[#0284C7]/30'
+                        : 'border-black/5 bg-[var(--mist)] dark:border-white/5'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -1453,15 +1508,24 @@ export const BayPhoneModal: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      {isCurrent ? (
-                        <span className="shrink-0 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
-                          🏠 Active Lease
-                        </span>
-                      ) : isOwned ? (
-                        <span className="shrink-0 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-black text-amber-700 dark:text-amber-300">
-                          🔑 Deed Owned
-                        </span>
-                      ) : null}
+                      <div className="text-right">
+                        {isCurrent ? (
+                          <span className="inline-block rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                            🏠 Your Home
+                          </span>
+                        ) : isOwned ? (
+                          <span className="inline-block rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-black text-amber-700 dark:text-amber-300">
+                            🔑 Deed Owned
+                          </span>
+                        ) : (
+                          <div className="font-mono text-xs font-black text-[#0284C7] dark:text-sky-400">
+                            {formatCurrency(h.weeklyRent)}/wk
+                          </div>
+                        )}
+                        <div className="mt-0.5 font-mono text-[9.5px] font-bold text-[var(--ink-soft)]">
+                          Bluefin Est: {formatCurrency(h.buyPrice)}
+                        </div>
+                      </div>
                     </div>
 
                     <p className="mt-2 text-[11px] leading-snug text-[var(--ink-soft)]">
@@ -1477,45 +1541,62 @@ export const BayPhoneModal: React.FC = () => {
                         >
                           <span>{perk.emoji}</span>
                           <span>{perk.label}:</span>
-                          <span className="font-extrabold text-[#5856D6] dark:text-indigo-300">
+                          <span className="font-extrabold text-[#0284C7] dark:text-sky-300">
                             {perk.desc}
                           </span>
                         </span>
                       ))}
                       {hqVenue && (
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-indigo-500/12 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:text-indigo-300">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-sky-500/12 px-2 py-0.5 text-[10px] font-extrabold text-[#0284C7] dark:text-sky-300">
                           <span>🚆 To {hqVenue.shortName}:</span>
                           <span>
                             {hqCommute.miles} mi · {hqCommute.durationMinutes}m
                           </span>
+                          {!isCurrent && commuteDelta !== 0 && (
+                            <span
+                              className={
+                                commuteDelta < 0
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-rose-500'
+                              }
+                            >
+                              ({commuteDelta < 0 ? `${commuteDelta}m` : `+${commuteDelta}m`})
+                            </span>
+                          )}
                         </span>
                       )}
                     </div>
 
-                    <div className="mt-2.5 grid grid-cols-2 gap-2">
+                    <div className="mt-2.5 grid grid-cols-3 gap-1.5">
                       <button
                         disabled={isCurrent || (!isOwned && !canAffordRent)}
                         onClick={() => moveHome(h.id, false)}
-                        className="btn-press rounded-xl bg-[#007AFF] px-2 py-2 text-[11px] font-extrabold text-white disabled:opacity-40"
+                        className="btn-press rounded-xl bg-[#007AFF] px-2 py-2 text-[10.5px] font-extrabold text-white disabled:opacity-40"
                       >
                         {isCurrent
-                          ? '🏠 Current Residence'
+                          ? '🏠 Current'
                           : isOwned
-                          ? '🔑 Move In ($0/wk)'
+                          ? '🔑 Move In'
                           : canAffordRent
-                          ? `Lease ${formatCurrency(h.weeklyRent)}/wk`
-                          : `Need ${formatCurrency(h.weeklyRent)}/wk`}
+                          ? `Lease ${formatCurrency(h.weeklyRent)}`
+                          : `Need ${formatCurrency(h.weeklyRent)}`}
                       </button>
                       <button
                         disabled={isOwned || !canAffordBuy}
                         onClick={() => moveHome(h.id, true)}
-                        className="btn-press rounded-xl bg-emerald-600 px-2 py-2 text-[11px] font-extrabold text-white disabled:opacity-40"
+                        className="btn-press rounded-xl bg-emerald-600 px-2 py-2 text-[10.5px] font-extrabold text-white disabled:opacity-40"
                       >
                         {isOwned
-                          ? '✓ Deed Owned ($0 Rent)'
+                          ? '✓ Owned'
                           : canAffordBuy
-                          ? `Buy Deed ${formatCurrency(h.buyPrice)}`
+                          ? `Buy ${formatCurrency(h.buyPrice)}`
                           : `Deed ${formatCurrency(h.buyPrice)}`}
+                      </button>
+                      <button
+                        onClick={() => openBluefinMap(h.id)}
+                        className="btn-press rounded-xl bg-[#0284C7]/15 px-2 py-2 text-[10.5px] font-extrabold text-[#0284C7] hover:bg-[#0284C7]/25 dark:text-sky-300"
+                      >
+                        📍 Pin on Map
                       </button>
                     </div>
                   </div>

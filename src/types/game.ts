@@ -639,8 +639,11 @@ export interface GameState {
     | 'garage'
     | 'computer'
     | 'account';
-  phoneApp: 'messages' | 'levels' | 'wealth' | 'doordash' | 'startup' | 'zillow' | 'blind';
+  phoneApp: 'messages' | 'levels' | 'wealth' | 'doordash' | 'startup' | 'bluefin' | 'zillow' | 'blind';
   simTab: 'needs' | 'skills' | 'relationships' | 'wishes' | 'perks' | 'backpack';
+  computerTab?: 'ide' | 'ai_lab' | 'bounties' | 'bluefin' | 'hardware';
+  mapHouseHuntMode?: boolean;
+  bluefinSelectedHomeId?: string | null;
 
   sim: SimProfile;
   needs: NeedsState;
@@ -724,7 +727,15 @@ export interface GoogleUserProfile {
 
 export type SerializableGameState = Omit<
   GameState,
-  'screen' | 'view' | 'activeModal' | 'phoneApp' | 'simTab' | 'lastToast'
+  | 'screen'
+  | 'view'
+  | 'activeModal'
+  | 'phoneApp'
+  | 'simTab'
+  | 'computerTab'
+  | 'mapHouseHuntMode'
+  | 'bluefinSelectedHomeId'
+  | 'lastToast'
 >;
 
 export interface SaveSlotSummary {
