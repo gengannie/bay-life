@@ -4,12 +4,14 @@ import {
   ACTIONS,
   ASPIRATIONS,
   BASE_NEEDS,
+  calculateCommuteDetails,
   CAREER_BY_ID,
   COMMUTE_MODES,
   DOORDASH_MENU,
   FURNITURE_BY_ID,
   GOALS,
   HOMES,
+  HOME_BY_ID,
   LOCATION_BY_ID,
   MOODLETS,
   NPCS,
@@ -17,6 +19,9 @@ import {
   RANDOM_EVENTS,
   REWARD_PERKS,
   WISH_TEMPLATES,
+  WORK_EXPLORATION_TASKS,
+  WORK_PROJECTS,
+  WORK_PROJECT_BY_ID,
   WORK_TONES,
 } from '../data/worldData';
 import {
@@ -28,6 +33,8 @@ import {
   SimProfile,
   SkillKey,
   WeatherKind,
+  WeekdayAttendance,
+  WorkMode,
   WorkToneId,
 } from '../types/game';
 import { sfx } from '../utils/sound';
@@ -103,11 +110,75 @@ export function calculateOverallMood(state: GameState): {
 }
 
 export function hasHomeBackupPower(state: GameState): boolean {
-  return state.objects.some((o) => FURNITURE_BY_ID[o.objectId]?.powerBackup);
+  const homeDef = HOME_BY_ID[state.homeId];
+  return Boolean(
+    homeDef?.bonuses?.builtInPowerBackup ||
+      state.objects.some((o) => FURNITURE_BY_ID[o.objectId]?.powerBackup)
+  );
 }
 
 export function isHomePowered(state: GameState): boolean {
   return state.pgePowerOn || hasHomeBackupPower(state);
+}
+
+function getNextCareerProject(
+  careerId: string,
+  currentProjId?: string,
+  completedIds: string[] = []
+): string {
+  const careerProjs = WORK_PROJECTS.filter((p) => p.careerId === careerId);
+  const uncompletedCareer = careerProjs.find(
+    (p) => p.id !== currentProjId && !completedIds.includes(p.id)
+  );
+  if (uncompletedCareer) return uncompletedCareer.id;
+  const anyUncompleted = WORK_PROJECTS.find(
+    (p) => p.id !== currentProjId && !completedIds.includes(p.id)
+  );
+  if (anyUncompleted) return anyUncompleted.id;
+  const fallbackCareer = careerProjs.find((p) => p.id !== currentProjId);
+  if (fallbackCareer) return fallbackCareer.id;
+  return WORK_PROJECTS[0].id;
+}
+
+function logShiftAttendance(
+  job: NonNullable<GameState['job']>,
+  mode: WorkMode,
+  timeMinutes: number
+): NonNullable<GameState['job']> {
+  const today = getDayNumber(timeMinutes);
+  const dayIdx = Math.floor(timeMinutes / 1440) % 7; // 0=Mon..4=Fri
+  if (job.lastWorkDayLogged === today) {
+    return job;
+  }
+  const weekly: WeekdayAttendance[] = [
+    ...(job.weeklyAttendance || ['none', 'none', 'none', 'none', 'none']),
+  ];
+  while (weekly.length < 5) weekly.push('none');
+  if (dayIdx >= 0 && dayIdx < 5) {
+    weekly[dayIdx] = mode;
+  }
+
+  let officeDaysThisWeek = job.officeDaysThisWeek || 0;
+  let wfhDaysThisWeek = job.wfhDaysThisWeek || 0;
+  let wfaDaysRemaining = job.wfaDaysRemaining ?? 4;
+
+  if (mode === 'office') {
+    officeDaysThisWeek += 1;
+  } else if (mode === 'wfh') {
+    wfhDaysThisWeek += 1;
+  } else if (mode === 'wfa') {
+    wfaDaysRemaining = Math.max(0, wfaDaysRemaining - 1);
+  }
+
+  return {
+    ...job,
+    officeDaysThisWeek,
+    wfhDaysThisWeek,
+    wfaDaysRemaining,
+    weeklyAttendance: weekly,
+    lastWorkDayLogged: today,
+    rtoCompliant: officeDaysThisWeek >= 3 ? true : job.rtoCompliant,
+  };
 }
 
 function getRelStatus(score: number): RelationshipStatus {
@@ -229,8 +300,19 @@ function createFreshState(profile: SimProfile, chosenHomeId?: string): GameState
     job: {
       careerId: 'bigtech_swe',
       levelIndex: 0,
-      performance: 35,
+      performance: 22,
       shiftsCompleted: 0,
+      shiftsAtLevel: 0,
+      deliverablesCompleted: 0,
+      activeProjectId: WORK_PROJECTS[0].id,
+      projectProgress: 15,
+      completedProjects: [],
+      officeDaysThisWeek: 0,
+      wfhDaysThisWeek: 0,
+      wfaDaysRemaining: 4,
+      weeklyAttendance: ['none', 'none', 'none', 'none', 'none'],
+      lastWorkDayLogged: 0,
+      rtoCompliant: true,
       autoWork: false,
       preferredCommute: profile.origin === 'nepo' ? 'tesla' : 'gbus',
     },
@@ -249,7 +331,12 @@ function createFreshState(profile: SimProfile, chosenHomeId?: string): GameState
     },
 
     relationships: buildInitialRelationships(),
-    moodlets: [{ id: 'philz_buzz', expiresAt: startTime + 240 }],
+    moodlets: [
+      { id: 'philz_buzz', expiresAt: startTime + 240 },
+      ...(homeDef.bonuses?.ambientMoodletId
+        ? [{ id: homeDef.bonuses.ambientMoodletId, expiresAt: startTime + 1440 }]
+        : []),
+    ],
     wishes: WISH_TEMPLATES.slice(0, 3).map((w) => ({ ...w, progress: 0 })),
     activeEvent: null,
     notices: [initialNotice],
@@ -292,7 +379,11 @@ interface GameActions {
   cancelQueuedAction: (uid: string) => void;
   travelTo: (destId: string, mode: CommuteModeId) => void;
   skipTravelNow: () => void;
-  startWorkShift: () => void;
+  startWorkShift: (preferredMode?: WorkMode) => void;
+  commuteToOfficeAndWork: (mode?: CommuteModeId) => void;
+  selectWorkProject: (projectId: string) => void;
+  doWorkExploration: (taskId: string) => void;
+  submitPromoPacket: () => void;
   leaveWorkEarly: () => void;
   setWorkTone: (tone: WorkToneId) => void;
   toggleAutoWork: () => void;
@@ -520,11 +611,15 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        if (s.cash < modeDef.baseFare) {
+        const commuteEst = calculateCommuteDetails(s.locationId, destId, s.homeId, mode);
+        const actualFare = commuteEst.fare;
+        const actualDuration = commuteEst.durationMinutes;
+
+        if (s.cash < actualFare) {
           sfx.play('error');
           const notice = {
             id: uid(),
-            text: `Not enough cash for ${modeDef.name} (${formatCurrency(modeDef.baseFare)}). Take the free G-Bus!`,
+            text: `Not enough cash for ${modeDef.name} (${formatCurrency(actualFare)}). Take the free G-Bus!`,
             emoji: '🚌',
             tone: 'bad' as const,
             time: s.time,
@@ -535,7 +630,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         sfx.play('open');
         set({
-          cash: s.cash - modeDef.baseFare,
+          cash: s.cash - actualFare,
           queue: [],
           view: 'live',
           activeModal: null,
@@ -544,9 +639,9 @@ export const useGameStore = create<GameState & GameActions>()(
             to: destId,
             mode,
             startedAt: s.time,
-            arriveAt: s.time + modeDef.durationMinutes,
-            totalMinutes: modeDef.durationMinutes,
-            fare: modeDef.baseFare,
+            arriveAt: s.time + actualDuration,
+            totalMinutes: actualDuration,
+            fare: actualFare,
           },
         });
       },
@@ -600,6 +695,8 @@ export const useGameStore = create<GameState & GameActions>()(
           time: s.travel.arriveAt,
         };
 
+        const shouldStartShift = Boolean(s.travel.autoStartShiftOnArrival);
+
         sfx.play('tap');
         set({
           time: s.travel.arriveAt,
@@ -616,26 +713,70 @@ export const useGameStore = create<GameState & GameActions>()(
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
         });
+
+        if (shouldStartShift) {
+          get().startWorkShift('office');
+        }
       },
 
-      startWorkShift: () => {
+      startWorkShift: (preferredMode) => {
         const s = get();
         if (!s.job || s.workShift || s.travel) return;
         const career = CAREER_BY_ID[s.job.careerId];
         if (!career) return;
 
+        const resolvedMode: WorkMode =
+          preferredMode ||
+          (s.locationId === career.locationId
+            ? 'office'
+            : s.locationId === 'home'
+            ? 'wfh'
+            : 'wfa');
+
+        if (resolvedMode === 'wfh' && !isHomePowered(s)) {
+          sfx.play('error');
+          const outNotice = {
+            id: uid(),
+            text: 'PG&E Grid Outage at home! Commute to campus or work from a cafe with Wi-Fi.',
+            emoji: '🕯️',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [outNotice, ...s.notices.slice(0, 29)], lastToast: outNotice });
+          return;
+        }
+
+        const nextLocationId =
+          resolvedMode === 'office'
+            ? career.locationId
+            : resolvedMode === 'wfh'
+            ? 'home'
+            : s.locationId === 'home'
+            ? 'blue_bottle'
+            : s.locationId;
+
+        const updatedJob = logShiftAttendance(s.job, resolvedMode, s.time);
         const duration = (career.shiftEndHour - career.shiftStartHour) * 60;
         sfx.play('open');
+
+        const modeLabel =
+          resolvedMode === 'office'
+            ? `${career.company} Campus`
+            : resolvedMode === 'wfh'
+            ? 'Remote WFH Studio'
+            : `WFA (${LOCATION_BY_ID[nextLocationId]?.name || 'Third-Place Cafe'})`;
+
         const notice = {
           id: uid(),
-          text: `Badged into ${career.company} (${career.levels[s.job.levelIndex].code}). Let’s ship!`,
-          emoji: career.emoji,
+          text: `Badged into ${modeLabel} (${career.levels[s.job.levelIndex].code}). Let’s ship!`,
+          emoji: resolvedMode === 'office' ? career.emoji : resolvedMode === 'wfh' ? '🏠' : '☕',
           tone: 'info' as const,
           time: s.time,
         };
 
         set({
-          locationId: career.locationId,
+          locationId: nextLocationId,
+          job: updatedJob,
           queue: [],
           view: 'live',
           activeModal: null,
@@ -645,10 +786,272 @@ export const useGameStore = create<GameState & GameActions>()(
             totalMinutes: duration,
             elapsedMinutes: 0,
             tone: 'deepWork',
+            mode: resolvedMode,
+            workLocationId: nextLocationId,
           },
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
         });
+      },
+
+      commuteToOfficeAndWork: (mode) => {
+        const s = get();
+        if (!s.job || s.workShift || s.travel) return;
+        const career = CAREER_BY_ID[s.job.careerId];
+        if (!career) return;
+
+        if (s.locationId === career.locationId) {
+          get().startWorkShift('office');
+          return;
+        }
+
+        const chosenMode = mode || s.job.preferredCommute || 'gbus';
+        const modeDef = COMMUTE_MODES.find((m) => m.id === chosenMode) || COMMUTE_MODES[0];
+        const commuteMode: CommuteModeId =
+          modeDef.requiresCar && !s.ownedCars.includes('tesla') ? 'gbus' : chosenMode;
+        const commuteEst = calculateCommuteDetails(
+          s.locationId,
+          career.locationId,
+          s.homeId,
+          commuteMode
+        );
+        const actualFare = s.cash >= commuteEst.fare ? commuteEst.fare : 0;
+
+        sfx.play('open');
+        set({
+          cash: Math.max(0, s.cash - actualFare),
+          job: { ...s.job, preferredCommute: commuteMode },
+          queue: [],
+          view: 'live',
+          activeModal: null,
+          travel: {
+            from: s.locationId,
+            to: career.locationId,
+            mode: commuteMode,
+            startedAt: s.time,
+            arriveAt: s.time + commuteEst.durationMinutes,
+            totalMinutes: commuteEst.durationMinutes,
+            fare: actualFare,
+            autoStartShiftOnArrival: true,
+          },
+        });
+      },
+
+      selectWorkProject: (projectId) => {
+        const s = get();
+        if (!s.job) return;
+        const proj = WORK_PROJECT_BY_ID[projectId];
+        if (!proj) return;
+        sfx.play('tap');
+        const notice = {
+          id: uid(),
+          text: `Switched Technical Charter to ${proj.emoji} ${proj.title} (${proj.codeName}).`,
+          emoji: proj.emoji,
+          tone: 'info' as const,
+          time: s.time,
+        };
+        set({
+          job: {
+            ...s.job,
+            activeProjectId: proj.id,
+            projectProgress: s.job.activeProjectId === proj.id ? s.job.projectProgress : 0,
+          },
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      doWorkExploration: (taskId) => {
+        const s = get();
+        if (!s.job) return;
+        const task = WORK_EXPLORATION_TASKS.find((t) => t.id === taskId);
+        if (!task) return;
+        const career = CAREER_BY_ID[s.job.careerId];
+        if (!career) return;
+
+        if (task.requiresOffice && s.locationId !== career.locationId) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `${task.title} requires on-site campus lab access at ${career.company}!`,
+            emoji: '🏢',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
+        if (s.needs.energy < task.energyCost) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `Need ${task.energyCost}⚡ Energy to execute ${task.title}. Grab an espresso or rest!`,
+            emoji: '☕',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
+        const activeProjId =
+          s.job.activeProjectId || getNextCareerProject(career.id, undefined, s.job.completedProjects);
+        const proj = WORK_PROJECT_BY_ID[activeProjId] || WORK_PROJECTS[0];
+        const isCampusBonus = s.locationId === career.locationId ? 1.2 : 1.0;
+
+        const nextSkills = {
+          ...s.skills,
+          [task.skill]: clamp(s.skills[task.skill] + task.skillGain, 0, 10),
+        };
+        const nextNeeds = {
+          ...s.needs,
+          energy: clamp(s.needs.energy - task.energyCost, 0, 100),
+        };
+
+        let nextProgress = (s.job.projectProgress || 0) + Math.round(task.projectProgressGain * isCampusBonus);
+        let nextPerf = clamp(
+          s.job.performance + Math.round(task.performanceGain * isCampusBonus),
+          0,
+          100
+        );
+        let nextDeliverables = s.job.deliverablesCompleted || 0;
+        let nextCompleted = [...(s.job.completedProjects || [])];
+        let nextProjId = proj.id;
+        let cash = s.cash;
+        let unvestedRsu = s.unvestedRsu;
+        let karma = s.karma;
+        let notice;
+
+        if (nextProgress >= 100) {
+          nextDeliverables += 1;
+          if (!nextCompleted.includes(proj.id)) {
+            nextCompleted.push(proj.id);
+          }
+          cash += proj.rewardCash;
+          unvestedRsu += proj.rewardRsu;
+          karma += 10;
+          nextPerf = clamp(nextPerf + proj.promoPerfBoost, 0, 100);
+          nextProjId = getNextCareerProject(career.id, proj.id, nextCompleted);
+          nextProgress = 0;
+          sfx.play('levelup');
+          notice = {
+            id: uid(),
+            text: `SHIPPED CHARTER: ${proj.emoji} ${proj.title}! Awarded +${formatCurrency(proj.rewardCash)} Spot Bonus, +${formatCurrency(proj.rewardRsu)} RSU & +1 Promo Deliverable!`,
+            emoji: '🚀',
+            tone: 'good' as const,
+            time: s.time,
+          };
+        } else {
+          sfx.play('tap');
+          notice = {
+            id: uid(),
+            text: `${task.emoji} ${task.title}: Charter at ${nextProgress}% (+${task.performanceGain}% Calibration Perf)`,
+            emoji: task.emoji,
+            tone: 'info' as const,
+            time: s.time,
+          };
+        }
+
+        set({
+          cash,
+          unvestedRsu,
+          karma,
+          skills: nextSkills,
+          needs: nextNeeds,
+          job: {
+            ...s.job,
+            activeProjectId: nextProjId,
+            projectProgress: nextProgress,
+            performance: nextPerf,
+            deliverablesCompleted: nextDeliverables,
+            completedProjects: nextCompleted,
+          },
+          stats: {
+            ...s.stats,
+            earnedToday: s.stats.earnedToday + (cash - s.cash),
+            earnedTotal: s.stats.earnedTotal + (cash - s.cash),
+            commitsPushed: s.stats.commitsPushed + 1,
+          },
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      submitPromoPacket: () => {
+        const s = get();
+        if (!s.job) return;
+        const career = CAREER_BY_ID[s.job.careerId];
+        if (!career) return;
+        const nextLvl = career.levels[s.job.levelIndex + 1];
+        if (!nextLvl) return;
+
+        const shiftsAtLevel = s.job.shiftsAtLevel ?? s.job.shiftsCompleted ?? 0;
+        const reqShifts = nextLvl.minShiftsForPromo ?? 3;
+        const reqDeliverables = nextLvl.requiredDeliverables ?? 1;
+        const deliverablesDone = s.job.deliverablesCompleted ?? 0;
+        const primaryPass =
+          Math.floor(s.skills[nextLvl.requiredSkill.skill] ?? 0) >= nextLvl.requiredSkill.level;
+        const secondaryPass =
+          !nextLvl.secondarySkill ||
+          Math.floor(s.skills[nextLvl.secondarySkill.skill] ?? 0) >= nextLvl.secondarySkill.level;
+        const perfPass = Math.round(s.job.performance) >= 92;
+        const tenurePass = shiftsAtLevel >= reqShifts;
+        const delivPass = deliverablesDone >= reqDeliverables;
+        const rtoPass = s.job.rtoCompliant !== false;
+
+        if (perfPass && tenurePass && primaryPass && secondaryPass && delivPass && rtoPass) {
+          const spotBonus = Math.round(nextLvl.baseSalary * 0.06);
+          sfx.play('levelup');
+          const notice = {
+            id: uid(),
+            text: `PROMO COMMITTEE APPROVED! Promoted to ${nextLvl.code} ${nextLvl.title} at ${career.company} (${formatCurrency(nextLvl.baseSalary + nextLvl.rsuAnnual)}/yr TC + ${formatCurrency(spotBonus)} bonus)!`,
+            emoji: '👑',
+            tone: 'good' as const,
+            time: s.time,
+          };
+          set({
+            cash: s.cash + spotBonus,
+            karma: s.karma + 20,
+            job: {
+              ...s.job,
+              levelIndex: s.job.levelIndex + 1,
+              performance: 42,
+              shiftsAtLevel: 0,
+            },
+            stats: {
+              ...s.stats,
+              earnedToday: s.stats.earnedToday + spotBonus,
+              earnedTotal: s.stats.earnedTotal + spotBonus,
+            },
+            notices: [notice, ...s.notices.slice(0, 29)],
+            lastToast: notice,
+          });
+        } else {
+          sfx.play('error');
+          const missing: string[] = [];
+          if (!perfPass) missing.push(`92% Perf (at ${Math.round(s.job.performance)}%)`);
+          if (!tenurePass) missing.push(`${reqShifts} Shifts (at ${shiftsAtLevel})`);
+          if (!primaryPass)
+            missing.push(`${nextLvl.requiredSkill.skill} Lv.${nextLvl.requiredSkill.level}`);
+          if (!secondaryPass && nextLvl.secondarySkill)
+            missing.push(`${nextLvl.secondarySkill.skill} Lv.${nextLvl.secondarySkill.level}`);
+          if (!delivPass)
+            missing.push(`${reqDeliverables} Shipped Deliverables (at ${deliverablesDone})`);
+          if (!rtoPass) missing.push('3/3 Hybrid Office Days');
+
+          const notice = {
+            id: uid(),
+            text: `Promo Committee Feedback for ${nextLvl.code}: Complete remaining gates — ${missing.join(' · ')}.`,
+            emoji: '📋',
+            tone: 'info' as const,
+            time: s.time,
+          };
+          set({
+            notices: [notice, ...s.notices.slice(0, 29)],
+            lastToast: notice,
+          });
+        }
       },
 
       leaveWorkEarly: () => {
@@ -737,6 +1140,16 @@ export const useGameStore = create<GameState & GameActions>()(
             levelIndex: qualifiedIndex,
             performance: 40,
             shiftsCompleted: 0,
+            shiftsAtLevel: 0,
+            deliverablesCompleted: s.job?.deliverablesCompleted ?? 0,
+            activeProjectId: getNextCareerProject(careerId, undefined, s.job?.completedProjects),
+            projectProgress: 0,
+            completedProjects: s.job?.completedProjects ?? [],
+            officeDaysThisWeek: s.job?.officeDaysThisWeek ?? 0,
+            wfhDaysThisWeek: s.job?.wfhDaysThisWeek ?? 0,
+            wfaDaysRemaining: s.job?.wfaDaysRemaining ?? 4,
+            weeklyAttendance: s.job?.weeklyAttendance ?? ['none', 'none', 'none', 'none', 'none'],
+            rtoCompliant: true,
             autoWork: s.job?.autoWork ?? false,
             preferredCommute: s.job?.preferredCommute ?? 'gbus',
           },
@@ -932,10 +1345,58 @@ export const useGameStore = create<GameState & GameActions>()(
           y: o.y,
         }));
 
+        let carriedOverCount = 0;
+        for (const prevPlaced of s.objects) {
+          const prevDef = FURNITURE_BY_ID[prevPlaced.objectId];
+          if (!prevDef) continue;
+          // Check if the new home has an item in the same category with lower quality
+          const sameCatIdx = newObjects.findIndex((no) => {
+            const noDef = FURNITURE_BY_ID[no.objectId];
+            return noDef && noDef.category === prevDef.category && noDef.quality < prevDef.quality;
+          });
+          if (sameCatIdx !== -1) {
+            newObjects[sameCatIdx] = {
+              ...newObjects[sameCatIdx],
+              objectId: prevDef.id,
+            };
+            carriedOverCount++;
+          } else if (!newObjects.some((no) => no.objectId === prevDef.id)) {
+            // Find an open tile on the new home's grid for extra owned gear (fitness, power, decor, etc.)
+            let openTile: { x: number; y: number } | null = null;
+            outerCarry: for (let gy = 0; gy < homeDef.gridSize; gy++) {
+              for (let gx = 0; gx < homeDef.gridSize; gx++) {
+                if (!newObjects.some((no) => no.x === gx && no.y === gy)) {
+                  openTile = { x: gx, y: gy };
+                  break outerCarry;
+                }
+              }
+            }
+            if (openTile) {
+              newObjects.push({
+                uid: uid(),
+                objectId: prevDef.id,
+                x: openTile.x,
+                y: openTile.y,
+              });
+              carriedOverCount++;
+            }
+          }
+        }
+
+        // Swap home ambient moodlet to the new residence's signature aura
+        const allHomeMoodletIds = new Set(
+          HOMES.map((h) => h.bonuses.ambientMoodletId).filter(Boolean)
+        );
+        const updatedMoodlets = [
+          ...s.moodlets.filter((m) => !allHomeMoodletIds.has(m.id)),
+          { id: homeDef.bonuses.ambientMoodletId, expiresAt: s.time + 1440 },
+        ];
+
         sfx.play('levelup');
+        const perkSummary = homeDef.perks.map((p) => `${p.emoji} ${p.label}`).join(' · ');
         const notice = {
           id: uid(),
-          text: `${purchase ? 'Purchased deed to' : 'Moved into'} ${homeDef.name} in ${homeDef.area}!`,
+          text: `${purchase ? 'Purchased Deed to' : 'Moved into'} ${homeDef.name} (${homeDef.tierLabel})! Unlocked: ${perkSummary}${carriedOverCount > 0 ? ` · Moved ${carriedOverCount} custom gear!` : ''}`,
           emoji: homeDef.emoji,
           tone: 'good' as const,
           time: s.time,
@@ -945,10 +1406,12 @@ export const useGameStore = create<GameState & GameActions>()(
           cash: s.cash - cost,
           homeId: newHomeId,
           locationId: 'home',
+          view: 'live',
           ownedHomes: purchase
             ? Array.from(new Set([...s.ownedHomes, newHomeId]))
             : s.ownedHomes,
           objects: newObjects,
+          moodlets: updatedMoodlets,
           pos: { x: Math.floor(homeDef.gridSize / 2), y: Math.floor(homeDef.gridSize / 2) },
           targetPos: null,
           activeModal: null,
@@ -1586,18 +2049,35 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // 3. Passive Needs Decay
+        // 3. Passive Needs Decay & Home Ambient Luxury Aura
+        const currentHomeDef = HOME_BY_ID[s.homeId] || HOMES[1];
+        const homeDecayMult = currentHomeDef.bonuses?.needDecayMult ?? 1.0;
+        const homeAmbientId = currentHomeDef.bonuses?.ambientMoodletId;
+        if (homeAmbientId && MOODLETS[homeAmbientId]) {
+          const allHomeMoodletIds = new Set(
+            HOMES.map((h) => h.bonuses.ambientMoodletId).filter(Boolean)
+          );
+          moodlets = [
+            ...moodlets.filter((m) => !allHomeMoodletIds.has(m.id)),
+            { id: homeAmbientId, expiresAt: newTime + 1440 },
+          ];
+        }
+
         const hoursElapsed = dt / 60;
         const biohackerMult = s.sim.traits.includes('biohacker') ? 0.75 : 1.0;
         const caffeinePerk = s.unlockedPerks.includes('perk_caffeine_synth') ? 0.7 : 1.0;
         const zenPerk = s.unlockedPerks.includes('perk_zero_burnout') ? 0.65 : 1.0;
 
-        needs.hunger = clamp(needs.hunger - 3.2 * hoursElapsed);
-        needs.energy = clamp(needs.energy - 2.8 * hoursElapsed * biohackerMult * caffeinePerk);
-        needs.hygiene = clamp(needs.hygiene - 2.0 * hoursElapsed * biohackerMult);
-        needs.bladder = clamp(needs.bladder - 3.6 * hoursElapsed);
-        needs.fun = clamp(needs.fun - 2.5 * hoursElapsed * zenPerk);
-        needs.social = clamp(needs.social - 2.1 * hoursElapsed * zenPerk);
+        needs.hunger = clamp(needs.hunger - 3.2 * hoursElapsed * homeDecayMult);
+        needs.energy = clamp(
+          needs.energy - 2.8 * hoursElapsed * biohackerMult * caffeinePerk * homeDecayMult
+        );
+        needs.hygiene = clamp(
+          needs.hygiene - 2.0 * hoursElapsed * biohackerMult * homeDecayMult
+        );
+        needs.bladder = clamp(needs.bladder - 3.6 * hoursElapsed * homeDecayMult);
+        needs.fun = clamp(needs.fun - 2.5 * hoursElapsed * zenPerk * homeDecayMult);
+        needs.social = clamp(needs.social - 2.1 * hoursElapsed * zenPerk * homeDecayMult);
 
         // 4. Travel Progression
         if (travel) {
@@ -1626,6 +2106,28 @@ export const useGameStore = create<GameState & GameActions>()(
             wishes = wishes.map((w) =>
               w.kind === 'visit' && w.targetKey === dest ? { ...w, progress: w.targetValue } : w
             );
+
+            if (s.travel?.autoStartShiftOnArrival && job) {
+              const career = CAREER_BY_ID[job.careerId];
+              if (career) {
+                const duration = (career.shiftEndHour - career.shiftStartHour) * 60;
+                job = logShiftAttendance(job, 'office', newTime);
+                workShift = {
+                  startedAt: newTime,
+                  endsAt: newTime + duration,
+                  totalMinutes: duration,
+                  elapsedMinutes: 0,
+                  tone: 'deepWork',
+                  mode: 'office',
+                  workLocationId: career.locationId,
+                };
+                pushNotice(
+                  `Arrived & badged into ${career.company} Campus (${career.levels[job.levelIndex].code}). Let’s ship!`,
+                  career.emoji,
+                  'info'
+                );
+              }
+            }
           }
         }
 
@@ -1645,12 +2147,15 @@ export const useGameStore = create<GameState & GameActions>()(
           const duration = (career.shiftEndHour - career.shiftStartHour) * 60;
           locationId = career.locationId;
           queue = [];
+          job = logShiftAttendance(job, 'office', newTime);
           workShift = {
             startedAt: newTime,
             endsAt: newTime + duration,
             totalMinutes: duration,
             elapsedMinutes: 0,
             tone: 'deepWork',
+            mode: 'office',
+            workLocationId: career.locationId,
           };
           pushNotice(`Auto-commuted to ${career.company} for your shift!`, career.emoji, 'info');
         }
@@ -1667,6 +2172,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
           const perfGain = (dt / 60) * 3.8 * toneDef.perfMult * leetcodeMult * promoPerk;
           job.performance = clamp(job.performance + perfGain, 0, 100);
+          job.projectProgress = clamp((job.projectProgress || 0) + (dt / 60) * 4.5, 0, 100);
           needs.energy = clamp(needs.energy - (dt / 60) * 2.2 * toneDef.energyDrainMult);
           needs.social = clamp(needs.social + (dt / 60) * (toneDef.socialBonus * 0.25));
 
@@ -1689,6 +2195,7 @@ export const useGameStore = create<GameState & GameActions>()(
             cash += payCash;
             unvestedRsu += payRsu;
             job.shiftsCompleted += 1;
+            job.shiftsAtLevel = (job.shiftsAtLevel ?? 0) + 1;
             stats.earnedToday += payCash;
             stats.earnedTotal += payCash;
 
@@ -1701,6 +2208,7 @@ export const useGameStore = create<GameState & GameActions>()(
             ) {
               job.levelIndex += 1;
               job.performance = 38;
+              job.shiftsAtLevel = 0;
               const spotBonus = Math.round(nextLvl.baseSalary * 0.05);
               cash += spotBonus;
               sfx.play('levelup');
@@ -1759,15 +2267,24 @@ export const useGameStore = create<GameState & GameActions>()(
               current.elapsedMinutes += dt;
               const progressStep = dt / current.totalMinutes;
 
-              // Apply needs deltas proportionally
+              // Apply needs deltas proportionally (boosted by Home Luxury Recovery when at home)
+              const homeCareMult =
+                locationId === 'home' ? currentHomeDef.bonuses?.sleepRecoveryMult ?? 1.0 : 1.0;
               (Object.keys(def.needsDelta) as NeedKey[]).forEach((k) => {
-                const delta = (def.needsDelta[k] || 0) * progressStep;
+                const rawDelta = def.needsDelta[k] || 0;
+                const scaledDelta =
+                  rawDelta > 0 && (k === 'energy' || k === 'hygiene' || k === 'fun')
+                    ? rawDelta * homeCareMult
+                    : rawDelta;
+                const delta = scaledDelta * progressStep;
                 needs[k] = clamp(needs[k] + delta);
               });
 
-              // Apply skill gains proportionally
+              // Apply skill gains proportionally (boosted by Home Luxury Studio XP multiplier when at home)
               if (def.skillGain) {
                 const sk = def.skillGain.skill;
+                const homeSkillMult =
+                  locationId === 'home' ? currentHomeDef.bonuses?.skillXpMult ?? 1.0 : 1.0;
                 const tenXMult =
                   s.sim.traits.includes('tenXEngineer') &&
                   (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
@@ -1781,7 +2298,14 @@ export const useGameStore = create<GameState & GameActions>()(
                 const prevFloor = Math.floor(skills[sk]);
                 skills[sk] = Math.min(
                   10,
-                  +(skills[sk] + (def.skillGain.amount / 100) * progressStep * tenXMult * perkMult).toFixed(3)
+                  +(
+                    skills[sk] +
+                    (def.skillGain.amount / 100) *
+                      progressStep *
+                      tenXMult *
+                      perkMult *
+                      homeSkillMult
+                  ).toFixed(3)
                 );
                 const newFloor = Math.floor(skills[sk]);
                 if (newFloor > prevFloor) {
@@ -1795,9 +2319,11 @@ export const useGameStore = create<GameState & GameActions>()(
                 }
               }
 
-              // Startup progress
+              // Startup progress (boosted by Home Founder Incubator/Loft multiplier when at home)
               if (def.startupProgress) {
-                const gain = def.startupProgress * progressStep;
+                const homeStartupMult =
+                  locationId === 'home' ? currentHomeDef.bonuses?.startupMult ?? 1.0 : 1.0;
+                const gain = def.startupProgress * progressStep * homeStartupMult;
                 startup.productProgress = clamp(startup.productProgress + gain, 0, 100);
                 startup.users += Math.round(gain * 12);
               }

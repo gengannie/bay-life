@@ -3,6 +3,7 @@ import {
   AspirationId,
   CareerDef,
   CommuteModeDef,
+  CommuteModeId,
   FurnitureDef,
   HomeDef,
   InteractiveEvent,
@@ -16,6 +17,8 @@ import {
   SkillKey,
   TraitId,
   WishItem,
+  WorkExplorationTaskDef,
+  WorkProjectDef,
   WorkToneId,
 } from '../types/game';
 
@@ -305,14 +308,19 @@ export const HOMES: HomeDef[] = [
   {
     id: 'daly_city_inlaw',
     name: 'Daly City Garage In-Law',
+    shortName: 'Daly City Garage',
     area: 'Daly City · Serramonte',
     district: 'Peninsula',
+    tier: 1,
+    tierLabel: 'Tier 1 · Humble Garage Unit',
     emoji: '🌫️',
-    tagline: 'Perpetual fog, thin walls, 12 mins to BART. Humble Bay Area beginnings.',
+    tagline: 'Perpetual fog, thin cinderblock walls, 12 mins to BART. Humble Bay Area beginnings.',
     weeklyRent: 1400,
     buyPrice: 380000,
     gridSize: 6,
     floorStyle: 'wood',
+    mapCoords: { x: 18, y: 54 },
+    commuteSummary: 'Fast I-280 / BART hop to SF & Peninsula · 32m to South Bay',
     starterMoney: 4800,
     starterObjects: [
       { objectId: 'twin_mattress', x: 1, y: 1 },
@@ -321,18 +329,62 @@ export const HOMES: HomeDef[] = [
       { objectId: 'basic_shower', x: 4, y: 4 },
       { objectId: 'basic_toilet', x: 5, y: 4 },
     ],
+    perks: [
+      {
+        emoji: '🍜',
+        label: 'Low Burn Rate',
+        desc: 'Cheapest rent in the Bay Area so you can hoard runway cash.',
+      },
+      {
+        emoji: '🚇',
+        label: 'BART / I-280 Access',
+        desc: 'Border of SF and Peninsula for balanced budget transit.',
+      },
+      {
+        emoji: '🌫️',
+        label: 'Foggy Garage Vibes',
+        desc: 'Converted garage floor & high transom window (+6 Underdog Mood).',
+      },
+    ],
+    bonuses: {
+      needDecayMult: 1.0,
+      sleepRecoveryMult: 1.0,
+      skillXpMult: 1.04,
+      startupMult: 1.0,
+      commuteTimeMult: 1.0,
+      ambientMoodletId: 'home_daly_grit',
+      maxVisitors: 1,
+    },
+    architecture: {
+      styleName: 'Converted Suburban Garage Unit',
+      windowType: 'garage_transom',
+      rightWallFeature: 'breaker_box',
+      wallLeftGrad: ['#E2E8F0', '#CBD5E1'],
+      wallRightGrad: ['#CBD5E1', '#94A3B8'],
+      wallLeftNight: ['#1E293B', '#0F172A'],
+      wallRightNight: ['#334155', '#1E293B'],
+      trimColor: '#64748B',
+      floorPrimary: '#C2B59B',
+      floorSecondary: '#B3A58A',
+      ambientGlow: 'rgba(148,163,184,0.22)',
+    },
   },
   {
     id: 'sunnyvale_hacker',
     name: 'Sunnyvale 4-BR Hacker House',
+    shortName: 'Sunnyvale Hacker House',
     area: 'Sunnyvale · El Camino Real',
     district: 'South Bay',
+    tier: 2,
+    tierLabel: 'Tier 2 · Co-Founder Incubator',
     emoji: '💻',
-    tagline: 'Whiteboards on every wall, fiber internet, and 6 founders sharing one espresso machine.',
+    tagline: 'Whiteboards on every wall, gigabit fiber, and 6 founders sharing one espresso bar.',
     weeklyRent: 1950,
     buyPrice: 620000,
     gridSize: 7,
     floorStyle: 'wood',
+    mapCoords: { x: 61, y: 84 },
+    commuteSummary: '⚡ 8–12m hop to Goggle Plex & Apple Park · Longer haul to SF',
     starterMoney: 5200,
     starterObjects: [
       { objectId: 'twin_mattress', x: 1, y: 1 },
@@ -342,18 +394,64 @@ export const HOMES: HomeDef[] = [
       { objectId: 'basic_toilet', x: 6, y: 5 },
       { objectId: 'beanbag_chair', x: 3, y: 3 },
     ],
+    perks: [
+      {
+        emoji: '🚀',
+        label: '+15% Startup Velocity',
+        desc: 'Late-night co-founder war room boosts MVP & Hustle progress.',
+      },
+      {
+        emoji: '🚲',
+        label: 'South Bay Campus Neighbor',
+        desc: 'Steps from Mountain View Plex & Cupertino Spaceship Park.',
+      },
+      {
+        emoji: '👥',
+        label: '2 Housemate Regulars',
+        desc: 'Two Bay Area engineers/founders hang out in the common room.',
+      },
+    ],
+    bonuses: {
+      needDecayMult: 0.92,
+      sleepRecoveryMult: 1.08,
+      skillXpMult: 1.1,
+      startupMult: 1.15,
+      commuteTimeMult: 0.94,
+      ambientMoodletId: 'home_sunnyvale_hack',
+      maxVisitors: 2,
+    },
+    architecture: {
+      styleName: 'Silicon Valley Ranch Hacker House',
+      windowType: 'ranch_slider',
+      rightWallFeature: 'founder_whiteboard',
+      wallLeftGrad: ['#FEF9C3', '#FDE68A'],
+      wallRightGrad: ['#FEF3C7', '#FCD34D'],
+      wallLeftNight: ['#1E293B', '#172554'],
+      wallRightNight: ['#1E3A8A', '#1E293B'],
+      trimColor: '#D97706',
+      floorPrimary: '#D6B18A',
+      floorSecondary: '#CCA47B',
+      rugColor: '#312E81',
+      rugAccent: '#6366F1',
+      ambientGlow: 'rgba(245,158,11,0.2)',
+    },
   },
   {
     id: 'mission_studio',
     name: 'Mission Sunny Walk-Up Studio',
+    shortName: 'Mission Walk-Up',
     area: 'San Francisco · 24th & Valencia',
     district: 'San Francisco',
+    tier: 3,
+    tierLabel: 'Tier 3 · Boutique Edwardian',
     emoji: '☀️',
-    tagline: 'Warm Mission microclimate, steps from Dolores Park, Tartine, and tech shuttle stops.',
+    tagline: 'Warm Mission microclimate, steps from Dolores Park, Tartine, and Valencia shuttle stops.',
     weeklyRent: 2800,
     buyPrice: 890000,
     gridSize: 8,
     floorStyle: 'wood',
+    mapCoords: { x: 33, y: 45 },
+    commuteSummary: '⚡ 5m walk to Dolores Park & SF cafes · Tech shuttle stop outside',
     starterMoney: 6000,
     starterObjects: [
       { objectId: 'casper_queen', x: 1, y: 1 },
@@ -364,18 +462,64 @@ export const HOMES: HomeDef[] = [
       { objectId: 'midcentury_sofa', x: 3, y: 4 },
       { objectId: 'monstera_plant', x: 0, y: 3 },
     ],
+    perks: [
+      {
+        emoji: '☀️',
+        label: '+16 Mission Sun Aura',
+        desc: 'Sun-drenched bay window & vinyl alcove keep your mood elevated.',
+      },
+      {
+        emoji: '🛡️',
+        label: '-16% Slower Need Drain',
+        desc: 'Warm redwood herringbone floors, Aesop rainfall shower & Casper Queen.',
+      },
+      {
+        emoji: '🚌',
+        label: 'Valencia Tech Shuttle Hub',
+        desc: 'Walk to Dolores Park, Hayes Valley & direct commuter shuttles.',
+      },
+    ],
+    bonuses: {
+      needDecayMult: 0.84,
+      sleepRecoveryMult: 1.18,
+      skillXpMult: 1.16,
+      startupMult: 1.18,
+      commuteTimeMult: 0.88,
+      ambientMoodletId: 'home_mission_sun',
+      maxVisitors: 2,
+    },
+    architecture: {
+      styleName: '1910 Mission Edwardian Walk-Up',
+      windowType: 'edwardian_bay',
+      rightWallFeature: 'vinyl_alcove',
+      wallLeftGrad: ['#FFF7ED', '#FFEDD5'],
+      wallRightGrad: ['#FFEDD5', '#FED7AA'],
+      wallLeftNight: ['#27171C', '#1C1917'],
+      wallRightNight: ['#3B1D24', '#27171C'],
+      trimColor: '#EA580C',
+      floorPrimary: '#C88D5E',
+      floorSecondary: '#B67B4C',
+      rugColor: '#9A3412',
+      rugAccent: '#FBBF24',
+      ambientGlow: 'rgba(251,146,60,0.28)',
+    },
   },
   {
     id: 'soma_loft',
     name: 'SoMa Architectural Glass Loft',
+    shortName: 'SoMa Glass Loft',
     area: 'San Francisco · South Park / Townsend',
     district: 'San Francisco',
+    tier: 4,
+    tierLabel: 'Tier 4 · Designer Penthouse Loft',
     emoji: '🏙️',
-    tagline: 'Double-height concrete ceilings, exposed ductwork, walk to Caltrain & YC AI startups.',
+    tagline: 'Double-height concrete ceilings, Bay Bridge curtainwall, walk to Caltrain & YC AI labs.',
     weeklyRent: 4400,
     buyPrice: 1450000,
     gridSize: 9,
     floorStyle: 'concrete',
+    mapCoords: { x: 44, y: 28 },
+    commuteSummary: '⚡ Steps to YC Loft, Caltrain Depot, Ferry Bldg & Dogpatch',
     starterMoney: 12000,
     starterObjects: [
       { objectId: 'casper_queen', x: 1, y: 1 },
@@ -387,18 +531,65 @@ export const HOMES: HomeDef[] = [
       { objectId: 'peloton_bike', x: 7, y: 4 },
       { objectId: 'ecoflow_delta', x: 0, y: 5 },
     ],
+    perks: [
+      {
+        emoji: '🏙️',
+        label: '+22 Penthouse Flow Aura',
+        desc: 'Double-height Bay Bridge curtainwall & acoustic walnut gallery.',
+      },
+      {
+        emoji: '🧠',
+        label: '+24% Skill & AI Velocity',
+        desc: 'Includes Dual-H100 XDR Rig, La Marzocco Espresso & EcoFlow Backup.',
+      },
+      {
+        emoji: '🚆',
+        label: '4th & King Transit Core',
+        desc: '-18% faster commutes across SF and express Caltrain to South Bay.',
+      },
+    ],
+    bonuses: {
+      needDecayMult: 0.74,
+      sleepRecoveryMult: 1.26,
+      skillXpMult: 1.24,
+      startupMult: 1.28,
+      commuteTimeMult: 0.82,
+      ambientMoodletId: 'home_soma_loft',
+      maxVisitors: 3,
+      builtInPowerBackup: true,
+    },
+    architecture: {
+      styleName: 'South Park Industrial Glass Penthouse',
+      windowType: 'soma_curtainwall',
+      rightWallFeature: 'acoustic_slats',
+      wallLeftGrad: ['#E2E8F0', '#94A3B8'],
+      wallRightGrad: ['#CBD5E1', '#64748B'],
+      wallLeftNight: ['#0F172A', '#020617'],
+      wallRightNight: ['#1E293B', '#0F172A'],
+      trimColor: '#38BDF8',
+      floorPrimary: '#94A3B8',
+      floorSecondary: '#7E8F9F',
+      rugColor: '#0F172A',
+      rugAccent: '#38BDF8',
+      ambientGlow: 'rgba(56,189,248,0.28)',
+    },
   },
   {
     id: 'pac_heights_victorian',
-    name: 'Pacific Heights Golden Gate Flat',
+    name: 'Pacific Heights Billionaires Row Estate',
+    shortName: 'Pac Heights Estate',
     area: 'San Francisco · Billionaires Row',
     district: 'San Francisco',
+    tier: 5,
+    tierLabel: 'Tier 5 · Crown Jewel Estate',
     emoji: '🌉',
-    tagline: 'Panoramic Bay & Golden Gate views, herringbone oak floors, and private infrared sauna.',
+    tagline: 'Unobstructed Golden Gate terrace, Calacatta gold marble, private sauna & Powerwall.',
     weeklyRent: 7200,
     buyPrice: 2650000,
     gridSize: 10,
     floorStyle: 'marble',
+    mapCoords: { x: 22, y: 17 },
+    commuteSummary: '🚁 Priority Presidio / US-101 Express · -25% Commute Time',
     starterMoney: 25000,
     starterObjects: [
       { objectId: 'eightsleep_pod', x: 1, y: 1 },
@@ -411,8 +602,54 @@ export const HOMES: HomeDef[] = [
       { objectId: 'tesla_powerwall', x: 0, y: 6 },
       { objectId: 'yc_neon_sign', x: 4, y: 0 },
     ],
+    perks: [
+      {
+        emoji: '👑',
+        label: '+30 Billionaires Row Aura',
+        desc: 'Golden Gate terrace, marble fireplace, Eight Sleep Pod & Cold Plunge.',
+      },
+      {
+        emoji: '🧬',
+        label: '-35% Need Drain · +35% Recovery',
+        desc: 'Peak longevity bio-sanctuary with 100% Tesla Powerwall grid immunity.',
+      },
+      {
+        emoji: '🦄',
+        label: '+35% XP, Pitch & VIP Salon',
+        desc: '3 Bay Area icons visit your salon; +35% faster skill & startup gains.',
+      },
+    ],
+    bonuses: {
+      needDecayMult: 0.65,
+      sleepRecoveryMult: 1.35,
+      skillXpMult: 1.35,
+      startupMult: 1.38,
+      commuteTimeMult: 0.75,
+      ambientMoodletId: 'home_pac_heights',
+      maxVisitors: 3,
+      builtInPowerBackup: true,
+    },
+    architecture: {
+      styleName: 'Billionaires Row Neo-Classical Glass Villa',
+      windowType: 'pac_heights_terrace',
+      rightWallFeature: 'marble_fireplace',
+      wallLeftGrad: ['#FFFBEB', '#FEF3C7'],
+      wallRightGrad: ['#FEF3C7', '#FDE68A'],
+      wallLeftNight: ['#1E1B4B', '#0F172A'],
+      wallRightNight: ['#311042', '#1E1B4B'],
+      trimColor: '#F59E0B',
+      floorPrimary: '#F8FAFC',
+      floorSecondary: '#E2E8F0',
+      rugColor: '#064E3B',
+      rugAccent: '#F59E0B',
+      ambientGlow: 'rgba(251,191,36,0.32)',
+    },
   },
 ];
+
+export const HOME_BY_ID: Record<string, HomeDef> = Object.fromEntries(
+  HOMES.map((h) => [h.id, h])
+);
 
 export const FURNITURE_CATALOG: FurnitureDef[] = [
   // SLEEP
@@ -1288,6 +1525,10 @@ export const CAREERS: CareerDef[] = [
         shiftPay: 950,
         rsuPerShift: 350,
         requiredSkill: { skill: 'coding', level: 1 },
+        secondarySkill: { skill: 'systemDesign', level: 1 },
+        minShiftsForPromo: 0,
+        requiredDeliverables: 0,
+        scopeSummary: 'Ship clean PRs, learn the monorepo, and pass onboarding calibration.',
       },
       {
         level: 2,
@@ -1298,6 +1539,10 @@ export const CAREERS: CareerDef[] = [
         shiftPay: 1350,
         rsuPerShift: 650,
         requiredSkill: { skill: 'coding', level: 3 },
+        secondarySkill: { skill: 'systemDesign', level: 2 },
+        minShiftsForPromo: 3,
+        requiredDeliverables: 1,
+        scopeSummary: 'Own feature modules end-to-end with zero P0 regressions.',
       },
       {
         level: 3,
@@ -1309,6 +1554,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 1200,
         requiredSkill: { skill: 'coding', level: 5 },
         secondarySkill: { skill: 'systemDesign', level: 4 },
+        minShiftsForPromo: 5,
+        requiredDeliverables: 2,
+        scopeSummary: 'Lead multi-quarter system architecture and mentor junior engineers.',
       },
       {
         level: 4,
@@ -1320,6 +1568,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 2100,
         requiredSkill: { skill: 'systemDesign', level: 7 },
         secondarySkill: { skill: 'charisma', level: 5 },
+        minShiftsForPromo: 7,
+        requiredDeliverables: 3,
+        scopeSummary: 'Drive cross-org technical strategy, RFC consensus, and reliability.',
       },
       {
         level: 5,
@@ -1331,6 +1582,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 3600,
         requiredSkill: { skill: 'systemDesign', level: 9 },
         secondarySkill: { skill: 'charisma', level: 7 },
+        minShiftsForPromo: 9,
+        requiredDeliverables: 4,
+        scopeSummary: 'Define company-wide platform roadmaps and executive alignment.',
       },
       {
         level: 6,
@@ -1342,6 +1596,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 6400,
         requiredSkill: { skill: 'systemDesign', level: 10 },
         secondarySkill: { skill: 'coding', level: 9 },
+        minShiftsForPromo: 12,
+        requiredDeliverables: 5,
+        scopeSummary: 'Industry-defining technical vision, keynote launches, and board impact.',
       },
     ],
   },
@@ -1367,6 +1624,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 800,
         requiredSkill: { skill: 'coding', level: 2 },
         secondarySkill: { skill: 'aiResearch', level: 1 },
+        minShiftsForPromo: 0,
+        requiredDeliverables: 0,
+        scopeSummary: 'Ship clean PRs, learn the monorepo, and pass onboarding calibration.',
       },
       {
         level: 2,
@@ -1378,6 +1638,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 1550,
         requiredSkill: { skill: 'aiResearch', level: 4 },
         secondarySkill: { skill: 'coding', level: 4 },
+        minShiftsForPromo: 3,
+        requiredDeliverables: 1,
+        scopeSummary: 'Own feature modules end-to-end with zero P0 regressions.',
       },
       {
         level: 3,
@@ -1389,6 +1652,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 2600,
         requiredSkill: { skill: 'aiResearch', level: 6 },
         secondarySkill: { skill: 'systemDesign', level: 5 },
+        minShiftsForPromo: 5,
+        requiredDeliverables: 2,
+        scopeSummary: 'Lead multi-quarter system architecture and mentor junior engineers.',
       },
       {
         level: 4,
@@ -1400,6 +1666,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 4400,
         requiredSkill: { skill: 'aiResearch', level: 8 },
         secondarySkill: { skill: 'systemDesign', level: 7 },
+        minShiftsForPromo: 7,
+        requiredDeliverables: 3,
+        scopeSummary: 'Drive cross-org technical strategy, RFC consensus, and reliability.',
       },
       {
         level: 5,
@@ -1411,6 +1680,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 6900,
         requiredSkill: { skill: 'aiResearch', level: 9 },
         secondarySkill: { skill: 'charisma', level: 7 },
+        minShiftsForPromo: 9,
+        requiredDeliverables: 4,
+        scopeSummary: 'Define company-wide platform roadmaps and executive alignment.',
       },
       {
         level: 6,
@@ -1422,6 +1694,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 9500,
         requiredSkill: { skill: 'aiResearch', level: 10 },
         secondarySkill: { skill: 'systemDesign', level: 9 },
+        minShiftsForPromo: 12,
+        requiredDeliverables: 5,
+        scopeSummary: 'Industry-defining technical vision, keynote launches, and board impact.',
       },
     ],
   },
@@ -1446,6 +1721,10 @@ export const CAREERS: CareerDef[] = [
         shiftPay: 1020,
         rsuPerShift: 400,
         requiredSkill: { skill: 'coding', level: 1 },
+        secondarySkill: { skill: 'systemDesign', level: 1 },
+        minShiftsForPromo: 0,
+        requiredDeliverables: 0,
+        scopeSummary: 'Ship clean PRs, learn the monorepo, and pass onboarding calibration.',
       },
       {
         level: 2,
@@ -1456,6 +1735,10 @@ export const CAREERS: CareerDef[] = [
         shiftPay: 1420,
         rsuPerShift: 720,
         requiredSkill: { skill: 'coding', level: 3 },
+        secondarySkill: { skill: 'systemDesign', level: 2 },
+        minShiftsForPromo: 3,
+        requiredDeliverables: 1,
+        scopeSummary: 'Own feature modules end-to-end with zero P0 regressions.',
       },
       {
         level: 3,
@@ -1467,6 +1750,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 1350,
         requiredSkill: { skill: 'coding', level: 5 },
         secondarySkill: { skill: 'charisma', level: 4 },
+        minShiftsForPromo: 5,
+        requiredDeliverables: 2,
+        scopeSummary: 'Lead multi-quarter system architecture and mentor junior engineers.',
       },
       {
         level: 4,
@@ -1478,6 +1764,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 2400,
         requiredSkill: { skill: 'systemDesign', level: 7 },
         secondarySkill: { skill: 'coding', level: 7 },
+        minShiftsForPromo: 7,
+        requiredDeliverables: 3,
+        scopeSummary: 'Drive cross-org technical strategy, RFC consensus, and reliability.',
       },
       {
         level: 5,
@@ -1489,6 +1778,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 4200,
         requiredSkill: { skill: 'systemDesign', level: 9 },
         secondarySkill: { skill: 'charisma', level: 8 },
+        minShiftsForPromo: 9,
+        requiredDeliverables: 4,
+        scopeSummary: 'Define company-wide platform roadmaps and executive alignment.',
       },
       {
         level: 6,
@@ -1500,6 +1792,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 7800,
         requiredSkill: { skill: 'systemDesign', level: 10 },
         secondarySkill: { skill: 'charisma', level: 9 },
+        minShiftsForPromo: 12,
+        requiredDeliverables: 5,
+        scopeSummary: 'Industry-defining technical vision, keynote launches, and board impact.',
       },
     ],
   },
@@ -1524,6 +1819,10 @@ export const CAREERS: CareerDef[] = [
         shiftPay: 980,
         rsuPerShift: 520,
         requiredSkill: { skill: 'hustle', level: 1 },
+        secondarySkill: { skill: 'coding', level: 1 },
+        minShiftsForPromo: 0,
+        requiredDeliverables: 0,
+        scopeSummary: 'Ship clean PRs, learn the monorepo, and pass onboarding calibration.',
       },
       {
         level: 2,
@@ -1535,6 +1834,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 980,
         requiredSkill: { skill: 'hustle', level: 3 },
         secondarySkill: { skill: 'coding', level: 3 },
+        minShiftsForPromo: 3,
+        requiredDeliverables: 1,
+        scopeSummary: 'Own feature modules end-to-end with zero P0 regressions.',
       },
       {
         level: 3,
@@ -1546,6 +1848,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 1800,
         requiredSkill: { skill: 'hustle', level: 5 },
         secondarySkill: { skill: 'charisma', level: 5 },
+        minShiftsForPromo: 5,
+        requiredDeliverables: 2,
+        scopeSummary: 'Lead multi-quarter system architecture and mentor junior engineers.',
       },
       {
         level: 4,
@@ -1557,6 +1862,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 2900,
         requiredSkill: { skill: 'investing', level: 6 },
         secondarySkill: { skill: 'charisma', level: 7 },
+        minShiftsForPromo: 7,
+        requiredDeliverables: 3,
+        scopeSummary: 'Drive cross-org technical strategy, RFC consensus, and reliability.',
       },
       {
         level: 5,
@@ -1568,6 +1876,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 5200,
         requiredSkill: { skill: 'investing', level: 8 },
         secondarySkill: { skill: 'charisma', level: 8 },
+        minShiftsForPromo: 9,
+        requiredDeliverables: 4,
+        scopeSummary: 'Define company-wide platform roadmaps and executive alignment.',
       },
       {
         level: 6,
@@ -1579,6 +1890,9 @@ export const CAREERS: CareerDef[] = [
         rsuPerShift: 8900,
         requiredSkill: { skill: 'investing', level: 10 },
         secondarySkill: { skill: 'charisma', level: 10 },
+        minShiftsForPromo: 12,
+        requiredDeliverables: 5,
+        scopeSummary: 'Industry-defining technical vision, keynote launches, and board impact.',
       },
     ],
   },
@@ -1587,6 +1901,209 @@ export const CAREERS: CareerDef[] = [
 export const CAREER_BY_ID: Record<string, CareerDef> = Object.fromEntries(
   CAREERS.map((c) => [c.id, c])
 );
+
+export const WORK_PROJECTS: WorkProjectDef[] = [
+  {
+    id: 'proj_spanner_mesh',
+    careerId: 'bigtech_swe',
+    title: 'Planet-Scale Spanner Consensus v4',
+    codeName: 'PROJECT CHRONOS',
+    emoji: '🌐',
+    category: 'infra',
+    desc: 'Architect sub-5ms atomic clock replication across 38 global cloud regions with zero split-brain failovers.',
+    deliverableName: 'Multi-Region TrueTime Paxos Engine',
+    primarySkill: 'systemDesign',
+    rewardCash: 1800,
+    rewardRsu: 2400,
+    promoPerfBoost: 12,
+    accent: '#007AFF',
+  },
+  {
+    id: 'proj_borg_autoscaler',
+    careerId: 'bigtech_swe',
+    title: 'Borg TPU v6 Cluster Autoscaler',
+    codeName: 'PROJECT HYPERION',
+    emoji: '⚡',
+    category: 'infra',
+    desc: 'Eliminate cold-start scheduling bottlenecks across 100,000 liquid-cooled TPU pods in Mountain View.',
+    deliverableName: 'Zero-Cold-Start TPU Scheduling Daemon',
+    primarySkill: 'coding',
+    rewardCash: 1600,
+    rewardRsu: 2100,
+    promoPerfBoost: 10,
+    accent: '#0284C7',
+  },
+  {
+    id: 'proj_frontier_rlhf',
+    careerId: 'frontier_ai',
+    title: 'Frontier Chain-of-Thought RLHF Loop',
+    codeName: 'PROJECT STRAWBERRY',
+    emoji: '🍓',
+    category: 'ai',
+    desc: 'Train self-verifying multi-step reasoning trajectories for Olympiad math and autonomous repo synthesis.',
+    deliverableName: 'Test-Time Compute Verifier Kernel',
+    primarySkill: 'aiResearch',
+    rewardCash: 2200,
+    rewardRsu: 3200,
+    promoPerfBoost: 14,
+    accent: '#AF52DE',
+  },
+  {
+    id: 'proj_sparse_moe',
+    careerId: 'frontier_ai',
+    title: '1.8T Sparse MoE CUDA Inference Kernel',
+    codeName: 'PROJECT TRITON-X',
+    emoji: '🧠',
+    category: 'ai',
+    desc: 'Hand-tune custom FP4 Flash-Attention and expert-routing kernels to cut token latency by 68%.',
+    deliverableName: 'FP4 Speculative MoE Decoder',
+    primarySkill: 'aiResearch',
+    rewardCash: 2400,
+    rewardRsu: 3500,
+    promoPerfBoost: 14,
+    accent: '#7C3AED',
+  },
+  {
+    id: 'proj_cupertino_silicon',
+    careerId: 'cupertino_os',
+    title: 'M5 Ultra Unified Memory Neural Fabric',
+    codeName: 'PROJECT BALTRA',
+    emoji: '🍎',
+    category: 'product',
+    desc: 'Co-design zero-copy unified memory bandwidth between the 48-core GPU and on-device foundation models.',
+    deliverableName: 'Zero-Copy On-Device Neural Compositor',
+    primarySkill: 'systemDesign',
+    rewardCash: 2000,
+    rewardRsu: 2800,
+    promoPerfBoost: 12,
+    accent: '#1D1D1F',
+  },
+  {
+    id: 'proj_spatial_fluid',
+    careerId: 'cupertino_os',
+    title: '120Hz Spatial ProMotion Physics Engine',
+    codeName: 'PROJECT SOLARIUM',
+    emoji: '✨',
+    category: 'product',
+    desc: 'Craft sub-millisecond spring dynamics and eye-tracked glass shaders for the June WWDC keynote.',
+    deliverableName: 'Sub-Millisecond Eye-Tracked Glass UI',
+    primarySkill: 'coding',
+    rewardCash: 1750,
+    rewardRsu: 2300,
+    promoPerfBoost: 11,
+    accent: '#475569',
+  },
+  {
+    id: 'proj_sandhill_ai_thesis',
+    careerId: 'sandhill_vc',
+    title: 'Autonomous Enterprise Agent Market Map',
+    codeName: 'MEMO SEQUOIA-AI',
+    emoji: '🌲',
+    category: 'venture',
+    desc: 'Benchmark 60 stealth YC & South Park AI infra startups to lead the next decacorn Series A round.',
+    deliverableName: '$50M Series A Lead Term Sheet & Thesis',
+    primarySkill: 'investing',
+    rewardCash: 2500,
+    rewardRsu: 3000,
+    promoPerfBoost: 13,
+    accent: '#16A34A',
+  },
+  {
+    id: 'proj_hypergrowth_gtm',
+    careerId: 'sandhill_vc',
+    title: 'Developer-Led PLG & Enterprise GTM Flywheel',
+    codeName: 'PROJECT VELOCITY',
+    emoji: '🚀',
+    category: 'venture',
+    desc: 'Build the open-source community wedge and Fortune 500 expansion playbook from $2M to $40M ARR.',
+    deliverableName: '140% Net Dollar Retention Playbook',
+    primarySkill: 'hustle',
+    rewardCash: 1900,
+    rewardRsu: 2500,
+    promoPerfBoost: 11,
+    accent: '#EA580C',
+  },
+];
+
+export const WORK_PROJECT_BY_ID: Record<string, WorkProjectDef> = Object.fromEntries(
+  WORK_PROJECTS.map((p) => [p.id, p])
+);
+
+export const WORK_EXPLORATION_TASKS: WorkExplorationTaskDef[] = [
+  {
+    id: 'exp_rfc_doc',
+    title: 'Author Architecture RFC',
+    subtitle: 'Write a 12-page multi-region design doc and resolve Staff Engineer comments.',
+    emoji: '📐',
+    energyCost: 14,
+    projectProgressGain: 28,
+    performanceGain: 6,
+    skill: 'systemDesign',
+    skillGain: 0.22,
+    badgeLabel: '📐 +28% Project · +6% Calibration',
+  },
+  {
+    id: 'exp_proto_spike',
+    title: 'Ship Prototype Benchmark Spike',
+    subtitle: 'Hack together a high-throughput Rust/C++ benchmark and prove 3x p99 speedup.',
+    emoji: '⚡',
+    energyCost: 16,
+    projectProgressGain: 32,
+    performanceGain: 7,
+    skill: 'coding',
+    skillGain: 0.24,
+    badgeLabel: '⚡ +32% Project · +7% Calibration',
+  },
+  {
+    id: 'exp_ai_evals',
+    title: 'Run Frontier Model Eval Suite',
+    subtitle: 'Launch distributed H100 evaluation sweeps and ablate reward-hacking edge cases.',
+    emoji: '🧠',
+    energyCost: 16,
+    projectProgressGain: 34,
+    performanceGain: 8,
+    skill: 'aiResearch',
+    skillGain: 0.25,
+    badgeLabel: '🧠 +34% Project · +8% Calibration',
+  },
+  {
+    id: 'exp_skip_demo',
+    title: 'Live Demo to Skip-Level VP',
+    subtitle: 'Pitch your technical charter face-to-face at campus for promo committee sponsorship.',
+    emoji: '🤝',
+    energyCost: 12,
+    projectProgressGain: 25,
+    performanceGain: 10,
+    skill: 'charisma',
+    skillGain: 0.22,
+    requiresOffice: true,
+    badgeLabel: '🤝 +25% Project · +10% Calibration (In-Office)',
+  },
+  {
+    id: 'exp_oncall_sev',
+    title: 'Lead Production SEV-1 War Room',
+    subtitle: 'Triage cascading shard timeouts, ship a surgical hotfix, and lead the postmortem.',
+    emoji: '🚨',
+    energyCost: 18,
+    projectProgressGain: 36,
+    performanceGain: 9,
+    skill: 'coding',
+    skillGain: 0.26,
+    badgeLabel: '🚨 +36% Project · +9% Calibration',
+  },
+  {
+    id: 'exp_deal_memo',
+    title: 'Write Technical GTM / Thesis Memo',
+    subtitle: 'Model unit economics, GPU gross margins, and competitive moats for executive review.',
+    emoji: '📈',
+    energyCost: 12,
+    projectProgressGain: 28,
+    performanceGain: 7,
+    skill: 'investing',
+    skillGain: 0.22,
+    badgeLabel: '📈 +28% Project · +7% Calibration',
+  },
+];
 
 export const WORK_TONES: Array<{
   id: WorkToneId;
@@ -1654,7 +2171,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '🌈',
     tagline: 'Colorful cruiser bikes, free gourmet micro-kitchens, and planet-scale distributed systems.',
     description: 'Silicon Valley’s flagship search & cloud campus. Grab free sushi at the micro-kitchen, pair-program on Borg clusters, or recharge in a nap pod.',
-    mapCoords: { x: 64, y: 78 },
+    mapCoords: { x: 70, y: 76 },
     floorStyle: 'campus',
     accentColor: '#007AFF',
     vibes: [
@@ -1708,7 +2225,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '🍎',
     tagline: 'Curved glass, 9,000 drought-resistant trees, Caffè Macs, and Jony-level industrial craft.',
     description: 'The world’s most iconic ring-shaped headquarters. Dine at Caffè Macs with sliding glass doors or rehearse a keynote at the subterranean theater.',
-    mapCoords: { x: 56, y: 84 },
+    mapCoords: { x: 46, y: 87 },
     floorStyle: 'marble',
     accentColor: '#1D1D1F',
     vibes: [
@@ -1750,7 +2267,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '🦄',
     tagline: 'Exposed brick, H100 cluster hum, cold brew kegs, and Demo Day rehearsals.',
     description: 'Where the next trillion-dollar AI company is being hacked together at 2 AM. Practice your Demo Day pitch or sprint on multi-agent models.',
-    mapCoords: { x: 34, y: 32 },
+    mapCoords: { x: 36, y: 31 },
     floorStyle: 'concrete',
     accentColor: '#FF9500',
     vibes: [
@@ -1803,7 +2320,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '🌴',
     tagline: 'Sunny palm trees overlooking the SF skyline, Tartine morning buns, and La Taqueria.',
     description: 'San Francisco’s beloved sunny living room. Escape the fog, grab a warm morning bun or dorado super burrito, and vibe with founders and artists on the hill.',
-    mapCoords: { x: 26, y: 40 },
+    mapCoords: { x: 20, y: 43 },
     floorStyle: 'grass',
     accentColor: '#34C759',
     vibes: [
@@ -1856,7 +2373,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '☕',
     tagline: 'Blue Bottle’s original kiosk, boutique eyewear, and deep-learning patio debates.',
     description: 'The epicenter of "Cerebral Valley." Every table has three AI researchers discussing scaling laws over single-origin Gibraltar cortados.',
-    mapCoords: { x: 25, y: 31 },
+    mapCoords: { x: 23, y: 27 },
     floorStyle: 'wood',
     accentColor: '#A2845E',
     vibes: [
@@ -1898,7 +2415,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '🌲',
     tagline: 'Redwood trees, rosewood boardrooms, Porsche Taycans, and $100M Series A term sheets.',
     description: 'The highest concentration of venture capital on Earth. Pitch your startup to Sequoia & Benchmark partners or network over pancakes at Buck’s.',
-    mapCoords: { x: 48, y: 66 },
+    mapCoords: { x: 52, y: 65 },
     floorStyle: 'marble',
     accentColor: '#15803D',
     vibes: [
@@ -1940,7 +2457,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '🧗',
     tagline: 'The official Bay Area SWE third place: chalk bags, V6 overhangs, and eucalyptus steam.',
     description: 'Why go to a bar when you can project a V6 overhang with six Staff Engineers from Stripe and Anthropic, followed by a eucalyptus steam room?',
-    mapCoords: { x: 36, y: 39 },
+    mapCoords: { x: 47, y: 40 },
     floorStyle: 'concrete',
     accentColor: '#30B0C7',
     vibes: [
@@ -1982,7 +2499,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '⛴️',
     tagline: 'Bay Bridge views, Saturday organic farmers market, and Hog Island oyster bar.',
     description: 'Historic clocktower terminal on the San Francisco Bay. Stock up on organic farm produce for your home kitchen or enjoy oysters by the water.',
-    mapCoords: { x: 35, y: 24 },
+    mapCoords: { x: 45, y: 16 },
     floorStyle: 'marble',
     accentColor: '#0284C7',
     vibes: [
@@ -2024,7 +2541,7 @@ export const LOCATIONS: LocationDef[] = [
     emoji: '🪩',
     tagline: 'Funktion-One sound system, Boiler Room melodic house sets, and Series A celebration tables.',
     description: 'Where San Francisco engineers trade hoodies for black tees on Friday night. Catch a surprise DJ set or celebrate a funding round in VIP.',
-    mapCoords: { x: 31, y: 34 },
+    mapCoords: { x: 28, y: 36 },
     floorStyle: 'club',
     accentColor: '#AF52DE',
     vibes: [
@@ -2068,7 +2585,7 @@ export const COMMUTE_MODES: CommuteModeDef[] = [
     id: 'caltrain',
     name: 'Caltrain Electric / BART',
     emoji: '🚆',
-    tagline: 'Quiet car Wi-Fi, bike rack, $8 Clipper tap. Watch out for Millbrae transfers.',
+    tagline: 'Quiet car Wi-Fi, bike rack, Clipper tap. Express along the Peninsula spine.',
     baseFare: 8,
     durationMinutes: 30,
   },
@@ -2108,6 +2625,118 @@ export const COMMUTE_MODES: CommuteModeDef[] = [
     moodletId: 'taycan_hov',
   },
 ];
+
+export function resolvePlaceCoords(
+  placeId: string,
+  activeHomeId: string
+): { x: number; y: number; district: string; name: string; emoji: string } {
+  const cleanHomeId = placeId.startsWith('home:') ? placeId.slice(5) : placeId;
+  if (placeId === 'home' || HOME_BY_ID[cleanHomeId]) {
+    const h = HOME_BY_ID[placeId === 'home' ? activeHomeId : cleanHomeId] || HOMES[1];
+    return {
+      x: h.mapCoords.x,
+      y: h.mapCoords.y,
+      district: h.district,
+      name: h.shortName || h.name,
+      emoji: h.emoji,
+    };
+  }
+  const loc = LOCATION_BY_ID[placeId];
+  if (loc) {
+    return {
+      x: loc.mapCoords.x,
+      y: loc.mapCoords.y,
+      district: loc.district,
+      name: loc.shortName,
+      emoji: loc.emoji,
+    };
+  }
+  return { x: 35, y: 40, district: 'San Francisco', name: 'Bay Area', emoji: '📍' };
+}
+
+export interface CommuteEstimate {
+  rawDistance: number;
+  miles: number;
+  durationMinutes: number;
+  fare: number;
+  zoneLabel: 'Walkable Hop' | 'Neighborhood' | 'Regional Transit' | 'Cross-Bay Haul';
+  zoneColor: string;
+}
+
+export function calculateCommuteDetails(
+  fromId: string,
+  toId: string,
+  activeHomeId: string,
+  modeId: CommuteModeId
+): CommuteEstimate {
+  const from = resolvePlaceCoords(fromId, activeHomeId);
+  const to = resolvePlaceCoords(toId, activeHomeId);
+  const rawDistance = Math.hypot(to.x - from.x, to.y - from.y);
+  const miles = +(Math.max(0.6, rawDistance * 0.65)).toFixed(1);
+
+  const modeDef = COMMUTE_MODES.find((m) => m.id === modeId) || COMMUTE_MODES[0];
+
+  // If departing from or arriving at a specific home, factor in that home's transit efficiency bonus
+  const homeInvolvedId =
+    fromId === 'home'
+      ? activeHomeId
+      : fromId.startsWith('home:')
+      ? fromId.slice(5)
+      : HOME_BY_ID[fromId]
+      ? fromId
+      : toId === 'home'
+      ? activeHomeId
+      : toId.startsWith('home:')
+      ? toId.slice(5)
+      : HOME_BY_ID[toId]
+      ? toId
+      : activeHomeId;
+
+  const homeObj = HOME_BY_ID[homeInvolvedId];
+  const homeTimeMult = homeObj?.bonuses?.commuteTimeMult ?? 1.0;
+
+  // Baseline distance on 0..100 map is ~32 units (~21 miles)
+  const distFactor = Math.max(0.32, Math.min(1.75, rawDistance / 30));
+  const durationMinutes = Math.max(
+    5,
+    Math.round(modeDef.durationMinutes * distFactor * homeTimeMult)
+  );
+
+  let fare = 0;
+  if (modeDef.baseFare > 0) {
+    if (modeId === 'caltrain') {
+      fare = rawDistance < 18 ? 5 : rawDistance < 38 ? 8 : 12;
+    } else {
+      const fareFactor = Math.max(0.42, Math.min(1.6, rawDistance / 32));
+      fare = Math.max(9, Math.round(modeDef.baseFare * fareFactor));
+    }
+  }
+
+  let zoneLabel: CommuteEstimate['zoneLabel'] = 'Regional Transit';
+  let zoneColor = '#F59E0B';
+  if (rawDistance <= 12) {
+    zoneLabel = 'Walkable Hop';
+    zoneColor = '#10B981';
+  } else if (rawDistance <= 25) {
+    zoneLabel = 'Neighborhood';
+    zoneColor = '#007AFF';
+  } else if (rawDistance <= 46) {
+    zoneLabel = 'Regional Transit';
+    zoneColor = '#F59E0B';
+  } else {
+    zoneLabel = 'Cross-Bay Haul';
+    zoneColor = '#AF52DE';
+  }
+
+  return {
+    rawDistance,
+    miles,
+    durationMinutes,
+    fare,
+    zoneLabel,
+    zoneColor,
+  };
+}
 
 export const NPCS: NPCDef[] = [
   {
@@ -2358,6 +2987,51 @@ export const MOODLETS: Record<string, MoodletDef> = {
     delta: -20,
     durationMinutes: 240,
     tone: 'bad',
+  },
+  home_daly_grit: {
+    id: 'home_daly_grit',
+    label: 'Garage Underdog Grit',
+    emoji: '🌫️',
+    desc: 'Humble Daly City garage roots keeping your burn rate low and hustle sharp.',
+    delta: 6,
+    durationMinutes: 1440,
+    tone: 'good',
+  },
+  home_sunnyvale_hack: {
+    id: 'home_sunnyvale_hack',
+    label: 'Hacker House Synergy',
+    emoji: '💻',
+    desc: 'Whiteboards covered in system diagrams and 2 AM co-founder momentum.',
+    delta: 10,
+    durationMinutes: 1440,
+    tone: 'good',
+  },
+  home_mission_sun: {
+    id: 'home_mission_sun',
+    label: 'Sunny Mission Microclimate',
+    emoji: '☀️',
+    desc: '70°F Valencia St sunshine and Tartine sourdough aroma drifting through your bay window.',
+    delta: 16,
+    durationMinutes: 1440,
+    tone: 'good',
+  },
+  home_soma_loft: {
+    id: 'home_soma_loft',
+    label: 'South Park Glass Penthouse',
+    emoji: '🏙️',
+    desc: 'Double-height architectural glass, Bay Bridge views, and gallery acoustics.',
+    delta: 22,
+    durationMinutes: 1440,
+    tone: 'good',
+  },
+  home_pac_heights: {
+    id: 'home_pac_heights',
+    label: 'Billionaires Row Crown Estate',
+    emoji: '🌉',
+    desc: 'Unobstructed Golden Gate panorama, Italian Calacatta marble, and private wellness sanctuary.',
+    delta: 30,
+    durationMinutes: 1440,
+    tone: 'good',
   },
 };
 

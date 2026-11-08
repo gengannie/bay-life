@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ACTIONS,
+  CAREER_BY_ID,
   COMMUTE_MODES,
   HOMES,
   LOCATIONS,
@@ -118,8 +119,15 @@ export const WorldMapModal: React.FC = () => {
   const objects = useGameStore((s) => s.objects);
   const ownedCars = useGameStore((s) => s.ownedCars);
   const job = useGameStore((s) => s.job);
+  const workShift = useGameStore((s) => s.workShift);
   const setView = useGameStore((s) => s.setView);
   const travelTo = useGameStore((s) => s.travelTo);
+  const startWorkShift = useGameStore((s) => s.startWorkShift);
+  const commuteToOfficeAndWork = useGameStore((s) => s.commuteToOfficeAndWork);
+  const leaveWorkEarly = useGameStore((s) => s.leaveWorkEarly);
+  const setActiveModal = useGameStore((s) => s.setActiveModal);
+
+  const careerDef = job ? CAREER_BY_ID[job.careerId] : null;
 
   const homeDef = HOMES.find((h) => h.id === homeId) || HOMES[1];
   const currentVenueDef =
@@ -211,13 +219,33 @@ export const WorldMapModal: React.FC = () => {
           </button>
 
           {/* 1-Click Return Home Button right in the Header when away from Home */}
-          {locationId !== 'home' && (
+          {locationId !== 'home' && !workShift && (
             <button
               onClick={handleReturnHomeNow}
               className="btn-press flex items-center gap-1.5 rounded-full bg-[#007AFF] px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md shadow-[#007AFF]/25 hover:bg-[#0066CC]"
             >
               <Home className="size-3.5" />
               <span>🏠 Return Home</span>
+            </button>
+          )}
+
+          {/* Quick Hybrid / HQ Jump Button */}
+          {job && careerDef && (
+            <button
+              onClick={() => {
+                const hqLoc = LOCATIONS.find((l) => l.id === careerDef.locationId);
+                if (hqLoc) {
+                  setDistrictFilter('All');
+                  setSelectedLoc(hqLoc);
+                }
+              }}
+              className="btn-press flex items-center gap-1.5 rounded-full border border-indigo-400/50 bg-indigo-600/90 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm hover:bg-indigo-700"
+              title="Inspect your company HQ campus on the map"
+            >
+              <span>🏢 HQ: {careerDef.company}</span>
+              <span className="rounded-full bg-white/20 px-1.5 py-0.2 font-mono text-[10px]">
+                {job.officeDaysThisWeek || 0}/3 Office Days
+              </span>
             </button>
           )}
         </div>
@@ -247,6 +275,32 @@ export const WorldMapModal: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Prominent Active Work Shift Travel Lock Banner */}
+      {workShift && (
+        <div className="relative z-20 mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-xs font-extrabold text-amber-950 shadow-sm backdrop-blur-md dark:text-amber-200">
+          <div className="flex items-center gap-2">
+            <Lock className="size-4 shrink-0 text-amber-600 dark:text-amber-300" />
+            <span>
+              🔒 Currently Clocked Into Work Shift ({workShift.mode?.toUpperCase() || 'OFFICE'}) — You cannot travel while working! Finish your shift or Leave Shift Early first.
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setActiveModal('career')}
+              className="btn-press rounded-full bg-[#007AFF] px-3 py-1 text-[11px] font-extrabold text-white"
+            >
+              🔬 Career Hub
+            </button>
+            <button
+              onClick={leaveWorkEarly}
+              className="btn-press rounded-full bg-rose-600 px-3 py-1 text-[11px] font-extrabold text-white hover:bg-rose-700"
+            >
+              Leave Shift Early to Travel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Quick NPC Spotter Strip: Immediately see where every NPC is hanging out */}
       <div className="relative z-20 flex items-center gap-1.5 overflow-x-auto px-4 pb-2">
@@ -614,15 +668,17 @@ export const WorldMapModal: React.FC = () => {
                   }`}
                 >
                   <span>🏠 Home</span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.2 text-[9px] font-black ${
-                      isHomeHere || isHomeSelected
-                        ? 'bg-white/25 text-white'
-                        : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
-                    }`}
-                  >
-                    👥 {homeNpcs.length}
-                  </span>
+                  {homeNpcs.length > 0 && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[9px] font-black ${
+                        isHomeHere || isHomeSelected
+                          ? 'bg-white/25 text-white'
+                          : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
+                      }`}
+                    >
+                      👥 {homeNpcs.length}
+                    </span>
+                  )}
                 </button>
               </div>
             );
@@ -633,6 +689,7 @@ export const WorldMapModal: React.FC = () => {
             const isSelected =
               selectedLoc !== 'home' && selectedLoc.id === loc.id;
             const isHere = locationId === loc.id;
+            const isCompanyHq = Boolean(job && careerDef?.locationId === loc.id);
             const matchesDistrict =
               districtFilter === 'All' || loc.district === districtFilter;
             const npcsAtLoc = getNpcsAtLocation(loc.id, time);
@@ -647,11 +704,20 @@ export const WorldMapModal: React.FC = () => {
                     ? 'z-40'
                     : isSelected
                     ? 'z-30'
+                    : isCompanyHq
+                    ? 'z-25'
                     : matchesDistrict
                     ? 'z-20'
                     : 'z-10 opacity-40'
                 }`}
               >
+                {/* Floating "🏢 YOUR HQ" Badge */}
+                {isCompanyHq && job && (
+                  <div className="mb-0.5 flex items-center gap-1 whitespace-nowrap rounded-full bg-indigo-600 px-2 py-0.5 text-[9px] font-black tracking-wide text-white uppercase shadow-md ring-1 ring-white">
+                    <span>🏢 YOUR HQ ({job.officeDaysThisWeek || 0}/3 Office Days)</span>
+                  </div>
+                )}
+
                 {/* Floating "📍 YOU ARE HERE" or "🎯 DESTINATION" Badge */}
                 {isHere ? (
                   <div className="mb-1 flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white uppercase shadow-lg ring-2 ring-white">
@@ -796,6 +862,9 @@ export const WorldMapModal: React.FC = () => {
                 </p>
 
                 <div className="flex flex-wrap gap-1.5">
+                  <span className="rounded-xl bg-indigo-500/15 px-2.5 py-1 text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400">
+                    🏠 Remote WFH Eligible ({job?.wfhDaysThisWeek || 0}/2 days used this week)
+                  </span>
                   <span className="rounded-xl bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                     🏠 {homeDef.gridSize}×{homeDef.gridSize} Apartment Grid
                   </span>
@@ -809,6 +878,23 @@ export const WorldMapModal: React.FC = () => {
                     💻 Deep Work & Startup Rig
                   </span>
                 </div>
+
+                {isAlreadyHere && job && !workShift && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-3">
+                    <div className="text-xs font-bold text-[var(--ink)]">
+                      🏠 Ready to log a Remote WFH Shift from your apartment desk?
+                    </div>
+                    <button
+                      onClick={() => {
+                        startWorkShift('wfh');
+                        setView('live');
+                      }}
+                      className="btn-press rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-indigo-700"
+                    >
+                      🏠 Start WFH Shift ({job.wfhDaysThisWeek || 0}/2 wk)
+                    </button>
+                  </div>
+                )}
 
                 {/* Neighbor / Visitor at Home */}
                 {homeNpcs.length > 0 && (
@@ -854,6 +940,15 @@ export const WorldMapModal: React.FC = () => {
                         👥 {venueNpcs.length}{' '}
                         {venueNpcs.length === 1 ? 'Person' : 'People'} Here Now
                       </span>
+                      {job && careerDef?.locationId === selectedLoc.id ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-indigo-500/20 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:text-indigo-300">
+                          🏢 Your HQ ({job.officeDaysThisWeek || 0}/3 Office Days)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-teal-500/15 px-2 py-0.5 text-[10px] font-extrabold text-teal-700 dark:text-teal-300">
+                          🌍 WFA Eligible ({job?.wfaDaysRemaining ?? 4}/4 WFA Passes left)
+                        </span>
+                      )}
                       {!isAlreadyHere && (
                         <span className="inline-flex items-center gap-1 rounded-md bg-[var(--mist)] px-2 py-0.5 text-[10px] font-bold text-[var(--ink-soft)]">
                           <Clock className="size-3" />
@@ -864,6 +959,52 @@ export const WorldMapModal: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Hybrid Office Card OR WFA Nomad Card */}
+                {job && careerDef?.locationId === selectedLoc.id ? (
+                  <div className="rounded-2xl border-2 border-indigo-500/40 bg-indigo-500/12 p-3">
+                    <div className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
+                      🏢 Your Company HQ Campus — Required 3 days/week ({job.officeDaysThisWeek || 0}/3 completed this week).
+                    </div>
+                    <p className="mt-0.5 text-[11px] font-medium text-indigo-800/90 dark:text-indigo-300/90">
+                      In-office shifts grant +20% Promo Velocity and unlock campus-only War Room exploration tasks.
+                    </p>
+                    {!workShift && (
+                      <button
+                        onClick={() => {
+                          if (isAlreadyHere) {
+                            startWorkShift('office');
+                          } else {
+                            commuteToOfficeAndWork(selectedMode);
+                          }
+                          setView('live');
+                        }}
+                        className="btn-press mt-2.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-xs font-extrabold text-white shadow-sm hover:bg-indigo-700"
+                      >
+                        <span>🚌 Commute & Badge In for Office Shift</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  isAlreadyHere &&
+                  job &&
+                  !workShift && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-500/35 bg-teal-500/12 p-3">
+                      <div className="text-xs font-bold text-teal-950 dark:text-teal-200">
+                        🌍 Work From Anywhere Pass ({job.wfaDaysRemaining ?? 4}/4 WFA Passes left)
+                      </div>
+                      <button
+                        onClick={() => {
+                          startWorkShift('wfa');
+                          setView('live');
+                        }}
+                        className="btn-press rounded-xl bg-teal-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-teal-700"
+                      >
+                        🌍 Work From Here (Use 1 WFA Day)
+                      </button>
+                    </div>
+                  )
+                )}
 
                 {/* People Hanging Out Here Right Now (Full Names, Roles & Companies) */}
                 <div>
@@ -1007,7 +1148,20 @@ export const WorldMapModal: React.FC = () => {
 
           {/* Primary Bottom Action Button */}
           <div className="mt-4 pt-2">
-            {isAlreadyHere ? (
+            {workShift ? (
+              <div className="space-y-2">
+                <div className="rounded-xl bg-amber-500/15 px-3 py-2 text-center text-[11px] font-extrabold text-amber-800 dark:text-amber-300">
+                  🔒 Currently Clocked Into Work Shift ({workShift.mode?.toUpperCase() || 'OFFICE'}) — Travel is locked until you finish or leave early.
+                </div>
+                <button
+                  onClick={leaveWorkEarly}
+                  className="btn-press flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 text-xs font-extrabold text-white shadow-md hover:bg-rose-700"
+                >
+                  <Lock className="size-4" />
+                  <span>Leave Shift Early to Travel</span>
+                </button>
+              </div>
+            ) : isAlreadyHere ? (
               <button
                 onClick={() => setView('live')}
                 className="btn-press flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-extrabold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-700"

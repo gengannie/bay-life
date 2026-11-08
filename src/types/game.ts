@@ -120,6 +120,39 @@ export interface ActiveMoodlet {
   expiresAt: number; // game time in minutes
 }
 
+export type WorkMode = 'office' | 'wfh' | 'wfa';
+export type WeekdayAttendance = 'none' | 'office' | 'wfh' | 'wfa' | 'missed';
+
+export interface WorkProjectDef {
+  id: string;
+  careerId?: string; // optional career affinity or cross-company
+  title: string;
+  codeName: string;
+  emoji: string;
+  category: 'infra' | 'ai' | 'product' | 'venture';
+  desc: string;
+  deliverableName: string;
+  primarySkill: SkillKey;
+  rewardCash: number;
+  rewardRsu: number;
+  promoPerfBoost: number;
+  accent: string;
+}
+
+export interface WorkExplorationTaskDef {
+  id: string;
+  title: string;
+  subtitle: string;
+  emoji: string;
+  energyCost: number;
+  projectProgressGain: number;
+  performanceGain: number;
+  skill: SkillKey;
+  skillGain: number;
+  requiresOffice?: boolean;
+  badgeLabel: string;
+}
+
 export interface CareerLevel {
   level: number;
   code: string; // e.g., "L3", "L4", "L5", "L6", "L7", "L8"
@@ -130,6 +163,9 @@ export interface CareerLevel {
   rsuPerShift: number; // per shift RSU grant
   requiredSkill: { skill: SkillKey; level: number };
   secondarySkill?: { skill: SkillKey; level: number };
+  minShiftsForPromo?: number; // minimum shifts at current level before promo packet
+  requiredDeliverables?: number; // completed work exploration deliverables required for promo
+  scopeSummary?: string; // what this level actually owns / explores
 }
 
 export interface CareerDef {
@@ -153,6 +189,17 @@ export interface JobState {
   levelIndex: number; // 0-based index into CareerDef.levels
   performance: number; // 0 to 100
   shiftsCompleted: number;
+  shiftsAtLevel?: number;
+  deliverablesCompleted?: number;
+  activeProjectId?: string;
+  projectProgress?: number; // 0 to 100
+  completedProjects?: string[];
+  officeDaysThisWeek?: number; // 3 required per week for Hybrid Policy
+  wfhDaysThisWeek?: number; // 2 remote WFH days OK per week
+  wfaDaysRemaining?: number; // 4 WFA (Work From Anywhere) days bank
+  weeklyAttendance?: WeekdayAttendance[]; // [Mon, Tue, Wed, Thu, Fri]
+  lastWorkDayLogged?: number;
+  rtoCompliant?: boolean;
   autoWork: boolean;
   preferredCommute: CommuteModeId;
 }
@@ -163,6 +210,8 @@ export interface ActiveWorkShift {
   totalMinutes: number;
   elapsedMinutes: number;
   tone: WorkToneId;
+  mode?: WorkMode;
+  workLocationId?: string;
   dilemmaTriggered?: boolean;
 }
 
@@ -188,6 +237,7 @@ export interface ActiveTravel {
   arriveAt: number;
   totalMinutes: number;
   fare: number;
+  autoStartShiftOnArrival?: boolean;
 }
 
 export interface VenueStation {
@@ -218,19 +268,70 @@ export interface LocationDef {
   stations: VenueStation[];
 }
 
+export interface HomePerkBadge {
+  emoji: string;
+  label: string;
+  desc: string;
+}
+
+export interface HomeBonuses {
+  needDecayMult: number; // < 1.0 slows need drain
+  sleepRecoveryMult: number; // > 1.0 boosts sleep/care recovery
+  skillXpMult: number; // > 1.0 boosts home skill XP
+  startupMult: number; // > 1.0 boosts home startup progress
+  commuteTimeMult: number; // < 1.0 speeds up commutes from this home
+  ambientMoodletId: string;
+  maxVisitors: number; // 1 to 3 NPCs visiting/around building
+  builtInPowerBackup?: boolean; // built-in luxury building backup power
+}
+
+export interface HomeArchitecture {
+  styleName: string;
+  windowType:
+    | 'garage_transom'
+    | 'ranch_slider'
+    | 'edwardian_bay'
+    | 'soma_curtainwall'
+    | 'pac_heights_terrace';
+  rightWallFeature:
+    | 'breaker_box'
+    | 'founder_whiteboard'
+    | 'vinyl_alcove'
+    | 'acoustic_slats'
+    | 'marble_fireplace';
+  wallLeftGrad: [string, string];
+  wallRightGrad: [string, string];
+  wallLeftNight: [string, string];
+  wallRightNight: [string, string];
+  trimColor: string;
+  floorPrimary: string;
+  floorSecondary: string;
+  rugColor?: string;
+  rugAccent?: string;
+  ambientGlow: string;
+}
+
 export interface HomeDef {
   id: string;
   name: string;
+  shortName?: string;
   area: string;
   district: 'San Francisco' | 'Peninsula' | 'South Bay';
+  tier: 1 | 2 | 3 | 4 | 5;
+  tierLabel: string;
   emoji: string;
   tagline: string;
   weeklyRent: number;
   buyPrice: number;
   gridSize: number;
   floorStyle: 'wood' | 'concrete' | 'marble';
+  mapCoords: { x: number; y: number };
+  commuteSummary: string;
   starterMoney: number;
   starterObjects: Array<{ objectId: string; x: number; y: number }>;
+  perks: HomePerkBadge[];
+  bonuses: HomeBonuses;
+  architecture: HomeArchitecture;
 }
 
 export interface NPCDef {

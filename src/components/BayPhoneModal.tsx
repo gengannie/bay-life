@@ -7,6 +7,9 @@ import {
   HOMES,
   NPCS,
   SKILLS_META,
+  WORK_EXPLORATION_TASKS,
+  WORK_PROJECTS,
+  WORK_PROJECT_BY_ID,
 } from '../data/worldData';
 import {
   calculateNetWorth,
@@ -14,6 +17,7 @@ import {
   formatTime,
   useGameStore,
 } from '../store/useGameStore';
+import { CommuteModeId, WorkMode } from '../types/game';
 import { Portrait } from './Portrait';
 import {
   Briefcase,
@@ -141,7 +145,28 @@ export const BayPhoneModal: React.FC = () => {
   const stats = useGameStore((s) => s.stats);
 
   const applyJob = useGameStore((s) => s.applyJob);
-  const startWorkShift = useGameStore((s) => s.startWorkShift);
+  const startWorkShift = useGameStore(
+    (s) =>
+      (s as typeof s & { startWorkShift: (preferredMode?: WorkMode) => void })
+        .startWorkShift
+  );
+  const commuteToOfficeAndWork = useGameStore(
+    (s) =>
+      (
+        s as typeof s & {
+          commuteToOfficeAndWork?: (mode?: CommuteModeId) => void;
+        }
+      ).commuteToOfficeAndWork
+  );
+  const doWorkExploration = useGameStore(
+    (s) =>
+      (s as typeof s & { doWorkExploration?: (taskId: string) => void })
+        .doWorkExploration
+  );
+  const submitPromoPacket = useGameStore(
+    (s) => (s as typeof s & { submitPromoPacket?: () => void }).submitPromoPacket
+  );
+  const locationId = useGameStore((s) => s.locationId);
   const toggleAutoWork = useGameStore((s) => s.toggleAutoWork);
   const vestRsuToCash = useGameStore((s) => s.vestRsuToCash);
   const investInPortfolio = useGameStore((s) => s.investInPortfolio);
@@ -391,116 +416,298 @@ export const BayPhoneModal: React.FC = () => {
           ========================================================= */}
           {phoneApp === 'levels' && (
             <div className="space-y-3.5">
-              {/* Current Role Hero Card */}
-              {currentCareer && currentLevel && job && (
-                <div className="rounded-3xl bg-gradient-to-br from-[#007AFF]/15 via-indigo-500/10 to-transparent p-4 border border-[#007AFF]/25">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{currentCareer.emoji}</span>
+              {/* Current Role Hero Card + Hybrid Work Policy & Multi-Gate Promo */}
+              {currentCareer && currentLevel && job && (() => {
+                const defaultProj =
+                  WORK_PROJECTS.find((p) => p.careerId === currentCareer.id) ||
+                  WORK_PROJECTS[0];
+                const activeProj =
+                  (job.activeProjectId && WORK_PROJECT_BY_ID[job.activeProjectId]) ||
+                  defaultProj;
+                const projPct = Math.min(100, Math.round(job.projectProgress ?? 0));
+                const shiftsAtLvl = job.shiftsAtLevel ?? job.shiftsCompleted ?? 0;
+                const reqShifts = nextLevel?.minShiftsForPromo ?? 3;
+                const deliverablesDone = job.deliverablesCompleted ?? 0;
+                const reqDeliverables = nextLevel?.requiredDeliverables ?? 1;
+                const isAtCampus = locationId === currentCareer.locationId;
+
+                return (
+                  <>
+                    <div className="rounded-3xl bg-gradient-to-br from-[#007AFF]/15 via-indigo-500/10 to-transparent p-4 border border-[#007AFF]/25 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{currentCareer.emoji}</span>
+                          <div>
+                            <div className="text-sm font-black leading-tight">
+                              {currentCareer.company}
+                            </div>
+                            <div className="text-[11px] font-semibold text-[var(--ink-soft)]">
+                              {currentLevel.title} · {currentCareer.district}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-[#007AFF] px-3 py-0.5 text-xs font-black text-white shadow-sm">
+                          {currentLevel.code}
+                        </span>
+                      </div>
+
+                      {/* Hybrid Work Policy Summary Pill + Full Hub Button */}
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-2xl bg-white/75 px-3 py-2 text-[10px] font-extrabold dark:bg-black/35">
+                        <span>
+                          🏢 {job.officeDaysThisWeek || 0}/3 Office · 🏠 {job.wfhDaysThisWeek || 0}/2 WFH · 🌍{' '}
+                          {job.wfaDaysRemaining ?? 4}/4 WFA
+                        </span>
+                        <button
+                          onClick={() => setActiveModal('career')}
+                          className="btn-press rounded-lg bg-[#007AFF] px-2 py-0.5 text-[10px] font-black text-white"
+                        >
+                          Open Career Hub ↗
+                        </button>
+                      </div>
+
+                      {/* Big Visual TC Bento Pills */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-2xl bg-white/70 p-2 text-center dark:bg-black/35">
+                          <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">
+                            Total Comp
+                          </div>
+                          <div className="mt-0.5 text-xs font-black text-[#007AFF]">
+                            {formatCurrency(currentLevel.baseSalary + currentLevel.rsuAnnual)}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white/70 p-2 text-center dark:bg-black/35">
+                          <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">
+                            Shift Cash
+                          </div>
+                          <div className="mt-0.5 text-xs font-black text-emerald-600">
+                            +{formatCurrency(currentLevel.shiftPay)}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white/70 p-2 text-center dark:bg-black/35">
+                          <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">
+                            Shift RSU
+                          </div>
+                          <div className="mt-0.5 text-xs font-black text-purple-600">
+                            +{formatCurrency(currentLevel.rsuPerShift)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Multi-Gate Promo Packet Checklist */}
                       <div>
-                        <div className="text-sm font-black leading-tight">{currentCareer.company}</div>
-                        <div className="text-[11px] font-semibold text-[var(--ink-soft)]">
-                          {currentLevel.title} · {currentCareer.district}
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                          <span>
+                            Promo Packet{' '}
+                            {nextLevel ? `→ ${nextLevel.code} (${nextLevel.title})` : '· Max Level'}
+                          </span>
+                          <span className="text-[#007AFF]">
+                            {Math.round(job.performance)}% / 92%
+                          </span>
+                        </div>
+                        <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-[#007AFF] to-indigo-500 transition-all duration-300"
+                            style={{ width: `${job.performance}%` }}
+                          />
+                        </div>
+
+                        {nextLevel ? (
+                          <div className="mt-2 space-y-1.5 rounded-2xl bg-white/65 p-2.5 text-[10px] font-bold dark:bg-black/30">
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div className="flex items-center justify-between rounded-lg bg-black/5 px-2 py-1 dark:bg-white/5">
+                                <span>📊 Calibration</span>
+                                <span
+                                  className={
+                                    Math.round(job.performance) >= 92
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-amber-600 dark:text-amber-400'
+                                  }
+                                >
+                                  {Math.round(job.performance)}%/92%
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between rounded-lg bg-black/5 px-2 py-1 dark:bg-white/5">
+                                <span>⏳ Tenure</span>
+                                <span
+                                  className={
+                                    shiftsAtLvl >= reqShifts
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-amber-600 dark:text-amber-400'
+                                  }
+                                >
+                                  {shiftsAtLvl}/{reqShifts} shifts
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between rounded-lg bg-black/5 px-2 py-1 dark:bg-white/5">
+                                <span>
+                                  {
+                                    SKILLS_META.find(
+                                      (sk) => sk.key === nextLevel.requiredSkill.skill
+                                    )?.emoji
+                                  }{' '}
+                                  Primary
+                                </span>
+                                <span
+                                  className={
+                                    Math.floor(skills[nextLevel.requiredSkill.skill]) >=
+                                    nextLevel.requiredSkill.level
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-amber-600 dark:text-amber-400'
+                                  }
+                                >
+                                  Lv.{Math.floor(skills[nextLevel.requiredSkill.skill])}/
+                                  {nextLevel.requiredSkill.level}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between rounded-lg bg-black/5 px-2 py-1 dark:bg-white/5">
+                                <span>📦 Shipped</span>
+                                <span
+                                  className={
+                                    deliverablesDone >= reqDeliverables
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-purple-600 dark:text-purple-400'
+                                  }
+                                >
+                                  {deliverablesDone}/{reqDeliverables}
+                                </span>
+                              </div>
+                            </div>
+
+                            {nextLevel.secondarySkill && (
+                              <div className="flex items-center justify-between rounded-lg bg-black/5 px-2 py-1 dark:bg-white/5">
+                                <span>
+                                  {
+                                    SKILLS_META.find(
+                                      (sk) => sk.key === nextLevel.secondarySkill!.skill
+                                    )?.emoji
+                                  }{' '}
+                                  Secondary (
+                                  {
+                                    SKILLS_META.find(
+                                      (sk) => sk.key === nextLevel.secondarySkill!.skill
+                                    )?.label
+                                  }
+                                  )
+                                </span>
+                                <span
+                                  className={
+                                    Math.floor(skills[nextLevel.secondarySkill.skill]) >=
+                                    nextLevel.secondarySkill.level
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-amber-600 dark:text-amber-400'
+                                  }
+                                >
+                                  Lv.{Math.floor(skills[nextLevel.secondarySkill.skill])}/
+                                  {nextLevel.secondarySkill.level}
+                                </span>
+                              </div>
+                            )}
+
+                            <button
+                              onClick={() => submitPromoPacket?.()}
+                              className="btn-press mt-1 w-full rounded-xl bg-gradient-to-r from-[#007AFF] to-indigo-600 py-1.5 text-[11px] font-black text-white shadow-xs"
+                            >
+                              📋 Submit Promo Packet ({nextLevel.code})
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="mt-1.5 rounded-xl bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            👑 Top IC/Partner Level Achieved
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quick Work Mode Dispatch Buttons (Office / WFH / WFA) */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px] font-extrabold text-[var(--ink-soft)]">
+                          <span>QUICK WORK SHIFT DISPATCH</span>
+                          <button
+                            onClick={toggleAutoWork}
+                            className={`rounded-md px-2 py-0.5 text-[9px] font-black ${
+                              job.autoWork
+                                ? 'bg-emerald-500 text-white'
+                                : 'bg-black/5 text-[var(--ink)] dark:bg-white/10'
+                            }`}
+                          >
+                            Auto: {job.autoWork ? 'ON' : 'OFF'}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <button
+                            disabled={!!workShift || !!travel}
+                            onClick={() =>
+                              isAtCampus
+                                ? startWorkShift('office')
+                                : commuteToOfficeAndWork
+                                ? commuteToOfficeAndWork(job.preferredCommute)
+                                : startWorkShift('office')
+                            }
+                            className="btn-press rounded-xl bg-emerald-600 py-2 text-[11px] font-extrabold text-white shadow-xs disabled:opacity-50"
+                          >
+                            🏢 Office ({job.officeDaysThisWeek || 0}/3)
+                          </button>
+                          <button
+                            disabled={!!workShift || !!travel}
+                            onClick={() => startWorkShift('wfh')}
+                            className="btn-press rounded-xl bg-[#007AFF] py-2 text-[11px] font-extrabold text-white shadow-xs disabled:opacity-50"
+                          >
+                            🏠 WFH ({job.wfhDaysThisWeek || 0}/2)
+                          </button>
+                          <button
+                            disabled={!!workShift || !!travel || (job.wfaDaysRemaining ?? 4) <= 0}
+                            onClick={() => startWorkShift('wfa')}
+                            className="btn-press rounded-xl bg-purple-600 py-2 text-[11px] font-extrabold text-white shadow-xs disabled:opacity-50"
+                          >
+                            🌍 WFA ({job.wfaDaysRemaining ?? 4}/4)
+                          </button>
                         </div>
                       </div>
                     </div>
-                    <span className="rounded-full bg-[#007AFF] px-3 py-0.5 text-xs font-black text-white shadow-sm">
-                      {currentLevel.code}
-                    </span>
-                  </div>
 
-                  {/* Big Visual TC Bento Pills */}
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <div className="rounded-2xl bg-white/70 p-2.5 text-center dark:bg-black/35">
-                      <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">Total Comp</div>
-                      <div className="mt-0.5 text-xs font-black text-[#007AFF]">
-                        {formatCurrency(currentLevel.baseSalary + currentLevel.rsuAnnual)}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl bg-white/70 p-2.5 text-center dark:bg-black/35">
-                      <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">Shift Cash</div>
-                      <div className="mt-0.5 text-xs font-black text-emerald-600">
-                        +{formatCurrency(currentLevel.shiftPay)}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl bg-white/70 p-2.5 text-center dark:bg-black/35">
-                      <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">Shift RSU</div>
-                      <div className="mt-0.5 text-xs font-black text-purple-600">
-                        +{formatCurrency(currentLevel.rsuPerShift)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Promo Readiness Bar */}
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-[11px] font-bold">
-                      <span>
-                        Promo Velocity{' '}
-                        {nextLevel ? `→ ${nextLevel.code} (${nextLevel.title})` : '· Max Level'}
-                      </span>
-                      <span className="text-[#007AFF]">{Math.round(job.performance)}% / 92%</span>
-                    </div>
-                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#007AFF] to-indigo-500 transition-all duration-300"
-                        style={{ width: `${job.performance}%` }}
-                      />
-                    </div>
-                    {nextLevel ? (
-                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 rounded-xl bg-white/60 px-2.5 py-1.5 text-[10px] font-bold text-[var(--ink)] dark:bg-black/25">
-                        <span>
-                          🎯 Promo at 92% Performance +{' '}
-                          {SKILLS_META.find((sk) => sk.key === nextLevel.requiredSkill.skill)?.label ||
-                            nextLevel.requiredSkill.skill}{' '}
-                          Lv.{nextLevel.requiredSkill.level}
+                    {/* Quick Active Work Exploration Project Card */}
+                    <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-transparent p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{activeProj.emoji}</span>
+                          <div>
+                            <div className="text-[9px] font-black uppercase tracking-wider text-indigo-500">
+                              ACTIVE CHARTER · {activeProj.codeName}
+                            </div>
+                            <div className="text-xs font-black leading-tight">
+                              {activeProj.title}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-black text-indigo-600 dark:text-indigo-300">
+                          {projPct}%
                         </span>
-                        <span
-                          className={
-                            Math.floor(skills[nextLevel.requiredSkill.skill]) >=
-                            nextLevel.requiredSkill.level
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-amber-600 dark:text-amber-400'
-                          }
+                      </div>
+
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-300"
+                          style={{ width: `${projPct}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <button
+                          onClick={() => doWorkExploration?.(WORK_EXPLORATION_TASKS[0].id)}
+                          className="btn-press flex-1 rounded-xl bg-indigo-600 py-1.5 text-[10px] font-extrabold text-white shadow-xs"
                         >
-                          {Math.floor(skills[nextLevel.requiredSkill.skill]) >=
-                          nextLevel.requiredSkill.level
-                            ? `✓ Lv.${Math.floor(skills[nextLevel.requiredSkill.skill])}/${nextLevel.requiredSkill.level}`
-                            : `Yours: Lv.${Math.floor(skills[nextLevel.requiredSkill.skill])}/${nextLevel.requiredSkill.level}`}
-                        </span>
+                          📐 Sprint Charter (+{WORK_EXPLORATION_TASKS[0].projectProgressGain}%)
+                        </button>
+                        <button
+                          onClick={() => setActiveModal('career')}
+                          className="btn-press rounded-xl bg-white/75 px-2.5 py-1.5 text-[10px] font-extrabold text-[var(--ink)] dark:bg-white/10"
+                        >
+                          All 6 Tasks ↗
+                        </button>
                       </div>
-                    ) : (
-                      <div className="mt-1.5 rounded-xl bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                        👑 Top IC/Partner Level Achieved
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 1-Tap Shift Controls */}
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      disabled={!!workShift || !!travel}
-                      onClick={startWorkShift}
-                      className="btn-press flex-1 rounded-2xl bg-[#007AFF] py-2.5 text-xs font-extrabold text-white shadow-sm disabled:opacity-50"
-                    >
-                      {workShift
-                        ? '⚡ Shift in Progress'
-                        : travel
-                        ? '🚌 Commuting...'
-                        : '⚡ Badge In for Shift'}
-                    </button>
-                    <button
-                      onClick={toggleAutoWork}
-                      className={`btn-press rounded-2xl px-3.5 py-2.5 text-xs font-extrabold ${
-                        job.autoWork
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-white/70 text-[var(--ink)] dark:bg-white/10'
-                      }`}
-                    >
-                      Auto: {job.autoWork ? 'ON' : 'OFF'}
-                    </button>
-                  </div>
-                </div>
-              )}
+                    </div>
+                  </>
+                );
+              })()}
 
               {/* INTERACTIVE MINI-GAME: ⚡ LEETCODE DAILY BLITZ */}
               <div className="rounded-3xl bg-gradient-to-br from-purple-500/15 via-indigo-500/10 to-transparent p-3.5 border border-purple-500/30 space-y-2.5">

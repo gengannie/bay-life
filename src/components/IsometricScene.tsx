@@ -216,6 +216,7 @@ export const IsometricScene: React.FC = () => {
   const autoFixNeed = useGameStore((s) => s.autoFixNeed);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
   const setView = useGameStore((s) => s.setView);
+  const setActiveModal = useGameStore((s) => s.setActiveModal);
   const travelTo = useGameStore((s) => s.travelTo);
 
   const [selectedObject, setSelectedObject] = useState<PlacedObject | null>(null);
@@ -249,6 +250,7 @@ export const IsometricScene: React.FC = () => {
   const [botPhase, setBotPhase] = useState<number>(0);
   const [botHovered, setBotHovered] = useState<boolean>(false);
   const [windowHovered, setWindowHovered] = useState<boolean>(false);
+  const [rightWallHovered, setRightWallHovered] = useState<boolean>(false);
   const [droneAvailable, setDroneAvailable] = useState<boolean>(true);
   const [droneHovered, setDroneHovered] = useState<boolean>(false);
   const [sparkleBurst, setSparkleBurst] = useState<{
@@ -393,6 +395,9 @@ export const IsometricScene: React.FC = () => {
 
   const getFloorColors = (x: number, y: number) => {
     const alt = (x + y) % 2 === 0;
+    if (isHome && homeDef.architecture) {
+      return alt ? homeDef.architecture.floorPrimary : homeDef.architecture.floorSecondary;
+    }
     if (floorStyle === 'wood') {
       return alt ? '#D6B18A' : '#CCA47B';
     }
@@ -549,9 +554,11 @@ export const IsometricScene: React.FC = () => {
             floorStyle === 'club'
               ? 'radial-gradient(circle at 50% 42%, rgba(168,85,247,0.32), rgba(15,23,42,0.92))'
               : isNight
-              ? 'radial-gradient(circle at 50% 35%, rgba(56,189,248,0.12), rgba(15,23,42,0.55))'
+              ? 'radial-gradient(circle at 50% 35%, rgba(56,189,248,0.14), rgba(15,23,42,0.58))'
               : isSunset
-              ? 'radial-gradient(circle at 50% 35%, rgba(251,146,60,0.22), transparent 70%)'
+              ? 'radial-gradient(circle at 50% 35%, rgba(251,146,60,0.24), transparent 70%)'
+              : isHome && homeDef.architecture
+              ? homeDef.architecture.ambientGlow
               : 'radial-gradient(circle at 50% 35%, rgba(255,255,255,0.45), transparent 70%)',
         }}
       />
@@ -575,12 +582,56 @@ export const IsometricScene: React.FC = () => {
       >
         <defs>
           <linearGradient id="wallLeftGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={isNight ? '#1E293B' : '#F8FAFC'} />
-            <stop offset="100%" stopColor={isNight ? '#0F172A' : '#E2E8F0'} />
+            <stop
+              offset="0%"
+              stopColor={
+                isHome && homeDef.architecture
+                  ? isNight
+                    ? homeDef.architecture.wallLeftNight[0]
+                    : homeDef.architecture.wallLeftGrad[0]
+                  : isNight
+                  ? '#1E293B'
+                  : '#F8FAFC'
+              }
+            />
+            <stop
+              offset="100%"
+              stopColor={
+                isHome && homeDef.architecture
+                  ? isNight
+                    ? homeDef.architecture.wallLeftNight[1]
+                    : homeDef.architecture.wallLeftGrad[1]
+                  : isNight
+                  ? '#0F172A'
+                  : '#E2E8F0'
+              }
+            />
           </linearGradient>
           <linearGradient id="wallRightGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={isNight ? '#334155' : '#F1F5F9'} />
-            <stop offset="100%" stopColor={isNight ? '#1E293B' : '#CBD5E1'} />
+            <stop
+              offset="0%"
+              stopColor={
+                isHome && homeDef.architecture
+                  ? isNight
+                    ? homeDef.architecture.wallRightNight[0]
+                    : homeDef.architecture.wallRightGrad[0]
+                  : isNight
+                  ? '#334155'
+                  : '#F1F5F9'
+              }
+            />
+            <stop
+              offset="100%"
+              stopColor={
+                isHome && homeDef.architecture
+                  ? isNight
+                    ? homeDef.architecture.wallRightNight[1]
+                    : homeDef.architecture.wallRightGrad[1]
+                  : isNight
+                  ? '#1E293B'
+                  : '#CBD5E1'
+              }
+            />
           </linearGradient>
           <linearGradient id="bayWindowSky" x1="0" y1="0" x2="0" y2="1">
             <stop
@@ -592,11 +643,22 @@ export const IsometricScene: React.FC = () => {
               stopColor={isNight ? '#1E1B4B' : isSunset ? '#FBBF24' : '#BAE6FD'}
             />
           </linearGradient>
-          <clipPath id="bayWindowClip">
-            <polygon
-              points={`${backCorner.sx - 150},${backCorner.sy - 16} ${backCorner.sx - 35},${backCorner.sy - 74} ${backCorner.sx - 35},${backCorner.sy - 4} ${backCorner.sx - 150},${backCorner.sy + 54}`}
-            />
-          </clipPath>
+          {(() => {
+            const winType = isHome ? homeDef.architecture?.windowType : 'edwardian_bay';
+            const pts =
+              winType === 'garage_transom'
+                ? `${backCorner.sx - 135},${backCorner.sy - 32} ${backCorner.sx - 42},${backCorner.sy - 79} ${backCorner.sx - 42},${backCorner.sy - 41} ${backCorner.sx - 135},${backCorner.sy + 6}`
+                : winType === 'soma_curtainwall'
+                ? `${backCorner.sx - 188},${backCorner.sy - 10} ${backCorner.sx - 24},${backCorner.sy - 94} ${backCorner.sx - 24},${backCorner.sy - 6} ${backCorner.sx - 188},${backCorner.sy + 78}`
+                : winType === 'pac_heights_terrace'
+                ? `${backCorner.sx - 206},${backCorner.sy - 2} ${backCorner.sx - 24},${backCorner.sy - 95} ${backCorner.sx - 24},${backCorner.sy - 5} ${backCorner.sx - 206},${backCorner.sy + 88}`
+                : `${backCorner.sx - 150},${backCorner.sy - 16} ${backCorner.sx - 35},${backCorner.sy - 74} ${backCorner.sx - 35},${backCorner.sy - 4} ${backCorner.sx - 150},${backCorner.sy + 54}`;
+            return (
+              <clipPath id="bayWindowClip">
+                <polygon points={pts} />
+              </clipPath>
+            );
+          })()}
           <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow
               dx="0"
@@ -614,218 +676,760 @@ export const IsometricScene: React.FC = () => {
           <polygon
             points={`${leftCorner.sx},${leftCorner.sy} ${backCorner.sx},${backCorner.sy} ${backCorner.sx},${backCorner.sy - WALL_H} ${leftCorner.sx},${leftCorner.sy - WALL_H}`}
             fill="url(#wallLeftGrad)"
-            stroke="rgba(148,163,184,0.35)"
-            strokeWidth="1.5"
+            stroke={isHome && homeDef.architecture ? homeDef.architecture.trimColor : 'rgba(148,163,184,0.35)'}
+            strokeWidth={isHome && homeDef.tier >= 4 ? '2.2' : '1.5'}
           />
           {/* Right Back Wall */}
           <polygon
             points={`${backCorner.sx},${backCorner.sy} ${rightCorner.sx},${rightCorner.sy} ${rightCorner.sx},${rightCorner.sy - WALL_H} ${backCorner.sx},${backCorner.sy - WALL_H}`}
             fill="url(#wallRightGrad)"
-            stroke="rgba(148,163,184,0.35)"
-            strokeWidth="1.5"
+            stroke={isHome && homeDef.architecture ? homeDef.architecture.trimColor : 'rgba(148,163,184,0.35)'}
+            strokeWidth={isHome && homeDef.tier >= 4 ? '2.2' : '1.5'}
           />
 
-          {/* Interactive Panoramic Bay Window with Golden Gate & Karl the Fog */}
-          <g
-            className="cursor-pointer"
-            onMouseEnter={() => setWindowHovered(true)}
-            onMouseLeave={() => setWindowHovered(false)}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (dragRef.current.moved) return;
-              triggerMicroReward({
-                needKey: 'fun',
-                needDelta: 16,
-                toastText: 'Watched Karl the Fog roll over the Golden Gate (+16% Peace)',
-                emoji: '🌉',
-              });
-              triggerSparkle(
-                backCorner.sx - 92,
-                backCorner.sy - 38,
-                '🌉',
-                '🎮 +16% Peace & Clarity',
-                'Golden Gate Panorama',
-                'Watched Karl the Fog drift across the Marin Headlands'
-              );
-            }}
-          >
-            <polygon
-              points={`${backCorner.sx - 150},${backCorner.sy - 16} ${backCorner.sx - 35},${backCorner.sy - 74} ${backCorner.sx - 35},${backCorner.sy - 4} ${backCorner.sx - 150},${backCorner.sy + 54}`}
-              fill="url(#bayWindowSky)"
-              stroke={windowHovered ? '#38BDF8' : '#64748B'}
-              strokeWidth={windowHovered ? '3' : '2.5'}
-            />
-
-            <g clipPath="url(#bayWindowClip)">
-              {/* Twinkling Bay Stars & City Lights at Night */}
-              {isNight && (
-                <g>
-                  <circle cx={backCorner.sx - 132} cy={backCorner.sy - 18} r="1.3" fill="#FDE047">
-                    <animate
-                      attributeName="opacity"
-                      values="0.25;1;0.25"
-                      dur="2.4s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                  <circle cx={backCorner.sx - 85} cy={backCorner.sy - 42} r="1.2" fill="#F8FAFC">
-                    <animate
-                      attributeName="opacity"
-                      values="0.9;0.2;0.9"
-                      dur="1.9s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                  <circle cx={backCorner.sx - 52} cy={backCorner.sy - 55} r="1.4" fill="#38BDF8">
-                    <animate
-                      attributeName="opacity"
-                      values="0.3;1;0.3"
-                      dur="2.8s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                  {/* Distant SF / Marin shore lights */}
-                  <circle cx={backCorner.sx - 135} cy={backCorner.sy + 26} r="1.2" fill="#FBBF24" />
-                  <circle cx={backCorner.sx - 108} cy={backCorner.sy + 14} r="1.2" fill="#FDE047" />
-                  <circle cx={backCorner.sx - 78} cy={backCorner.sy - 2} r="1.2" fill="#FBBF24" />
-                </g>
-              )}
-
-              {/* Golden Gate Bridge Silhouette inside Window */}
+          {/* Home-Specific Architectural Wall Detailing (Molding, Wainscoting, Conduit, or LED Cove) */}
+          {isHome && homeDef.id === 'daly_city_inlaw' && (
+            <g opacity="0.55">
+              {/* Exposed Garage Conduit Pipe & Cinderblock Seam Lines */}
               <line
-                x1={backCorner.sx - 122}
-                y1={backCorner.sy + 26}
-                x2={backCorner.sx - 122}
-                y2={backCorner.sy - 12}
-                stroke="#EA580C"
-                strokeWidth="3"
+                x1={leftCorner.sx + 10}
+                y1={leftCorner.sy - 26}
+                x2={backCorner.sx - 8}
+                y2={backCorner.sy - 26}
+                stroke="#64748B"
+                strokeWidth="2"
+                strokeDasharray="6 3"
               />
               <line
-                x1={backCorner.sx - 65}
-                y1={backCorner.sy - 4}
-                x2={backCorner.sx - 65}
-                y2={backCorner.sy - 44}
-                stroke="#EA580C"
-                strokeWidth="3"
-              />
-              {/* Bridge Deck & Suspension Cables */}
-              <line
-                x1={backCorner.sx - 148}
-                y1={backCorner.sy + 28}
-                x2={backCorner.sx - 36}
-                y2={backCorner.sy - 28}
-                stroke="#C2410C"
+                x1={backCorner.sx + 8}
+                y1={backCorner.sy - 26}
+                x2={rightCorner.sx - 10}
+                y2={rightCorner.sy - 26}
+                stroke="#64748B"
                 strokeWidth="2"
               />
-              <path
-                d={`M ${backCorner.sx - 146},${backCorner.sy + 18} Q ${backCorner.sx - 93},${backCorner.sy + 4} ${backCorner.sx - 40},${backCorner.sy - 36}`}
-                fill="none"
-                stroke="#EA580C"
-                strokeWidth="2"
-              />
-              {/* Tower Aviation Beacons */}
-              <circle cx={backCorner.sx - 122} cy={backCorner.sy - 13} r="1.8" fill="#EF4444">
-                <animate
-                  attributeName="opacity"
-                  values="0.3;1;0.3"
-                  dur="1.6s"
-                  repeatCount="indefinite"
-                />
-              </circle>
-              <circle cx={backCorner.sx - 65} cy={backCorner.sy - 45} r="1.8" fill="#EF4444">
-                <animate
-                  attributeName="opacity"
-                  values="1;0.3;1"
-                  dur="1.6s"
-                  repeatCount="indefinite"
-                />
-              </circle>
-
-              {/* Animated Karl the Fog drifting softly across Golden Gate */}
-              <g opacity={weather === 'foggy' ? 0.88 : 0.55}>
-                <ellipse
-                  cx={backCorner.sx - 96}
-                  cy={backCorner.sy + 6}
-                  rx="38"
-                  ry="8.5"
-                  fill="rgba(255,255,255,0.75)"
-                >
-                  <animateTransform
-                    attributeName="transform"
-                    type="translate"
-                    values="-18,9; 18,-9; -18,9"
-                    dur="9s"
-                    repeatCount="indefinite"
-                  />
-                </ellipse>
-                <ellipse
-                  cx={backCorner.sx - 76}
-                  cy={backCorner.sy - 14}
-                  rx="30"
-                  ry="6.5"
-                  fill="rgba(241,245,249,0.68)"
-                >
-                  <animateTransform
-                    attributeName="transform"
-                    type="translate"
-                    values="14,-7; -16,8; 14,-7"
-                    dur="12s"
-                    repeatCount="indefinite"
-                  />
-                </ellipse>
-              </g>
             </g>
+          )}
 
-            {/* Hover Prompt Badge on Window (Enlarged & Crisp) */}
-            {windowHovered && (
-              <g transform={`translate(${backCorner.sx - 92}, ${backCorner.sy - 58})`}>
-                <rect
-                  x="-76"
-                  y="-14"
-                  width="152"
-                  height="24"
-                  rx="12"
-                  fill="rgba(15,23,42,0.94)"
-                  stroke="#38BDF8"
-                  strokeWidth="1.5"
+          {isHome && homeDef.id === 'soma_loft' && (
+            <g>
+              {/* Warm Penthouse LED Ceiling Cove Glow Strip */}
+              <line
+                x1={leftCorner.sx + 4}
+                y1={leftCorner.sy - WALL_H + 5}
+                x2={backCorner.sx}
+                y2={backCorner.sy - WALL_H + 5}
+                stroke="#F59E0B"
+                strokeWidth="3"
+                opacity="0.85"
+              />
+              <line
+                x1={backCorner.sx}
+                y1={backCorner.sy - WALL_H + 5}
+                x2={rightCorner.sx - 4}
+                y2={rightCorner.sy - WALL_H + 5}
+                stroke="#F59E0B"
+                strokeWidth="3"
+                opacity="0.85"
+              />
+            </g>
+          )}
+
+          {isHome && homeDef.id === 'pac_heights_victorian' && (
+            <g>
+              {/* Gilded Victorian Crown Molding & Chair Rail Wainscoting */}
+              <line
+                x1={leftCorner.sx + 2}
+                y1={leftCorner.sy - WALL_H + 6}
+                x2={backCorner.sx}
+                y2={backCorner.sy - WALL_H + 6}
+                stroke="#D97706"
+                strokeWidth="2.8"
+                opacity="0.75"
+              />
+              <line
+                x1={backCorner.sx}
+                y1={backCorner.sy - WALL_H + 6}
+                x2={rightCorner.sx - 2}
+                y2={rightCorner.sy - WALL_H + 6}
+                stroke="#D97706"
+                strokeWidth="2.8"
+                opacity="0.75"
+              />
+              <line
+                x1={leftCorner.sx + 2}
+                y1={leftCorner.sy - 24}
+                x2={backCorner.sx}
+                y2={backCorner.sy - 24}
+                stroke="#D97706"
+                strokeWidth="1.6"
+                opacity="0.55"
+              />
+              <line
+                x1={backCorner.sx}
+                y1={backCorner.sy - 24}
+                x2={rightCorner.sx - 2}
+                y2={rightCorner.sy - 24}
+                stroke="#D97706"
+                strokeWidth="1.6"
+                opacity="0.55"
+              />
+            </g>
+          )}
+
+          {/* Interactive Left-Wall Window Customized by Home Tier & Architecture */}
+          {(() => {
+            const winType = isHome ? homeDef.architecture?.windowType : 'edwardian_bay';
+            const winPoly =
+              winType === 'garage_transom'
+                ? `${backCorner.sx - 135},${backCorner.sy - 32} ${backCorner.sx - 42},${backCorner.sy - 79} ${backCorner.sx - 42},${backCorner.sy - 41} ${backCorner.sx - 135},${backCorner.sy + 6}`
+                : winType === 'soma_curtainwall'
+                ? `${backCorner.sx - 188},${backCorner.sy - 10} ${backCorner.sx - 24},${backCorner.sy - 94} ${backCorner.sx - 24},${backCorner.sy - 6} ${backCorner.sx - 188},${backCorner.sy + 78}`
+                : winType === 'pac_heights_terrace'
+                ? `${backCorner.sx - 206},${backCorner.sy - 2} ${backCorner.sx - 24},${backCorner.sy - 95} ${backCorner.sx - 24},${backCorner.sy - 5} ${backCorner.sx - 206},${backCorner.sy + 88}`
+                : `${backCorner.sx - 150},${backCorner.sy - 16} ${backCorner.sx - 35},${backCorner.sy - 74} ${backCorner.sx - 35},${backCorner.sy - 4} ${backCorner.sx - 150},${backCorner.sy + 54}`;
+
+            const winMeta =
+              winType === 'garage_transom'
+                ? {
+                    needKey: 'energy' as NeedKey,
+                    delta: 14,
+                    emoji: '🌫️',
+                    hoverLabel: '🌫️ Fog & BART (+14% Focus)',
+                    toast: 'Watched Karl the Fog & distant BART train lights (+14% Focus)',
+                    sparkleTitle: 'Daly City Garage Transom',
+                    sparkleSub: 'Cool Pacific fog keeps your GPU & founder hustle running cold',
+                  }
+                : winType === 'ranch_slider'
+                ? {
+                    needKey: 'fun' as NeedKey,
+                    delta: 16,
+                    emoji: '🌴',
+                    hoverLabel: '🌴 South Bay Sun (+16% Peace)',
+                    toast: 'Took in the sunny Sunnyvale palm breeze (+16% Peace)',
+                    sparkleTitle: 'Sunnyvale Backyard Slider',
+                    sparkleSub: '74°F South Bay sunshine & Meyer lemon trees outside the hacker house',
+                  }
+                : winType === 'soma_curtainwall'
+                ? {
+                    needKey: 'fun' as NeedKey,
+                    delta: 22,
+                    emoji: '🏙️',
+                    hoverLabel: '🏙️ Skyline View (+22% Peace)',
+                    toast: 'Admired the Bay Bridge lights from your SoMa Curtain Wall (+22% Peace)',
+                    sparkleTitle: 'SoMa Penthouse Curtain Wall',
+                    sparkleSub: 'Floor-to-ceiling industrial glass overlooking the Bay Bridge & downtown towers',
+                  }
+                : winType === 'pac_heights_terrace'
+                ? {
+                    needKey: 'fun' as NeedKey,
+                    delta: 28,
+                    emoji: '🥂',
+                    hoverLabel: '🥂 Billionaire View (+28% Peace)',
+                    toast: 'Stepped onto your private Billionaire’s Row Golden Gate terrace (+28% Peace)',
+                    sparkleTitle: 'Billionaire’s Row Grand Terrace',
+                    sparkleSub: 'Unobstructed 270° panorama of the Golden Gate, Alcatraz & yacht regatta',
+                  }
+                : {
+                    needKey: 'fun' as NeedKey,
+                    delta: 18,
+                    emoji: '🌉',
+                    hoverLabel: '🌉 Gaze (+18% Peace)',
+                    toast: 'Watched Karl the Fog roll over the Bay (+18% Peace)',
+                    sparkleTitle: 'Edwardian Bay Panorama',
+                    sparkleSub: 'Warm afternoon sun over Dolores palms & the Golden Gate',
+                  };
+
+            return (
+              <g
+                className="cursor-pointer"
+                onMouseEnter={() => setWindowHovered(true)}
+                onMouseLeave={() => setWindowHovered(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (dragRef.current.moved) return;
+                  triggerMicroReward({
+                    needKey: winMeta.needKey,
+                    needDelta: winMeta.delta,
+                    karmaDelta: isHome ? homeDef.tier : 1,
+                    toastText: winMeta.toast,
+                    emoji: winMeta.emoji,
+                  });
+                  triggerSparkle(
+                    backCorner.sx - 96,
+                    backCorner.sy - 38,
+                    winMeta.emoji,
+                    `🎮 +${winMeta.delta}% ${winMeta.needKey === 'energy' ? 'Focus' : 'Peace'} · ✨ +${isHome ? homeDef.tier : 1} Karma`,
+                    winMeta.sparkleTitle,
+                    winMeta.sparkleSub
+                  );
+                }}
+              >
+                <polygon
+                  points={winPoly}
+                  fill="url(#bayWindowSky)"
+                  stroke={
+                    windowHovered
+                      ? '#38BDF8'
+                      : isHome && homeDef.architecture
+                      ? homeDef.architecture.trimColor
+                      : '#64748B'
+                  }
+                  strokeWidth={windowHovered ? '3.2' : '2.5'}
                 />
-                <text
-                  x="0"
-                  y="2"
-                  fill="#FFFFFF"
-                  fontSize="10.5"
-                  fontWeight="800"
-                  textAnchor="middle"
-                >
-                  🌉 Gaze (+16% Peace)
-                </text>
+
+                <g clipPath="url(#bayWindowClip)">
+                  {/* Night Stars */}
+                  {isNight && (
+                    <g>
+                      <circle cx={backCorner.sx - 132} cy={backCorner.sy - 18} r="1.3" fill="#FDE047">
+                        <animate attributeName="opacity" values="0.25;1;0.25" dur="2.4s" repeatCount="indefinite" />
+                      </circle>
+                      <circle cx={backCorner.sx - 85} cy={backCorner.sy - 42} r="1.2" fill="#F8FAFC">
+                        <animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.9s" repeatCount="indefinite" />
+                      </circle>
+                      <circle cx={backCorner.sx - 52} cy={backCorner.sy - 55} r="1.4" fill="#38BDF8">
+                        <animate attributeName="opacity" values="0.3;1;0.3" dur="2.8s" repeatCount="indefinite" />
+                      </circle>
+                    </g>
+                  )}
+
+                  {/* WINDOW CONTENT BY HOME TYPE */}
+                  {winType === 'garage_transom' ? (
+                    <g>
+                      {/* Thick Daly City Fog & Telephone Wires + BART Neon Sign */}
+                      <line
+                        x1={backCorner.sx - 140}
+                        y1={backCorner.sy - 14}
+                        x2={backCorner.sx - 38}
+                        y2={backCorner.sy - 64}
+                        stroke="#334155"
+                        strokeWidth="1.2"
+                      />
+                      <rect
+                        x={backCorner.sx - 78}
+                        y={backCorner.sy - 58}
+                        width="24"
+                        height="11"
+                        rx="3"
+                        fill="#0284C7"
+                        stroke="#E0F2FE"
+                        strokeWidth="0.8"
+                      />
+                      <text
+                        x={backCorner.sx - 66}
+                        y={backCorner.sy - 50}
+                        fill="#FFFFFF"
+                        fontSize="6.5"
+                        fontWeight="900"
+                        textAnchor="middle"
+                      >
+                        BART
+                      </text>
+                      <ellipse
+                        cx={backCorner.sx - 92}
+                        cy={backCorner.sy - 32}
+                        rx="42"
+                        ry="11"
+                        fill="rgba(241,245,249,0.85)"
+                      >
+                        <animateTransform
+                          attributeName="transform"
+                          type="translate"
+                          values="-12,6; 12,-6; -12,6"
+                          dur="6s"
+                          repeatCount="indefinite"
+                        />
+                      </ellipse>
+                      {/* Frosted Security Bars on Garage Transom */}
+                      <line
+                        x1={backCorner.sx - 104}
+                        y1={backCorner.sy - 47}
+                        x2={backCorner.sx - 104}
+                        y2={backCorner.sy - 9}
+                        stroke="#475569"
+                        strokeWidth="1.6"
+                      />
+                      <line
+                        x1={backCorner.sx - 73}
+                        y1={backCorner.sy - 63}
+                        x2={backCorner.sx - 73}
+                        y2={backCorner.sy - 25}
+                        stroke="#475569"
+                        strokeWidth="1.6"
+                      />
+                    </g>
+                  ) : winType === 'ranch_slider' ? (
+                    <g>
+                      {/* Sunny South Bay Sun, Cupertino Hills & Palm Trees */}
+                      <circle
+                        cx={backCorner.sx - 62}
+                        cy={backCorner.sy - 44}
+                        r="11"
+                        fill={isNight ? '#FDE047' : '#FBBF24'}
+                        opacity="0.9"
+                      />
+                      <path
+                        d={`M ${backCorner.sx - 155},${backCorner.sy + 48} Q ${backCorner.sx - 95},${backCorner.sy - 6} ${backCorner.sx - 30},${backCorner.sy - 14} L ${backCorner.sx - 30},${backCorner.sy + 60} Z`}
+                        fill="#10B981"
+                        opacity="0.55"
+                      />
+                      {/* Palm Tree Silhouette */}
+                      <line
+                        x1={backCorner.sx - 112}
+                        y1={backCorner.sy + 28}
+                        x2={backCorner.sx - 108}
+                        y2={backCorner.sy - 8}
+                        stroke="#78350F"
+                        strokeWidth="3"
+                      />
+                      <circle cx={backCorner.sx - 108} cy={backCorner.sy - 11} r="10" fill="#059669" />
+                      {/* Sliding Door Center Frame */}
+                      <line
+                        x1={backCorner.sx - 92}
+                        y1={backCorner.sy - 45}
+                        x2={backCorner.sx - 92}
+                        y2={backCorner.sy + 25}
+                        stroke="#D97706"
+                        strokeWidth="2.5"
+                      />
+                    </g>
+                  ) : winType === 'soma_curtainwall' ? (
+                    <g>
+                      {/* Downtown SF Skyscrapers + Illuminated Bay Bridge Span */}
+                      <rect x={backCorner.sx - 170} y={backCorner.sy + 6} width="16" height="58" fill="#1E293B" />
+                      <rect x={backCorner.sx - 146} y={backCorner.sy - 14} width="18" height="72" fill="#0F172A" />
+                      <polygon
+                        points={`${backCorner.sx - 146},${backCorner.sy - 14} ${backCorner.sx - 137},${backCorner.sy - 28} ${backCorner.sx - 128},${backCorner.sy - 14}`}
+                        fill="#38BDF8"
+                        opacity="0.85"
+                      />
+                      {/* Bay Bridge White Suspension Towers */}
+                      <line
+                        x1={backCorner.sx - 96}
+                        y1={backCorner.sy + 32}
+                        x2={backCorner.sx - 96}
+                        y2={backCorner.sy - 26}
+                        stroke="#E2E8F0"
+                        strokeWidth="2.8"
+                      />
+                      <line
+                        x1={backCorner.sx - 54}
+                        y1={backCorner.sy + 8}
+                        x2={backCorner.sx - 54}
+                        y2={backCorner.sy - 48}
+                        stroke="#E2E8F0"
+                        strokeWidth="2.8"
+                      />
+                      <path
+                        d={`M ${backCorner.sx - 130},${backCorner.sy + 36} Q ${backCorner.sx - 75},${backCorner.sy - 4} ${backCorner.sx - 26},${backCorner.sy - 42}`}
+                        fill="none"
+                        stroke="#38BDF8"
+                        strokeWidth="1.8"
+                      />
+                      {/* Black Steel Industrial Curtainwall Mullions */}
+                      <line
+                        x1={backCorner.sx - 132}
+                        y1={backCorner.sy - 38}
+                        x2={backCorner.sx - 132}
+                        y2={backCorner.sy + 50}
+                        stroke="#0F172A"
+                        strokeWidth="2.4"
+                      />
+                      <line
+                        x1={backCorner.sx - 78}
+                        y1={backCorner.sy - 66}
+                        x2={backCorner.sx - 78}
+                        y2={backCorner.sy + 22}
+                        stroke="#0F172A"
+                        strokeWidth="2.4"
+                      />
+                      <line
+                        x1={backCorner.sx - 188}
+                        y1={backCorner.sy + 32}
+                        x2={backCorner.sx - 24}
+                        y2={backCorner.sy - 52}
+                        stroke="#0F172A"
+                        strokeWidth="2"
+                      />
+                    </g>
+                  ) : (
+                    <g>
+                      {/* Golden Gate Bridge Silhouette inside Window (Mission / Pac Heights / Venues) */}
+                      {winType === 'pac_heights_terrace' && (
+                        /* Marin Headlands Emerald Hills + Yacht Sails on the Bay */
+                        <g>
+                          <path
+                            d={`M ${backCorner.sx - 206},${backCorner.sy + 48} Q ${backCorner.sx - 150},${backCorner.sy + 2} ${backCorner.sx - 95},${backCorner.sy + 14} Z`}
+                            fill="#047857"
+                            opacity="0.55"
+                          />
+                          {/* Regatta Sailboats */}
+                          <polygon
+                            points={`${backCorner.sx - 158},${backCorner.sy + 44} ${backCorner.sx - 152},${backCorner.sy + 30} ${backCorner.sx - 148},${backCorner.sy + 44}`}
+                            fill="#FFFFFF"
+                          />
+                          <polygon
+                            points={`${backCorner.sx - 86},${backCorner.sy + 8} ${backCorner.sx - 80},${backCorner.sy - 6} ${backCorner.sx - 76},${backCorner.sy + 8}`}
+                            fill="#FFFFFF"
+                          />
+                        </g>
+                      )}
+                      <line
+                        x1={backCorner.sx - 122}
+                        y1={backCorner.sy + 26}
+                        x2={backCorner.sx - 122}
+                        y2={backCorner.sy - 16}
+                        stroke="#EA580C"
+                        strokeWidth={winType === 'pac_heights_terrace' ? '3.8' : '3'}
+                      />
+                      <line
+                        x1={backCorner.sx - 65}
+                        y1={backCorner.sy - 4}
+                        x2={backCorner.sx - 65}
+                        y2={backCorner.sy - 48}
+                        stroke="#EA580C"
+                        strokeWidth={winType === 'pac_heights_terrace' ? '3.8' : '3'}
+                      />
+                      {/* Bridge Deck & Suspension Cables */}
+                      <line
+                        x1={backCorner.sx - 178}
+                        y1={backCorner.sy + 42}
+                        x2={backCorner.sx - 30}
+                        y2={backCorner.sy - 31}
+                        stroke="#C2410C"
+                        strokeWidth="2.2"
+                      />
+                      <path
+                        d={`M ${backCorner.sx - 166},${backCorner.sy + 28} Q ${backCorner.sx - 93},${backCorner.sy + 4} ${backCorner.sx - 34},${backCorner.sy - 40}`}
+                        fill="none"
+                        stroke="#EA580C"
+                        strokeWidth="2"
+                      />
+                      {/* Tower Aviation Beacons */}
+                      <circle cx={backCorner.sx - 122} cy={backCorner.sy - 17} r="1.8" fill="#EF4444">
+                        <animate attributeName="opacity" values="0.3;1;0.3" dur="1.6s" repeatCount="indefinite" />
+                      </circle>
+                      <circle cx={backCorner.sx - 65} cy={backCorner.sy - 49} r="1.8" fill="#EF4444">
+                        <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
+                      </circle>
+
+                      {/* Gilded Terrace Balustrade for Pacific Heights Mansion */}
+                      {winType === 'pac_heights_terrace' && (
+                        <line
+                          x1={backCorner.sx - 206}
+                          y1={backCorner.sy + 68}
+                          x2={backCorner.sx - 24}
+                          y2={backCorner.sy - 25}
+                          stroke="#F59E0B"
+                          strokeWidth="2.5"
+                          strokeDasharray="5 3"
+                        />
+                      )}
+
+                      {/* Animated Karl the Fog drifting softly across Golden Gate */}
+                      <g opacity={weather === 'foggy' ? 0.88 : 0.5}>
+                        <ellipse
+                          cx={backCorner.sx - 96}
+                          cy={backCorner.sy + 6}
+                          rx="38"
+                          ry="8.5"
+                          fill="rgba(255,255,255,0.75)"
+                        >
+                          <animateTransform
+                            attributeName="transform"
+                            type="translate"
+                            values="-18,9; 18,-9; -18,9"
+                            dur="9s"
+                            repeatCount="indefinite"
+                          />
+                        </ellipse>
+                      </g>
+                    </g>
+                  )}
+                </g>
+
+                {/* Hover Prompt Badge on Window (Enlarged & Crisp) */}
+                {windowHovered && (
+                  <g transform={`translate(${backCorner.sx - 96}, ${backCorner.sy - 62})`}>
+                    <rect
+                      x="-88"
+                      y="-14"
+                      width="176"
+                      height="24"
+                      rx="12"
+                      fill="rgba(15,23,42,0.94)"
+                      stroke="#38BDF8"
+                      strokeWidth="1.5"
+                    />
+                    <text
+                      x="0"
+                      y="2"
+                      fill="#FFFFFF"
+                      fontSize="10"
+                      fontWeight="800"
+                      textAnchor="middle"
+                    >
+                      {winMeta.hoverLabel}
+                    </text>
+                  </g>
+                )}
               </g>
-            )}
-          </g>
+            );
+          })()}
 
           {/* Right Wall Sign / Location Header (translated to sign center before skewY!) */}
           <g>
             <polygon
-              points={`${backCorner.sx + 36},${backCorner.sy + 18 - 86} ${backCorner.sx + 172},${backCorner.sy + 86 - 86} ${backCorner.sx + 172},${backCorner.sy + 86 - 42} ${backCorner.sx + 36},${backCorner.sy + 18 - 42}`}
-              fill={isNight ? '#0F172A' : '#1E293B'}
-              stroke="rgba(255,255,255,0.28)"
+              points={`${backCorner.sx + 28},${backCorner.sy + 14 - 96} ${backCorner.sx + 168},${backCorner.sy + 84 - 96} ${backCorner.sx + 168},${backCorner.sy + 84 - 62} ${backCorner.sx + 28},${backCorner.sy + 14 - 62}`}
+              fill={
+                isHome && homeDef.tier >= 5
+                  ? '#451A03'
+                  : isHome && homeDef.tier === 4
+                  ? '#0F172A'
+                  : isNight
+                  ? '#0F172A'
+                  : '#1E293B'
+              }
+              stroke={isHome && homeDef.tier >= 4 ? '#F59E0B' : 'rgba(255,255,255,0.28)'}
               strokeWidth="1.5"
             />
-            <g transform={`translate(${backCorner.sx + 104}, ${backCorner.sy - 12}) skewY(26.5)`}>
+            <g transform={`translate(${backCorner.sx + 98}, ${backCorner.sy - 30}) skewY(26.5)`}>
               <text
                 x="0"
                 y="3.5"
-                fill="#F8FAFC"
-                fontSize="10"
+                fill={isHome && homeDef.tier >= 4 ? '#FDE68A' : '#F8FAFC'}
+                fontSize="9.5"
                 fontWeight="800"
                 textAnchor="middle"
               >
                 {isHome
-                  ? `🏠 ${homeDef.district.toUpperCase()}`
+                  ? `${homeDef.emoji} ${(homeDef.shortName || homeDef.name).toUpperCase()} · T${homeDef.tier}`
                   : `${venueDef?.emoji || '📍'} ${venueDef?.shortName.toUpperCase()}`}
               </text>
             </g>
           </g>
+
+          {/* Home-Specific Interactive Right-Wall Architectural Feature */}
+          {isHome &&
+            homeDef.architecture &&
+            (() => {
+              const feat = homeDef.architecture.rightWallFeature;
+              const featMeta =
+                feat === 'breaker_box'
+                  ? {
+                      emoji: '🔌',
+                      badge: '🔌 Reset Breaker (+12% Focus)',
+                      needKey: 'energy' as NeedKey,
+                      delta: 12,
+                      title: '20A Garage Sub-Panel & Ramen Runway',
+                      sub: 'Balanced the circuit breaker so your kettle and GPU rig can run simultaneously',
+                    }
+                  : feat === 'founder_whiteboard'
+                  ? {
+                      emoji: '📐',
+                      badge: '📐 System Arch Jam (+16% Focus)',
+                      needKey: 'energy' as NeedKey,
+                      delta: 16,
+                      title: 'Sunnyvale Co-Founder OKR Whiteboard',
+                      sub: 'Sketched distributed shard topology & Demo Day growth milestones',
+                    }
+                  : feat === 'vinyl_alcove'
+                  ? {
+                      emoji: '🎵',
+                      badge: '🎵 Spin Vinyl (+18% Peace)',
+                      needKey: 'fun' as NeedKey,
+                      delta: 18,
+                      title: 'Valencia Analog Hi-Fi Turntable',
+                      sub: 'Dropped the needle on a warm Japanese jazz pressing in your sunlit studio',
+                    }
+                  : feat === 'acoustic_slats'
+                  ? {
+                      emoji: '📈',
+                      badge: '📈 Angel Deal Ticker (+22% Focus)',
+                      needKey: 'energy' as NeedKey,
+                      delta: 22,
+                      title: 'Walnut Acoustic Wall & Live Angel Ticker',
+                      sub: 'Checked secondary liquidity quotes & AI seed deal flow on the LED ticker',
+                    }
+                  : {
+                      emoji: '🔥',
+                      badge: '🔥 Marble Hearth (+26% Peace)',
+                      needKey: 'fun' as NeedKey,
+                      delta: 26,
+                      title: 'Calacatta Gold Fireplace & Private Art',
+                      sub: 'Warmed by the hand-carved Italian marble hearth under your museum Rothko canvas',
+                    };
+
+              return (
+                <g
+                  className="cursor-pointer"
+                  onMouseEnter={() => setRightWallHovered(true)}
+                  onMouseLeave={() => setRightWallHovered(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (dragRef.current.moved) return;
+                    triggerMicroReward({
+                      needKey: featMeta.needKey,
+                      needDelta: featMeta.delta,
+                      karmaDelta: homeDef.tier,
+                      toastText: `${featMeta.title} (+${featMeta.delta}% ${featMeta.needKey === 'energy' ? 'Focus' : 'Peace'})`,
+                      emoji: featMeta.emoji,
+                    });
+                    triggerSparkle(
+                      backCorner.sx + 106,
+                      backCorner.sy + 12,
+                      featMeta.emoji,
+                      `⚡ +${featMeta.delta}% ${featMeta.needKey === 'energy' ? 'Focus' : 'Peace'} · ✨ +${homeDef.tier} Karma`,
+                      featMeta.title,
+                      featMeta.sub
+                    );
+                  }}
+                >
+                  {feat === 'breaker_box' && (
+                    <g>
+                      {/* Steel Breaker Box + Sticky Note Runway Board */}
+                      <polygon
+                        points={`${backCorner.sx + 48},${backCorner.sy - 20} ${backCorner.sx + 92},${backCorner.sy + 2} ${backCorner.sx + 92},${backCorner.sy + 38} ${backCorner.sx + 48},${backCorner.sy + 16}`}
+                        fill="#475569"
+                        stroke={rightWallHovered ? '#38BDF8' : '#1E293B'}
+                        strokeWidth="1.8"
+                      />
+                      <circle cx={backCorner.sx + 70} cy={backCorner.sy + 8} r="3" fill="#22C55E" />
+                      <polygon
+                        points={`${backCorner.sx + 104},${backCorner.sy + 8} ${backCorner.sx + 154},${backCorner.sy + 33} ${backCorner.sx + 154},${backCorner.sy + 63} ${backCorner.sx + 104},${backCorner.sy + 38}`}
+                        fill="#FEF3C7"
+                        stroke="#D97706"
+                        strokeWidth="1.4"
+                      />
+                    </g>
+                  )}
+
+                  {feat === 'founder_whiteboard' && (
+                    <g>
+                      {/* 6-Foot System Architecture Whiteboard */}
+                      <polygon
+                        points={`${backCorner.sx + 42},${backCorner.sy - 24} ${backCorner.sx + 164},${backCorner.sy + 37} ${backCorner.sx + 164},${backCorner.sy + 77} ${backCorner.sx + 42},${backCorner.sy + 16}`}
+                        fill="#FFFFFF"
+                        stroke={rightWallHovered ? '#38BDF8' : '#0284C7'}
+                        strokeWidth="2"
+                      />
+                      {/* Sticky Notes & Architecture Nodes */}
+                      <circle cx={backCorner.sx + 74} cy={backCorner.sy + 12} r="4.5" fill="#F59E0B" />
+                      <circle cx={backCorner.sx + 104} cy={backCorner.sy + 27} r="4.5" fill="#38BDF8" />
+                      <circle cx={backCorner.sx + 134} cy={backCorner.sy + 42} r="4.5" fill="#10B981" />
+                      <line
+                        x1={backCorner.sx + 74}
+                        y1={backCorner.sy + 12}
+                        x2={backCorner.sx + 134}
+                        y2={backCorner.sy + 42}
+                        stroke="#64748B"
+                        strokeWidth="1.5"
+                        strokeDasharray="3 2"
+                      />
+                    </g>
+                  )}
+
+                  {feat === 'vinyl_alcove' && (
+                    <g>
+                      {/* Warm Teak Floating Shelf + Spinning Vinyl Record & Monstera */}
+                      <polygon
+                        points={`${backCorner.sx + 46},${backCorner.sy - 20} ${backCorner.sx + 158},${backCorner.sy + 36} ${backCorner.sx + 158},${backCorner.sy + 74} ${backCorner.sx + 46},${backCorner.sy + 18}`}
+                        fill="#78350F"
+                        stroke={rightWallHovered ? '#F59E0B' : '#B45309'}
+                        strokeWidth="2"
+                      />
+                      <circle cx={backCorner.sx + 84} cy={backCorner.sy + 18} r="11" fill="#0F172A" stroke="#F59E0B" strokeWidth="1.5" />
+                      <circle cx={backCorner.sx + 84} cy={backCorner.sy + 18} r="3.5" fill="#EF4444" />
+                      <circle cx={backCorner.sx + 128} cy={backCorner.sy + 38} r="9" fill="#10B981" />
+                    </g>
+                  )}
+
+                  {feat === 'acoustic_slats' && (
+                    <g>
+                      {/* Walnut Acoustic Slat Feature Wall + Neon Deal Ticker */}
+                      <polygon
+                        points={`${backCorner.sx + 40},${backCorner.sy - 26} ${backCorner.sx + 174},${backCorner.sy + 41} ${backCorner.sx + 174},${backCorner.sy + 85} ${backCorner.sx + 40},${backCorner.sy + 18}`}
+                        fill="#1E293B"
+                        stroke={rightWallHovered ? '#38BDF8' : '#D97706'}
+                        strokeWidth="2"
+                      />
+                      <line
+                        x1={backCorner.sx + 54}
+                        y1={backCorner.sy - 2}
+                        x2={backCorner.sx + 160}
+                        y2={backCorner.sy + 51}
+                        stroke="#10B981"
+                        strokeWidth="3"
+                      />
+                      <line
+                        x1={backCorner.sx + 54}
+                        y1={backCorner.sy + 10}
+                        x2={backCorner.sx + 140}
+                        y2={backCorner.sy + 53}
+                        stroke="#38BDF8"
+                        strokeWidth="2.5"
+                      />
+                    </g>
+                  )}
+
+                  {feat === 'marble_fireplace' && (
+                    <g>
+                      {/* Museum Painting Above + Calacatta Marble Hearth with Flickering Flame */}
+                      <polygon
+                        points={`${backCorner.sx + 66},${backCorner.sy - 22} ${backCorner.sx + 150},${backCorner.sy + 20} ${backCorner.sx + 150},${backCorner.sy + 50} ${backCorner.sx + 66},${backCorner.sy + 8}`}
+                        fill="#991B1B"
+                        stroke="#F59E0B"
+                        strokeWidth="2.2"
+                      />
+                      <polygon
+                        points={`${backCorner.sx + 54},${backCorner.sy + 10} ${backCorner.sx + 162},${backCorner.sy + 64} ${backCorner.sx + 162},${backCorner.sy + 98} ${backCorner.sx + 54},${backCorner.sy + 44}`}
+                        fill="#F8FAFC"
+                        stroke={rightWallHovered ? '#F59E0B' : '#CBD5E1'}
+                        strokeWidth="2.2"
+                      />
+                      {/* Glowing Hearth Fire */}
+                      <ellipse
+                        cx={backCorner.sx + 108}
+                        cy={backCorner.sy + 60}
+                        rx="16"
+                        ry="10"
+                        fill="#1E293B"
+                      />
+                      <circle cx={backCorner.sx + 108} cy={backCorner.sy + 61} r="7" fill="#F97316">
+                        <animate attributeName="r" values="6;8.5;6" dur="1.4s" repeatCount="indefinite" />
+                      </circle>
+                      <circle cx={backCorner.sx + 108} cy={backCorner.sy + 62} r="3.8" fill="#FDE047" />
+                    </g>
+                  )}
+
+                  {rightWallHovered && (
+                    <g transform={`translate(${backCorner.sx + 108}, ${backCorner.sy - 8})`}>
+                      <rect
+                        x="-92"
+                        y="-14"
+                        width="184"
+                        height="24"
+                        rx="12"
+                        fill="rgba(15,23,42,0.94)"
+                        stroke="#F59E0B"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        x="0"
+                        y="2"
+                        fill="#FFFFFF"
+                        fontSize="10"
+                        fontWeight="800"
+                        textAnchor="middle"
+                      >
+                        {featMeta.badge}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })()}
         </g>
 
         {/* Floating Waymo / Prime Air Delivery Drone Outside Balcony (Enlarged & Readable) */}
@@ -972,7 +1576,11 @@ export const IsometricScene: React.FC = () => {
                       ? '#93C5FD'
                       : getFloorColors(x, y)
                   }
-                  stroke="rgba(15,23,42,0.08)"
+                  stroke={
+                    isHome && homeDef.id === 'pac_heights_victorian'
+                      ? 'rgba(217,119,6,0.22)'
+                      : 'rgba(15,23,42,0.08)'
+                  }
                   strokeWidth="1"
                   className="cursor-pointer transition-colors duration-150"
                   onMouseEnter={() => setHoveredTile({ x, y })}
@@ -989,6 +1597,41 @@ export const IsometricScene: React.FC = () => {
               );
             })
           )}
+
+          {/* Designer Central Area Rug & Luxury Floor Accents for Tier 2–5 Homes */}
+          {isHome &&
+            homeDef.architecture?.rugColor &&
+            (() => {
+              const pad = homeDef.tier >= 4 ? 1.35 : 1.55;
+              const rTop = isoToScreen(pad, pad);
+              const rRight = isoToScreen(gridSize - pad, pad);
+              const rBottom = isoToScreen(gridSize - pad, gridSize - pad);
+              const rLeft = isoToScreen(pad, gridSize - pad);
+              const innerPad = pad + 0.25;
+              const iTop = isoToScreen(innerPad, innerPad);
+              const iRight = isoToScreen(gridSize - innerPad, innerPad);
+              const iBottom = isoToScreen(gridSize - innerPad, gridSize - innerPad);
+              const iLeft = isoToScreen(innerPad, gridSize - innerPad);
+              return (
+                <g pointerEvents="none">
+                  <polygon
+                    points={`${rTop.sx},${rTop.sy} ${rRight.sx},${rRight.sy} ${rBottom.sx},${rBottom.sy} ${rLeft.sx},${rLeft.sy}`}
+                    fill={homeDef.architecture.rugColor}
+                    opacity="0.82"
+                    stroke={homeDef.architecture.rugAccent || '#F59E0B'}
+                    strokeWidth="2"
+                  />
+                  <polygon
+                    points={`${iTop.sx},${iTop.sy} ${iRight.sx},${iRight.sy} ${iBottom.sx},${iBottom.sy} ${iLeft.sx},${iLeft.sy}`}
+                    fill="none"
+                    stroke={homeDef.architecture.rugAccent || '#F59E0B'}
+                    strokeWidth="1.2"
+                    strokeDasharray={homeDef.tier >= 5 ? 'none' : '4 2'}
+                    opacity="0.9"
+                  />
+                </g>
+              );
+            })()}
         </g>
 
         {/* Autonomous Robot Vacuum ("Matic AI Bot") on Floor */}
@@ -1737,6 +2380,79 @@ export const IsometricScene: React.FC = () => {
             >
               <X className="size-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Residence Luxury Status & Active Perks Strip (Stacked above Camera Controls when at Home) */}
+      {isHome && (
+        <div
+          className="pointer-events-auto absolute bottom-36 left-4 z-20 max-w-md"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="apple-glass-heavy rounded-2xl border border-white/40 px-3.5 py-2.5 text-xs text-[var(--ink)] shadow-lg dark:border-white/10">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">{homeDef.emoji}</span>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-[var(--ink)]">
+                      {homeDef.name}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                        homeDef.tier >= 5
+                          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                          : homeDef.tier >= 4
+                          ? 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
+                          : homeDef.tier >= 3
+                          ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                      }`}
+                    >
+                      {homeDef.tierLabel}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[10px] font-medium text-[var(--ink-soft)]">
+                    {homeDef.commuteSummary}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setView('map')}
+                  className="btn-press rounded-xl bg-[var(--mist)] px-2.5 py-1 text-[10px] font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+                  title="Inspect all 5 Bay Area homes and commute distances on the Map"
+                >
+                  🗺️ Map & Commutes
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveModal('phone', 'zillow');
+                  }}
+                  className="btn-press rounded-xl bg-[#007AFF] px-2.5 py-1 text-[10px] font-extrabold text-white shadow-xs"
+                  title="Browse Zillow leases and luxury upgrades"
+                >
+                  🏡 Zillow
+                </button>
+              </div>
+            </div>
+            {/* Active Residence Bonus Pills */}
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              {homeDef.perks.map((p, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 rounded-lg bg-[var(--mist)] px-2 py-0.5 text-[10px] font-bold text-[var(--ink)]"
+                >
+                  <span>{p.emoji}</span>
+                  <span>{p.label}:</span>
+                  <span className="font-extrabold text-[#007AFF] dark:text-[#5AC8FA]">
+                    {p.desc}
+                  </span>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -8,6 +8,8 @@ import {
   HOMES,
   LOCATION_BY_ID,
   NEEDS_META,
+  WORK_PROJECT_BY_ID,
+  WORK_PROJECTS,
   WORK_TONES,
 } from '../data/worldData';
 import {
@@ -463,6 +465,9 @@ export const AppleHUD: React.FC = () => {
       } else if (key === 'i') {
         e.preventDefault();
         setActiveModal(s.activeModal === 'sim' ? null : 'sim', 'needs');
+      } else if (key === 'w') {
+        e.preventDefault();
+        setActiveModal(s.activeModal === 'career' ? null : 'career');
       } else if (key === 'a') {
         e.preventDefault();
         handleSmartNext();
@@ -756,8 +761,8 @@ export const AppleHUD: React.FC = () => {
 
       {/* INTERACTIVE WORK SHIFT MINI-GAME ("LIVE CODE SPRINT & BUG SQUASH") */}
       {workShift && job && careerDef && levelDef && (
-        <div className="fixed top-24 left-1/2 z-30 w-[calc(100%-24px)] max-w-md -translate-x-1/2">
-          <div className="apple-glass-heavy relative overflow-hidden rounded-3xl p-4 shadow-xl">
+        <div className="fixed top-20 left-1/2 z-30 w-[calc(100%-24px)] max-w-md -translate-x-1/2">
+          <div className="apple-glass-heavy relative overflow-hidden rounded-3xl p-3.5 shadow-xl">
             {/* Floating +$$$ / +Promo Micro-Reward Popups */}
             <div className="pointer-events-none absolute top-3 right-4 z-40 flex flex-col items-end gap-1">
               {floatingPops.map((pop) => (
@@ -771,81 +776,239 @@ export const AppleHUD: React.FC = () => {
               ))}
             </div>
 
-            {/* Header Row */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="grid size-10 place-items-center rounded-2xl bg-[#007AFF]/15 text-xl">
-                  {careerDef.emoji}
-                </span>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-extrabold">{careerDef.company}</span>
-                    <span className="rounded-full bg-[#007AFF] px-2 py-0.5 text-[10px] font-bold text-white">
-                      {levelDef.code}
-                    </span>
-                    {sprintCombo > 0 && (
-                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
-                        🔥 {sprintCombo}× Flow
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-[var(--ink-soft)]">
-                    Ends {formatTime(workShift.endsAt)}
-                    {shiftBonusEarned > 0 && (
-                      <span className="ml-1.5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        · +{formatCurrency(shiftBonusEarned)} sprint bonus
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="text-right font-mono">
-                <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                  +{formatCurrency(levelDef.shiftPay)}
-                </div>
-                <div className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
-                  +{formatCurrency(levelDef.rsuPerShift)} RSU
-                </div>
-              </div>
-            </div>
+            {(() => {
+              const shiftMode =
+                workShift.mode ||
+                (locationId === 'home'
+                  ? 'wfh'
+                  : locationId === careerDef.locationId
+                  ? 'office'
+                  : 'wfa');
+              const nextLevel = careerDef.levels[job.levelIndex + 1] || null;
+              const activeProj =
+                (job.activeProjectId && WORK_PROJECT_BY_ID[job.activeProjectId]) ||
+                WORK_PROJECTS?.[0] ||
+                null;
+              const projPct = Math.min(100, Math.round(job.projectProgress || 0));
 
-            {/* Dual Compact Progress Bars: Shift & Promo */}
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
-              <div>
-                <div className="flex justify-between text-[10px] font-bold text-[var(--ink-soft)]">
-                  <span>Shift</span>
-                  <span className="font-mono text-[var(--ink)]">
-                    {Math.round((workShift.elapsedMinutes / workShift.totalMinutes) * 100)}%
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-[#007AFF] transition-all"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (workShift.elapsedMinutes / workShift.totalMinutes) * 100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
+              return (
+                <>
+                  {/* Custom SVG Work Environment Illustration Banner */}
+                  <div className="mb-2.5 overflow-hidden rounded-2xl border border-black/10 bg-slate-900/90 text-white shadow-inner dark:border-white/10">
+                    <div className="relative h-14 w-full overflow-hidden">
+                      {shiftMode === 'office' && (
+                        <svg viewBox="0 0 360 56" className="h-full w-full">
+                          <defs>
+                            <linearGradient id="officeGrad" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#0f172a" />
+                              <stop offset="50%" stopColor="#1e3a8a" />
+                              <stop offset="100%" stopColor="#0284c7" />
+                            </linearGradient>
+                          </defs>
+                          <rect width="360" height="56" fill="url(#officeGrad)" />
+                          {/* Glass Campus Curtain Wall Grid */}
+                          <g stroke="#38bdf8" strokeOpacity="0.22" strokeWidth="1">
+                            <line x1="40" y1="0" x2="40" y2="56" />
+                            <line x1="90" y1="0" x2="90" y2="56" />
+                            <line x1="140" y1="0" x2="140" y2="56" />
+                            <line x1="190" y1="0" x2="190" y2="56" />
+                            <line x1="0" y1="28" x2="220" y2="28" />
+                          </g>
+                          {/* Dual Studio Monitors & War Room Desk */}
+                          <rect x="18" y="14" width="32" height="20" rx="3" fill="#0284c7" stroke="#7dd3fc" strokeWidth="1.2" />
+                          <rect x="22" y="18" width="18" height="3" rx="1" fill="#bae6fd" />
+                          <rect x="22" y="23" width="24" height="3" rx="1" fill="#34d399" />
+                          <rect x="54" y="16" width="28" height="18" rx="3" fill="#1e293b" stroke="#60a5fa" strokeWidth="1.2" />
+                          <rect x="58" y="20" width="16" height="3" rx="1" fill="#a78bfa" />
+                          <rect x="12" y="38" width="84" height="4" rx="2" fill="#475569" />
+                          {/* Micro-Kitchen Espresso Badge */}
+                          <circle cx="114" cy="26" r="10" fill="#10b981" fillOpacity="0.25" stroke="#34d399" strokeWidth="1" />
+                          <text x="114" y="30" textAnchor="middle" fontSize="11">🏢</text>
+                        </svg>
+                      )}
 
-              <div>
-                <div className="flex justify-between text-[10px] font-bold text-[var(--ink-soft)]">
-                  <span>Promo Packet</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                    {Math.round(job.performance)}%
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-emerald-500 transition-all"
-                    style={{ width: `${job.performance}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+                      {shiftMode === 'wfh' && (
+                        <svg viewBox="0 0 360 56" className="h-full w-full">
+                          <defs>
+                            <linearGradient id="wfhGrad" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#1e1b4b" />
+                              <stop offset="55%" stopColor="#312e81" />
+                              <stop offset="100%" stopColor="#047857" />
+                            </linearGradient>
+                          </defs>
+                          <rect width="360" height="56" fill="url(#wfhGrad)" />
+                          {/* Apartment Window + Warm Lamp */}
+                          <rect x="16" y="8" width="38" height="34" rx="4" fill="#0f172a" stroke="#818cf8" strokeWidth="1.2" />
+                          <circle cx="28" cy="18" r="4" fill="#fde047" opacity="0.85" />
+                          {/* Standing Desk + Ultrawide + Pour-over Coffee */}
+                          <rect x="64" y="14" width="36" height="20" rx="3" fill="#1e293b" stroke="#34d399" strokeWidth="1.2" />
+                          <rect x="68" y="19" width="22" height="3" rx="1" fill="#6ee7b7" />
+                          <rect x="68" y="24" width="16" height="3" rx="1" fill="#93c5fd" />
+                          <rect x="58" y="37" width="52" height="4" rx="2" fill="#a16207" />
+                          <circle cx="124" cy="26" r="10" fill="#818cf8" fillOpacity="0.25" stroke="#a5b4fc" strokeWidth="1" />
+                          <text x="124" y="30" textAnchor="middle" fontSize="11">🏠</text>
+                        </svg>
+                      )}
+
+                      {shiftMode === 'wfa' && (
+                        <svg viewBox="0 0 360 56" className="h-full w-full">
+                          <defs>
+                            <linearGradient id="wfaGrad" x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor="#064e3b" />
+                              <stop offset="50%" stopColor="#0f766e" />
+                              <stop offset="100%" stopColor="#0369a1" />
+                            </linearGradient>
+                          </defs>
+                          <rect width="360" height="56" fill="url(#wfaGrad)" />
+                          {/* Bay Area Cafe / Park Trees & Laptop + Wi-Fi Waves */}
+                          <circle cx="26" cy="24" r="12" fill="#10b981" opacity="0.45" />
+                          <circle cx="42" cy="20" r="14" fill="#34d399" opacity="0.35" />
+                          <path d="M 66,34 L 94,34 L 90,18 L 70,18 Z" fill="#0f172a" stroke="#5eead4" strokeWidth="1.2" />
+                          <rect x="62" y="34" width="36" height="3.5" rx="1.5" fill="#cbd5e1" />
+                          {/* Wi-Fi Signal Arcs */}
+                          <path d="M 108,28 Q 114,22 120,28" fill="none" stroke="#fde047" strokeWidth="1.5" strokeLinecap="round" />
+                          <path d="M 105,24 Q 114,15 123,24" fill="none" stroke="#fde047" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+                          <circle cx="114" cy="31" r="1.8" fill="#fde047" />
+                        </svg>
+                      )}
+
+                      {/* Overlay Mode Status & Lock Pill */}
+                      <div className=" inset-0 absolute flex items-center justify-between gap-2 px-3 py-1.5">
+                        <div className="ml-auto flex flex-col items-end text-right">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-extrabold text-amber-300 ring-1 ring-amber-400/40 backdrop-blur-xs">
+                              🔒 On the Clock (Travel Locked)
+                            </span>
+                            <span className="rounded-full bg-white/20 px-2 py-0.5 font-mono text-[10px] font-extrabold text-white backdrop-blur-xs">
+                              {shiftMode === 'office'
+                                ? `Office Days: ${job.officeDaysThisWeek || 1}/3 req`
+                                : shiftMode === 'wfh'
+                                ? `WFH: ${job.wfhDaysThisWeek || 1}/2 wk`
+                                : `${job.wfaDaysRemaining ?? 3}/4 WFA left`}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-[11px] font-extrabold text-white drop-shadow-xs">
+                            {shiftMode === 'office'
+                              ? '🏢 In-Office Badge-In · +20% Promo Velocity'
+                              : shiftMode === 'wfh'
+                              ? `🏠 Remote WFH · Hybrid Policy (${job.wfhDaysThisWeek || 1}/2 wk)`
+                              : `🌍 WFA Pass Active at ${currentPlaceName} · ${job.wfaDaysRemaining ?? 3}/4 WFA left`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Header Row */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="grid size-10 place-items-center rounded-2xl bg-[#007AFF]/15 text-xl">
+                        {careerDef.emoji}
+                      </span>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm font-extrabold">{careerDef.company}</span>
+                          <span className="rounded-full bg-[#007AFF] px-2 py-0.5 text-[10px] font-bold text-white">
+                            {levelDef.code}
+                          </span>
+                          {sprintCombo > 0 && (
+                            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
+                              🔥 {sprintCombo}× Flow
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[var(--ink-soft)]">
+                          Ends {formatTime(workShift.endsAt)}
+                          {shiftBonusEarned > 0 && (
+                            <span className="ml-1.5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              · +{formatCurrency(shiftBonusEarned)} sprint bonus
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right font-mono">
+                      <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                        +{formatCurrency(levelDef.shiftPay)}
+                      </div>
+                      <div className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
+                        +{formatCurrency(levelDef.rsuPerShift)} RSU
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dual Compact Progress Bars: Shift & Multi-Gate Promo Packet */}
+                  <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold text-[var(--ink-soft)]">
+                        <span>Shift Progress</span>
+                        <span className="font-mono text-[var(--ink)]">
+                          {Math.round((workShift.elapsedMinutes / workShift.totalMinutes) * 100)}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-[#007AFF] transition-all"
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              (workShift.elapsedMinutes / workShift.totalMinutes) * 100
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
+                        Shifts: {job.shiftsAtLevel || 0}/{nextLevel?.minShiftsForPromo || 3} req
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold text-[var(--ink-soft)]">
+                        <span>Calibration</span>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                          {Math.round(job.performance)}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-emerald-500 transition-all"
+                          style={{ width: `${job.performance}%` }}
+                        />
+                      </div>
+                      <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
+                        Deliverables {job.deliverablesCompleted || 0}/
+                        {nextLevel?.requiredDeliverables || 1} · Shifts {job.shiftsAtLevel || 0}/
+                        {nextLevel?.minShiftsForPromo || 3}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Active Work Exploration Project Bar + 1-Tap Career Hub CTA */}
+                  <div className="mt-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#007AFF]/25 bg-[#007AFF]/8 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold">
+                        <span className="truncate text-[var(--ink)]">
+                          {activeProj ? `${activeProj.emoji} ${activeProj.title}` : '🔬 Active R&D Milestone'}
+                        </span>
+                        <span className="shrink-0 font-mono text-[#007AFF]">{projPct}%</span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-indigo-500 transition-all"
+                          style={{ width: `${projPct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveModal('career')}
+                      className="btn-press shrink-0 rounded-xl bg-[#007AFF] px-2.5 py-1.5 text-[10px] font-extrabold text-white shadow-xs hover:bg-[#0066CC]"
+                    >
+                      🔬 Explore / Career Hub
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Interactive Live Code Sprint & Bug Squash Arena */}
             <div className="mt-3 rounded-2xl border border-black/8 bg-black/[0.03] p-2.5 dark:border-white/10 dark:bg-white/[0.04]">
@@ -1244,12 +1407,30 @@ export const AppleHUD: React.FC = () => {
           )}
 
           <button
-            onClick={() => (workShift ? setActiveModal('phone', 'levels') : startWorkShift())}
-            className="btn-press flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold text-[var(--ink)] hover:bg-[var(--mist)]"
-            title="Start or Inspect Work Shift"
+            onClick={() => setActiveModal(activeModal === 'career' ? null : 'career')}
+            className={`btn-press relative flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold ${
+              activeModal === 'career'
+                ? 'bg-[#007AFF] text-white'
+                : 'text-[var(--ink)] hover:bg-[var(--mist)]'
+            }`}
+            title="Open Work & Career Hub — Hybrid Policy, R&D Exploration & Promo Packet (Shortcut: W)"
           >
-            <Briefcase className="size-4 text-[#007AFF]" />
-            <span>{workShift ? 'Working' : 'Work'}</span>
+            <span
+              className={`-mt-1 rounded-full px-1.5 py-0.2 font-mono text-[8px] font-extrabold ${
+                workShift
+                  ? 'bg-emerald-500 text-white'
+                  : activeModal === 'career'
+                  ? 'bg-white/25 text-white'
+                  : 'bg-[#007AFF]/15 text-[#007AFF]'
+              }`}
+            >
+              {workShift ? 'Working' : `${job?.officeDaysThisWeek || 0}/3🏢`}
+            </span>
+            <div className="flex items-center gap-1">
+              <Briefcase className={`size-3.5 ${activeModal === 'career' ? 'text-white' : 'text-[#007AFF]'}`} />
+              <span>Work</span>
+              <span className="keycap-hint">W</span>
+            </div>
           </button>
 
           <button

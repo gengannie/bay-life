@@ -8,6 +8,7 @@ import { BuyFurnishModal } from './components/BuyFurnishModal';
 import { AppleHUD } from './components/AppleHUD';
 import { BayPhoneModal } from './components/BayPhoneModal';
 import { SimInspectorSheet } from './components/SimInspectorSheet';
+import { WorkCareerModal } from './components/WorkCareerModal';
 
 function getBaySkyGradient(hour: number, isDarkTheme: boolean): string {
   if (hour >= 7 && hour < 17.5) {
@@ -91,6 +92,7 @@ export const App: React.FC = () => {
       {/* Modals */}
       {activeModal === 'phone' && <BayPhoneModal />}
       {activeModal === 'sim' && <SimInspectorSheet />}
+      {activeModal === 'career' && <WorkCareerModal />}
     </div>
   );
 };
