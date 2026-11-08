@@ -329,7 +329,7 @@ export const SimInspectorSheet: React.FC = () => {
                       ⚡ {karma} Karma
                     </span>
                     <button
-                      onClick={() => setActiveModal('career')}
+                      onClick={() => setActiveModal('career', 'tree')}
                       className="btn-press rounded-xl bg-[#007AFF] px-3 py-1.5 text-[11px] font-extrabold text-white shadow-sm"
                     >
                       🌳 Open Full Skill Tech Tree

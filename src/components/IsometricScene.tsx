@@ -7,6 +7,12 @@ import {
   NPCS,
 } from '../data/worldData';
 import {
+  getRelationshipTierInfo,
+  NPC_INTERACTIONS,
+  getNpcMilestones,
+  getAvailableTopicsForNpc,
+} from '../data/relationshipData';
+import {
   calculateOverallMood,
   formatCurrency,
   getHomeDeskCoord,
@@ -224,6 +230,8 @@ export const IsometricScene: React.FC = () => {
   const sellFurniture = useGameStore((s) => s.sellFurniture);
   const storeFurnitureInBackpack = useGameStore((s) => s.storeFurnitureInBackpack);
   const interactWithNpc = useGameStore((s) => s.interactWithNpc);
+  const claimRelationshipMilestone = useGameStore((s) => s.claimRelationshipMilestone);
+  const inviteNpcHangout = useGameStore((s) => s.inviteNpcHangout);
   const autoFixNeed = useGameStore((s) => s.autoFixNeed);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
   const setView = useGameStore((s) => s.setView);
@@ -3415,104 +3423,250 @@ export const IsometricScene: React.FC = () => {
       )}
 
       {/* Enlarged, Unclipped Apple visionOS NPC Popover */}
-      {selectedNpc && (
-        <div
-          className="absolute bottom-24 left-1/2 z-30 w-[calc(100%-24px)] max-w-md -translate-x-1/2"
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="apple-glass-heavy rounded-3xl p-4 text-[var(--ink)] shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <Portrait appearance={selectedNpc.appearance} size={48} ringColor="#007AFF" />
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <h3 className="text-base font-extrabold text-[var(--ink)]">
-                      {selectedNpc.name}
-                    </h3>
-                    <span className="rounded-full bg-[#007AFF]/15 px-2.5 py-0.5 text-[11px] font-bold text-[#007AFF]">
-                      {relationships[selectedNpc.id]?.status || 'Stranger'} ·{' '}
-                      {relationships[selectedNpc.id]?.score || 10}
-                    </span>
+      {selectedNpc && (() => {
+        const npcRel = relationships[selectedNpc.id];
+        const npcScore = npcRel?.score ?? 12;
+        const npcTrust = npcRel?.trust ?? 10;
+        const npcRomance = npcRel?.romance ?? 5;
+        const npcTierInfo = getRelationshipTierInfo(npcScore);
+        const npcMilestones = getNpcMilestones(selectedNpc.id);
+        const claimedIds = npcRel?.claimedMilestones || [];
+        const nextMilestone = npcMilestones.find((m) => m.threshold > npcScore);
+        const unclaimedMilestone = npcMilestones.find(
+          (m) =>
+            (npcScore >= m.threshold ||
+              (npcRel?.unlockedMilestones || []).includes(m.id)) &&
+            !claimedIds.includes(m.id)
+        );
+        const lastMsg =
+          npcRel?.messages?.[npcRel.messages.length - 1]?.text || selectedNpc.greeting;
+        const availTopics = getAvailableTopicsForNpc(
+          selectedNpc.id,
+          npcScore,
+          npcRel?.completedTopics || []
+        );
+        const unlockedHighTier = NPC_INTERACTIONS.filter(
+          (act) =>
+            ['deepDive', 'hangout', 'referral', 'cofounderSync'].includes(act.id) &&
+            npcScore >= act.minScore
+        );
+
+        return (
+          <div
+            className="absolute bottom-24 left-1/2 z-30 w-[calc(100%-24px)] max-w-md -translate-x-1/2"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="apple-glass-heavy rounded-3xl p-4 text-[var(--ink)] shadow-2xl space-y-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Portrait
+                    appearance={selectedNpc.appearance}
+                    size={48}
+                    ringColor={npcTierInfo.color}
+                  />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h3 className="text-base font-extrabold text-[var(--ink)]">
+                        {selectedNpc.name}
+                      </h3>
+                      <span
+                        className="rounded-full px-2.5 py-0.5 text-[10.5px] font-extrabold text-white shadow-xs"
+                        style={{ backgroundColor: npcTierInfo.color }}
+                      >
+                        {npcTierInfo.status} · {npcScore}%
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs font-medium text-[var(--ink-soft)]">
+                      {selectedNpc.role} · {selectedNpc.company}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold">
+                      <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-indigo-600 dark:text-indigo-300">
+                        🤝 Trust {npcTrust}
+                      </span>
+                      <span className="rounded-full bg-pink-500/15 px-2 py-0.5 text-pink-600 dark:text-pink-300">
+                        💖 Vibe {npcRomance}
+                      </span>
+                    </div>
                   </div>
-                  <p className="mt-0.5 text-xs font-medium text-[var(--ink-soft)]">
-                    {selectedNpc.role} · {selectedNpc.company}
-                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedNpc(null)}
+                  className="btn-press grid size-8 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              {/* Next Milestone Progress Bar */}
+              <div className="rounded-2xl bg-[var(--mist)] px-3 py-2">
+                <div className="flex items-center justify-between text-[10px] font-extrabold">
+                  <span className="text-[var(--ink-soft)]">
+                    {nextMilestone
+                      ? `Next Milestone: ${nextMilestone.emoji} ${nextMilestone.title}`
+                      : '🏆 All 4 Milestones Unlocked!'}
+                  </span>
+                  <span style={{ color: npcTierInfo.color }}>
+                    {nextMilestone ? `${npcScore}/${nextMilestone.threshold}%` : `${npcScore}%`}
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${
+                        nextMilestone
+                          ? Math.min(100, Math.round((npcScore / nextMilestone.threshold) * 100))
+                          : 100
+                      }%`,
+                      backgroundColor: npcTierInfo.color,
+                    }}
+                  />
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedNpc(null)}
-                className="btn-press grid size-8 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
 
-            <div className="mt-3.5 grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  interactWithNpc(selectedNpc.id, 'linkedin');
-                  setSelectedNpc(null);
-                }}
-                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
-              >
-                <span>🤝 LinkedIn Sync</span>
-                <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[11px] text-[#007AFF]">
-                  💬 +10
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  interactWithNpc(selectedNpc.id, 'coffeeChat');
-                  setSelectedNpc(null);
-                }}
-                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
-              >
-                <span>☕ Cortado Chat</span>
-                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-300">
-                  🗣️ +Charisma
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  interactWithNpc(selectedNpc.id, 'whiteboard');
-                  setSelectedNpc(null);
-                }}
-                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
-              >
-                <span>📐 Arch Jam</span>
-                <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] text-indigo-600 dark:text-indigo-300">
-                  🧠 +SysDesign
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  interactWithNpc(selectedNpc.id, 'pitch');
-                  setSelectedNpc(null);
-                }}
-                className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
-              >
-                <span>🚀 Pitch MVP</span>
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-600 dark:text-emerald-300">
-                  🚀 +10% MVP
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  interactWithNpc(selectedNpc.id, 'flirt');
-                  setSelectedNpc(null);
-                }}
-                className="btn-press col-span-2 flex items-center justify-between rounded-2xl bg-pink-500/15 px-3.5 py-2.5 text-xs font-extrabold text-pink-600 dark:text-pink-400"
-              >
-                <span>💖 Single-Origin Matcha Date</span>
-                <span className="rounded-full bg-pink-500/20 px-2.5 py-0.5 text-[11px] font-bold">
-                  ❤️ +16 Bond · 🎮 +12 Peace
-                </span>
-              </button>
+              {/* Latest Message Bubble */}
+              <div className="rounded-2xl rounded-tl-xs bg-[var(--mist)] px-3 py-2 text-[11px] font-medium italic text-[var(--ink)]">
+                “{lastMsg}”
+              </div>
+
+              {/* One-Tap Unclaimed Milestone Banner */}
+              {unclaimedMilestone && (
+                <button
+                  onClick={() => {
+                    claimRelationshipMilestone(selectedNpc.id, unclaimedMilestone.id);
+                  }}
+                  className="btn-press flex w-full animate-pulse items-center justify-between rounded-2xl bg-gradient-to-r from-amber-500 to-emerald-500 px-3.5 py-2 text-xs font-black text-white shadow-md"
+                >
+                  <span>
+                    🏆 Claim Milestone Reward: {unclaimedMilestone.emoji}{' '}
+                    {unclaimedMilestone.title}
+                  </span>
+                  <span className="rounded-full bg-white/25 px-2 py-0.5 text-[10px]">
+                    {unclaimedMilestone.perkLabel}
+                  </span>
+                </button>
+              )}
+
+              {/* Interaction Buttons Grid */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => {
+                    interactWithNpc(selectedNpc.id, 'linkedin');
+                    setSelectedNpc(null);
+                  }}
+                  className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+                >
+                  <span>🤝 LinkedIn Sync</span>
+                  <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[10px] text-[#007AFF]">
+                    +10
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    interactWithNpc(selectedNpc.id, 'coffeeChat');
+                    setSelectedNpc(null);
+                  }}
+                  className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+                >
+                  <span>☕ Cortado Chat</span>
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-600 dark:text-amber-300">
+                    +Charisma
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    interactWithNpc(selectedNpc.id, 'whiteboard');
+                    setSelectedNpc(null);
+                  }}
+                  className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+                >
+                  <span>📐 Arch Jam</span>
+                  <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] text-indigo-600 dark:text-indigo-300">
+                    +SysDesign
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    interactWithNpc(selectedNpc.id, 'pitch');
+                    setSelectedNpc(null);
+                  }}
+                  className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+                >
+                  <span>🚀 Pitch MVP</span>
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-300">
+                    +10% MVP
+                  </span>
+                </button>
+
+                {/* Unlocked Higher-Tier Interactions (deepDive, hangout, referral, cofounderSync) */}
+                {unlockedHighTier.map((act) => (
+                  <button
+                    key={act.id}
+                    onClick={() => {
+                      interactWithNpc(selectedNpc.id, act.id);
+                      setSelectedNpc(null);
+                    }}
+                    className="btn-press flex items-center justify-between rounded-2xl bg-[var(--mist)] px-3 py-2 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+                  >
+                    <span className="truncate">
+                      {act.emoji} {act.shortLabel}
+                    </span>
+                    <span
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] text-white"
+                      style={{ backgroundColor: act.accent }}
+                    >
+                      +{act.baseScoreDelta}
+                    </span>
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => {
+                    interactWithNpc(selectedNpc.id, 'flirt');
+                    setSelectedNpc(null);
+                  }}
+                  className="btn-press flex items-center justify-between rounded-2xl bg-pink-500/15 px-3 py-2 text-xs font-extrabold text-pink-600 dark:text-pink-400"
+                >
+                  <span>💖 Matcha Date</span>
+                  <span className="rounded-full bg-pink-500/20 px-2 py-0.5 text-[10px] font-bold">
+                    +16 Bond
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    inviteNpcHangout(selectedNpc.id);
+                    setSelectedNpc(null);
+                  }}
+                  className="btn-press flex items-center justify-between rounded-2xl bg-indigo-500/15 px-3 py-2 text-xs font-extrabold text-indigo-600 dark:text-indigo-300"
+                >
+                  <span>📍 Spot Hangout</span>
+                  <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold">
+                    +16 · +3⚡
+                  </span>
+                </button>
+
+                {/* Open Full Circle & Topics Button */}
+                <button
+                  onClick={() => {
+                    setActiveModal('sim', 'relationships');
+                    setSelectedNpc(null);
+                  }}
+                  className="btn-press col-span-2 flex items-center justify-between rounded-2xl bg-[#007AFF] px-3.5 py-2.5 text-xs font-extrabold text-white shadow-sm"
+                >
+                  <span>🔎 Open Full Circle & Topics</span>
+                  <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10.5px] font-bold">
+                    {availTopics.length > 0
+                      ? `💬 ${availTopics.length} Topic Ready`
+                      : 'Milestones & Gifts →'}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

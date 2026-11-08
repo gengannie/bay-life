@@ -4,13 +4,16 @@ import { formatCurrency, useGameStore } from '../store/useGameStore';
 import {
   computeRoomVibe,
   getIsoTileFromClientPoint,
+  getNextUpgradeFurnitureDef,
   useFurnishStore,
 } from '../store/useFurnishStore';
 import { FurnitureDef } from '../types/game';
 import {
+  ArrowUpCircle,
   ShoppingBag,
   Check,
   Sparkles,
+  Trash2,
   X,
   Flame,
   Home,
@@ -22,11 +25,12 @@ import {
   RotateCw,
 } from 'lucide-react';
 
-type FilterCategory = FurnitureDef['category'] | 'all' | 'best';
+type FilterCategory = FurnitureDef['category'] | 'all' | 'best' | 'stored';
 
 const CATEGORIES: Array<{ id: FilterCategory; label: string; emoji: string }> = [
   { id: 'all', label: 'All', emoji: '✨' },
   { id: 'best', label: 'Top Picks', emoji: '🔥' },
+  { id: 'stored', label: 'Packed', emoji: '🎒' },
   { id: 'compute', label: 'Compute', emoji: '🖥️' },
   { id: 'power', label: 'Backup', emoji: '🔋' },
   { id: 'kitchen', label: 'Coffee & Food', emoji: '☕' },
@@ -135,9 +139,12 @@ export const BuyFurnishModal: React.FC = () => {
   const homeId = useGameStore((s) => s.homeId);
   const locationId = useGameStore((s) => s.locationId);
   const objects = useGameStore((s) => s.objects);
+  const inventory = useGameStore((s) => s.inventory || []);
   const setView = useGameStore((s) => s.setView);
   const travelTo = useGameStore((s) => s.travelTo);
   const skipTravelNow = useGameStore((s) => s.skipTravelNow);
+  const sellFurniture = useGameStore((s) => s.sellFurniture);
+  const storeFurnitureInBackpack = useGameStore((s) => s.storeFurnitureInBackpack);
 
   const catalogDrag = useFurnishStore((s) => s.catalogDrag);
   const pendingPlaceId = useFurnishStore((s) => s.pendingPlaceId);
@@ -151,11 +158,13 @@ export const BuyFurnishModal: React.FC = () => {
   const setTrayMode = useFurnishStore((s) => s.setTrayMode);
   const setHoveredCatalogId = useFurnishStore((s) => s.setHoveredCatalogId);
   const buyAndPlaceFurniture = useFurnishStore((s) => s.buyAndPlaceFurniture);
+  const upgradePlacedFurniture = useFurnishStore((s) => s.upgradePlacedFurniture);
   const autoArrangeRoom = useFurnishStore((s) => s.autoArrangeRoom);
   const rotatePlacedFurniture = useFurnishStore((s) => s.rotatePlacedFurniture);
 
   const [cat, setCat] = useState<FilterCategory>('all');
   const dockRef = useRef<HTMLDivElement | null>(null);
+  const topBarRef = useRef<HTMLDivElement | null>(null);
 
   // Local pointer-down candidate before 6px threshold turns into a full room drag
   const dragCandidateRef = useRef<{
@@ -167,13 +176,63 @@ export const BuyFurnishModal: React.FC = () => {
 
   const homeDef = HOMES.find((h) => h.id === homeId) || HOMES[1];
 
+  const storedFurnitureById = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const entry of inventory) {
+      if (entry.kind === 'furniture' && entry.quantity > 0) {
+        map[entry.itemId] = (map[entry.itemId] || 0) + entry.quantity;
+      }
+    }
+    return map;
+  }, [inventory]);
+
+  const totalStoredCount = useMemo(
+    () => Object.values(storedFurnitureById).reduce((acc, q) => acc + q, 0),
+    [storedFurnitureById]
+  );
+
   const vibeSummary = useMemo(
     () => computeRoomVibe(objects, homeId),
     [objects, homeId]
   );
 
+  const selectedFurnishObj = selectedFurnishUid
+    ? objects.find((o) => o.uid === selectedFurnishUid) || null
+    : null;
+  const selectedFurnishDef = selectedFurnishObj
+    ? FURNITURE_BY_ID[selectedFurnishObj.objectId] || null
+    : null;
+  const furnishUpgradeTargetDef = selectedFurnishDef
+    ? getNextUpgradeFurnitureDef(selectedFurnishDef)
+    : null;
+  const furnishResaleValue = selectedFurnishDef
+    ? Math.round(selectedFurnishDef.price * 0.65)
+    : 0;
+  const furnishUpgradeNetCost = furnishUpgradeTargetDef
+    ? Math.max(0, furnishUpgradeTargetDef.price - furnishResaleValue)
+    : 0;
+
   // Global pointer tracking when dragging a catalog card from the shopping dock into the room
   useEffect(() => {
+    const isPointInsideOverlayUi = (clientX: number, clientY: number) => {
+      const dockRect = dockRef.current?.getBoundingClientRect();
+      const insideDock =
+        Boolean(dockRect) &&
+        clientY >= dockRect!.top + 8 &&
+        clientX >= dockRect!.left &&
+        clientX <= dockRect!.right;
+
+      const topRect = topBarRef.current?.getBoundingClientRect();
+      const insideTopBar =
+        Boolean(topRect) &&
+        clientY >= topRect!.top - 8 &&
+        clientY <= topRect!.bottom + 6 &&
+        clientX >= topRect!.left &&
+        clientX <= topRect!.right;
+
+      return insideDock || insideTopBar || clientY < 56;
+    };
+
     const onPointerMove = (e: PointerEvent) => {
       const cand = dragCandidateRef.current;
       if (!cand) return;
@@ -189,16 +248,16 @@ export const BuyFurnishModal: React.FC = () => {
       }
 
       if (cand.started) {
-        const dockRect = dockRef.current?.getBoundingClientRect();
-        const isInsideDock =
-          dockRect &&
-          e.clientY >= dockRect.top + 12 &&
-          e.clientX >= dockRect.left &&
-          e.clientX <= dockRect.right;
-
-        const targetTile = isInsideDock
+        const insideUi = isPointInsideOverlayUi(e.clientX, e.clientY);
+        const targetTile = insideUi
           ? null
-          : getIsoTileFromClientPoint(e.clientX, e.clientY, homeDef.gridSize, true);
+          : getIsoTileFromClientPoint(
+              e.clientX,
+              e.clientY,
+              homeDef.gridSize,
+              false,
+              0.45
+            );
 
         setCatalogDrag({
           furnitureId: cand.itemId,
@@ -215,31 +274,48 @@ export const BuyFurnishModal: React.FC = () => {
       dragCandidateRef.current = null;
 
       if (cand.started) {
-        const dockRect = dockRef.current?.getBoundingClientRect();
-        const isInsideDock =
-          dockRect &&
-          e.clientY >= dockRect.top + 18 &&
-          e.clientX >= dockRect.left &&
-          e.clientX <= dockRect.right;
-
-        if (!isInsideDock) {
+        const insideUi = isPointInsideOverlayUi(e.clientX, e.clientY);
+        if (!insideUi) {
           const dropTile = getIsoTileFromClientPoint(
             e.clientX,
             e.clientY,
             homeDef.gridSize,
-            true
+            false,
+            0.45
           );
-          buyAndPlaceFurniture(cand.itemId, dropTile || undefined);
+          if (dropTile) {
+            buyAndPlaceFurniture(cand.itemId, dropTile);
+          }
         }
         setCatalogDrag(null);
       }
     };
 
+    const cancelActiveCatalogDrag = () => {
+      if (!dragCandidateRef.current) return;
+      dragCandidateRef.current = null;
+      setCatalogDrag(null);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && dragCandidateRef.current?.started) {
+        e.preventDefault();
+        e.stopPropagation();
+        cancelActiveCatalogDrag();
+      }
+    };
+
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', cancelActiveCatalogDrag);
+    window.addEventListener('blur', cancelActiveCatalogDrag);
+    window.addEventListener('keydown', onKeyDown, true);
     return () => {
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', cancelActiveCatalogDrag);
+      window.removeEventListener('blur', cancelActiveCatalogDrag);
+      window.removeEventListener('keydown', onKeyDown, true);
     };
   }, [buyAndPlaceFurniture, homeDef.gridSize, setCatalogDrag, setPendingPlaceId, setTrayMode]);
 
@@ -248,8 +324,11 @@ export const BuyFurnishModal: React.FC = () => {
     return () => {
       setCatalogDrag(null);
       setPendingPlaceId(null);
+      if (useFurnishStore.getState().trayMode === 'expanded') {
+        setTrayMode('dock');
+      }
     };
-  }, [setCatalogDrag, setPendingPlaceId]);
+  }, [setCatalogDrag, setPendingPlaceId, setTrayMode]);
 
   if (locationId !== 'home') {
     return (

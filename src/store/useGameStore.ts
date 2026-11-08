@@ -816,13 +816,35 @@ function logShiftAttendance(
 ): NonNullable<GameState['job']> {
   const today = getDayNumber(timeMinutes);
   const dayIdx = Math.floor(timeMinutes / 1440) % 7; // 0=Mon..4=Fri
-  if (job.lastWorkDayLogged === today) {
-    return job;
-  }
   const weekly: WeekdayAttendance[] = [
     ...(job.weeklyAttendance || ['none', 'none', 'none', 'none', 'none']),
   ];
   while (weekly.length < 5) weekly.push('none');
+
+  if (job.lastWorkDayLogged === today) {
+    // If badging into the office or using a WFA pass later the same day, allow upgrading attendance & restoring RTO compliance
+    if (mode === 'office') {
+      const upgradedOffice =
+        dayIdx >= 0 && dayIdx < 5 && weekly[dayIdx] !== 'office'
+          ? (job.officeDaysThisWeek || 0) + 1
+          : job.officeDaysThisWeek || 0;
+      if (dayIdx >= 0 && dayIdx < 5) weekly[dayIdx] = 'office';
+      return {
+        ...job,
+        officeDaysThisWeek: upgradedOffice,
+        weeklyAttendance: weekly,
+        rtoCompliant: true,
+      };
+    }
+    if (mode === 'wfa') {
+      return {
+        ...job,
+        rtoCompliant: true,
+      };
+    }
+    return job;
+  }
+
   if (dayIdx >= 0 && dayIdx < 5) {
     weekly[dayIdx] = mode;
   }
@@ -846,7 +868,10 @@ function logShiftAttendance(
     wfaDaysRemaining,
     weeklyAttendance: weekly,
     lastWorkDayLogged: today,
-    rtoCompliant: officeDaysThisWeek >= 3 ? true : job.rtoCompliant,
+    rtoCompliant:
+      mode === 'office' || mode === 'wfa' || officeDaysThisWeek >= 3
+        ? true
+        : job.rtoCompliant,
   };
 }
 
@@ -988,6 +1013,7 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
     simTab: 'needs',
     computerTab: 'ide',
     guideTab: 'goals',
+    careerTab: 'hybrid',
     mapHouseHuntMode: false,
     bluefinSelectedHomeId: null,
 
@@ -1125,6 +1151,7 @@ interface GameActions {
       | GameState['simTab']
       | GameState['computerTab']
       | GameState['guideTab']
+      | GameState['careerTab']
   ) => void;
   selectAspiration: (aspirationId: AspirationId) => void;
   resignJob: () => void;
@@ -1151,7 +1178,7 @@ interface GameActions {
   doWorkExploration: (taskId: string) => void;
   submitPromoPacket: () => void;
   unlockTechNode: (nodeId: TechNodeId) => void;
-  trainTechNodeSkill: (nodeId: TechNodeId) => void;
+  trainTechNodeSkill: (nodeId: TechNodeId, preferredSkill?: SkillKey) => void;
   leaveWorkEarly: () => void;
   setWorkTone: (tone: WorkToneId) => void;
   toggleAutoWork: () => void;
@@ -1270,6 +1297,8 @@ export const useGameStore = create<GameState & GameActions>()(
           patch.computerTab = sub as GameState['computerTab'];
         } else if (modal === 'guide' && sub) {
           patch.guideTab = sub as GameState['guideTab'];
+        } else if (modal === 'career' && sub) {
+          patch.careerTab = sub as GameState['careerTab'];
         }
         // If on tutorial step 0 (Land or Inspect Your Engineering Role) and opening Career Hub
         if (s.goalIndex === 0 && modal === 'career') {
@@ -2434,7 +2463,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      trainTechNodeSkill: (nodeId) => {
+      trainTechNodeSkill: (nodeId, preferredSkill) => {
         const s = get();
         const node = SKILL_TREE_NODE_BY_ID[nodeId];
         if (!node) return;
@@ -2452,8 +2481,9 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        // Pick first unmet required skill, or primary skill of the node
+        // Pick preferredSkill if specified, otherwise first unmet required skill, or primary skill of the node
         const targetReq =
+          (preferredSkill && node.requiredSkills.find((req) => req.skill === preferredSkill)) ||
           node.requiredSkills.find((req) => Math.floor(s.skills[req.skill] ?? 0) < req.level) ||
           node.requiredSkills[0];
         const sk = targetReq.skill;
@@ -2462,7 +2492,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const nextVal = Math.min(10, +((s.skills[sk] ?? 0) + 0.55).toFixed(2));
         const newFloor = Math.floor(nextVal);
         const leveledUp = newFloor > prevFloor;
-        const karmaGain = leveledUp ? 3 : 0;
+        const karmaGain = leveledUp ? 6 : 2;
         const royaltyCash =
           leveledUp && s.unlockedPerks.includes('perk_principal_architect') ? 1500 : 0;
 
@@ -2471,7 +2501,7 @@ export const useGameStore = create<GameState & GameActions>()(
           id: uid(),
           text: leveledUp
             ? `🔬 ${node.codeName} Lab Breakthrough! ${meta?.emoji || '🎯'} ${meta?.label || sk} reached Lv.${newFloor} (+${karmaGain} ⚡ Karma${royaltyCash > 0 ? ` & +${formatCurrency(royaltyCash)} patent royalty` : ''})!`
-            : `🔬 Studied ${node.title}: +0.55 ${meta?.label || sk} (now ${nextVal.toFixed(1)}/${targetReq.level})! Reach Lv.${prevFloor + 1} for +3 ⚡ Karma.`,
+            : `🔬 Studied ${node.title}: +0.55 ${meta?.label || sk} (now ${nextVal.toFixed(1)}/${targetReq.level}) & +${karmaGain} ⚡ Karma!`,
           emoji: leveledUp ? '🎉' : '🔬',
           tone: (leveledUp ? 'good' : 'info') as 'good' | 'info',
           time: s.time,

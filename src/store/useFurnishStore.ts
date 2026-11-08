@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { FURNITURE_BY_ID, GOALS, HOMES } from '../data/worldData';
-import { PlacedObject } from '../types/game';
+import { FurnitureDef, PlacedObject } from '../types/game';
 import { sfx } from '../utils/sound';
 import { formatCurrency, useGameStore } from './useGameStore';
 
@@ -190,6 +190,48 @@ export interface FurnishSparkle {
   text: string;
 }
 
+export function getNextUpgradeFurnitureDef(def: FurnitureDef): FurnitureDef | null {
+  const explicitUpgradeId = (def as FurnitureDef & { upgradesTo?: string }).upgradesTo;
+  if (explicitUpgradeId && FURNITURE_BY_ID[explicitUpgradeId]) {
+    return FURNITURE_BY_ID[explicitUpgradeId];
+  }
+  const candidates = Object.values(FURNITURE_BY_ID)
+    .filter((item) => item.category === def.category && item.price > def.price)
+    .sort((a, b) => a.price - b.price);
+  return candidates[0] || null;
+}
+
+export function findNearestOpenTile(
+  objects: PlacedObject[],
+  gridSize: number,
+  prefX: number,
+  prefY: number
+): { x: number; y: number } | null {
+  const isOccupied = (x: number, y: number) => objects.some((o) => o.x === x && o.y === y);
+  const clampedX = Math.max(0, Math.min(gridSize - 1, prefX));
+  const clampedY = Math.max(0, Math.min(gridSize - 1, prefY));
+
+  if (!isOccupied(clampedX, clampedY)) {
+    return { x: clampedX, y: clampedY };
+  }
+
+  let bestTile: { x: number; y: number } | null = null;
+  let bestDist = Infinity;
+
+  for (let y = 0; y < gridSize; y++) {
+    for (let x = 0; x < gridSize; x++) {
+      if (!isOccupied(x, y)) {
+        const dist = Math.hypot(x - clampedX, y - clampedY);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestTile = { x, y };
+        }
+      }
+    }
+  }
+  return bestTile;
+}
+
 interface FurnishStoreState {
   catalogDrag: CatalogDragState | null;
   selectedFurnishUid: string | null;
@@ -209,6 +251,7 @@ interface FurnishStoreState {
     furnitureId: string,
     targetTile?: { x: number; y: number }
   ) => PlacedObject | null;
+  upgradePlacedFurniture: (placedUid: string) => PlacedObject | null;
   movePlacedFurniture: (
     placedUid: string,
     toX: number,
@@ -216,37 +259,6 @@ interface FurnishStoreState {
   ) => { moved: boolean; swappedWithName?: string };
   rotatePlacedFurniture: (placedUid: string) => void;
   autoArrangeRoom: () => void;
-}
-
-function findNearestOpenTile(
-  objects: PlacedObject[],
-  gridSize: number,
-  prefX: number,
-  prefY: number
-): { x: number; y: number } {
-  const isOccupied = (x: number, y: number) => objects.some((o) => o.x === x && o.y === y);
-  const clampedX = Math.max(0, Math.min(gridSize - 1, prefX));
-  const clampedY = Math.max(0, Math.min(gridSize - 1, prefY));
-
-  if (!isOccupied(clampedX, clampedY)) {
-    return { x: clampedX, y: clampedY };
-  }
-
-  let bestTile = { x: clampedX, y: clampedY };
-  let bestDist = Infinity;
-
-  for (let y = 0; y < gridSize; y++) {
-    for (let x = 0; x < gridSize; x++) {
-      if (!isOccupied(x, y)) {
-        const dist = Math.hypot(x - clampedX, y - clampedY);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestTile = { x, y };
-        }
-      }
-    }
-  }
-  return bestTile;
 }
 
 export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
@@ -258,8 +270,16 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
   furnishSparkle: null,
 
   setCatalogDrag: (catalogDrag) => set({ catalogDrag }),
-  setSelectedFurnishUid: (selectedFurnishUid) => set({ selectedFurnishUid }),
-  setPendingPlaceId: (pendingPlaceId) => set({ pendingPlaceId }),
+  setSelectedFurnishUid: (selectedFurnishUid) =>
+    set((state) => ({
+      selectedFurnishUid,
+      pendingPlaceId: selectedFurnishUid ? null : state.pendingPlaceId,
+    })),
+  setPendingPlaceId: (pendingPlaceId) =>
+    set((state) => ({
+      pendingPlaceId,
+      selectedFurnishUid: pendingPlaceId ? null : state.selectedFurnishUid,
+    })),
   setTrayMode: (trayMode) => set({ trayMode }),
   setHoveredCatalogId: (hoveredCatalogId) => set({ hoveredCatalogId }),
 
@@ -280,6 +300,91 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
     const def = FURNITURE_BY_ID[furnitureId];
     if (!def) return null;
 
+    const homeDef = HOMES.find((h) => h.id === s.homeId) || HOMES[1];
+    const gridSize = homeDef.gridSize;
+
+    const chosenTile = targetTile
+      ? findNearestOpenTile(s.objects, gridSize, targetTile.x, targetTile.y)
+      : findNearestOpenTile(
+          s.objects,
+          gridSize,
+          Math.floor(gridSize / 2),
+          Math.floor(gridSize / 2)
+        );
+
+    if (!chosenTile) {
+      sfx.play('error');
+      const fullNotice = {
+        id: uid(),
+        text: `Room floor is full! Pack or sell an item before placing ${def.name}.`,
+        emoji: '📦',
+        tone: 'bad' as const,
+        time: s.time,
+      };
+      useGameStore.setState({
+        notices: [fullNotice, ...s.notices.slice(0, 29)],
+        lastToast: fullNotice,
+      });
+      return null;
+    }
+
+    // Check if the player already has this furniture item packed in their Backpack
+    const inv = [...(s.inventory || [])];
+    const storedIdx = inv.findIndex(
+      (entry) =>
+        entry.itemId === furnitureId &&
+        entry.kind === 'furniture' &&
+        entry.quantity > 0
+    );
+
+    if (storedIdx !== -1) {
+      if (inv[storedIdx].quantity <= 1) {
+        inv.splice(storedIdx, 1);
+      } else {
+        inv[storedIdx] = {
+          ...inv[storedIdx],
+          quantity: inv[storedIdx].quantity - 1,
+        };
+      }
+
+      const unpackedObj: PlacedObject = {
+        uid: uid(),
+        objectId: def.id,
+        x: chosenTile.x,
+        y: chosenTile.y,
+        rot: 0,
+      };
+
+      sfx.play('tap');
+      const notice = {
+        id: uid(),
+        text: `Unpacked ${def.emoji} ${def.name} from Backpack at tile (${chosenTile.x}, ${chosenTile.y})!`,
+        emoji: def.emoji,
+        tone: 'good' as const,
+        time: s.time,
+      };
+
+      useGameStore.setState({
+        inventory: inv,
+        objects: [...s.objects, unpackedObj],
+        notices: [notice, ...s.notices.slice(0, 29)],
+        lastToast: notice,
+      });
+
+      set({
+        selectedFurnishUid: unpackedObj.uid,
+        pendingPlaceId: null,
+      });
+      get().triggerTileSparkle(
+        chosenTile.x,
+        chosenTile.y,
+        def.emoji,
+        `Unpacked ${def.name.split(' ')[0]}!`
+      );
+
+      return unpackedObj;
+    }
+
     if (s.cash < def.price) {
       sfx.play('error');
       const notice = {
@@ -295,18 +400,6 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
       });
       return null;
     }
-
-    const homeDef = HOMES.find((h) => h.id === s.homeId) || HOMES[1];
-    const gridSize = homeDef.gridSize;
-
-    const chosenTile = targetTile
-      ? findNearestOpenTile(s.objects, gridSize, targetTile.x, targetTile.y)
-      : findNearestOpenTile(
-          s.objects,
-          gridSize,
-          Math.floor(gridSize / 2),
-          Math.floor(gridSize / 2)
-        );
 
     let goalIndex = s.goalIndex;
     let karma = s.karma;
@@ -357,6 +450,86 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
     return newPlaced;
   },
 
+  upgradePlacedFurniture: (placedUid) => {
+    const s = useGameStore.getState();
+    const targetObj = s.objects.find((o) => o.uid === placedUid);
+    if (!targetObj) return null;
+
+    const currentDef = FURNITURE_BY_ID[targetObj.objectId];
+    if (!currentDef) return null;
+
+    const upgradeDef = getNextUpgradeFurnitureDef(currentDef);
+    if (!upgradeDef) return null;
+
+    const resaleValue = Math.round(currentDef.price * 0.65);
+    const netCost = Math.max(0, upgradeDef.price - resaleValue);
+
+    if (s.cash < netCost) {
+      sfx.play('error');
+      const notice = {
+        id: uid(),
+        text: `Need ${formatCurrency(netCost)} (after ${formatCurrency(resaleValue)} trade-in) to upgrade to ${upgradeDef.name}.`,
+        emoji: upgradeDef.emoji,
+        tone: 'bad' as const,
+        time: s.time,
+      };
+      useGameStore.setState({
+        notices: [notice, ...s.notices.slice(0, 29)],
+        lastToast: notice,
+      });
+      return null;
+    }
+
+    let goalIndex = s.goalIndex;
+    let karma = s.karma + 2;
+    let bonusCash = 0;
+    if (goalIndex === 4) {
+      goalIndex = 5;
+      bonusCash = GOALS[4].rewardCash;
+      karma += GOALS[4].rewardKarma;
+    }
+
+    const upgradedObj: PlacedObject = {
+      ...targetObj,
+      objectId: upgradeDef.id,
+    };
+
+    const nextObjects = s.objects.map((o) =>
+      o.uid === placedUid ? upgradedObj : o
+    );
+
+    sfx.play('levelup');
+    const notice = {
+      id: uid(),
+      text: `Upgraded ${currentDef.name} → ${upgradeDef.emoji} ${upgradeDef.name} (Trade-in credit: ${formatCurrency(resaleValue)})!`,
+      emoji: upgradeDef.emoji,
+      tone: 'good' as const,
+      time: s.time,
+    };
+
+    useGameStore.setState({
+      cash: s.cash - netCost + bonusCash,
+      karma,
+      goalIndex,
+      objects: nextObjects,
+      notices: [notice, ...s.notices.slice(0, 29)],
+      lastToast: notice,
+    });
+
+    set({
+      selectedFurnishUid: upgradedObj.uid,
+      pendingPlaceId: null,
+    });
+    get().triggerTileSparkle(
+      upgradedObj.x,
+      upgradedObj.y,
+      upgradeDef.emoji,
+      `Upgraded to ${upgradeDef.name.split(' ')[0]}!`
+    );
+
+    return upgradedObj;
+  },
+
   movePlacedFurniture: (placedUid, toX, toY) => {
     const s = useGameStore.getState();
     const homeDef = HOMES.find((h) => h.id === s.homeId) || HOMES[1];
@@ -397,16 +570,37 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
       return q;
     });
 
+    const activeHead = nextQueue[0];
+    let nextTargetPos = s.targetPos;
+    let nextPos = s.pos;
+    if (activeHead?.targetObjectUid === placedUid) {
+      if (activeHead.started) {
+        nextPos = { x: clampedX, y: clampedY };
+        nextTargetPos = null;
+      } else {
+        nextTargetPos = { x: clampedX, y: clampedY };
+      }
+    } else if (occupyingObj && activeHead?.targetObjectUid === occupyingObj.uid) {
+      if (activeHead.started) {
+        nextPos = { x: origX, y: origY };
+        nextTargetPos = null;
+      } else {
+        nextTargetPos = { x: origX, y: origY };
+      }
+    }
+
     sfx.play('tap');
     useGameStore.setState({
       objects: nextObjects,
       queue: nextQueue,
+      targetPos: nextTargetPos,
+      pos: nextPos,
     });
 
     const movedDef = FURNITURE_BY_ID[targetObj.objectId];
     const swappedDef = occupyingObj ? FURNITURE_BY_ID[occupyingObj.objectId] : null;
 
-    set({ selectedFurnishUid: placedUid });
+    set({ selectedFurnishUid: placedUid, pendingPlaceId: null });
     if (swappedDef) {
       get().triggerTileSparkle(
         clampedX,
@@ -501,6 +695,7 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
 
     const used = new Set<string>();
     const arranged: PlacedObject[] = [];
+    const posByUid = new Map<string, { x: number; y: number }>();
 
     for (const obj of s.objects) {
       const def = FURNITURE_BY_ID[obj.objectId];
@@ -521,7 +716,29 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
       }
       const finalTile = chosen || { x: obj.x, y: obj.y };
       used.add(`${finalTile.x},${finalTile.y}`);
+      posByUid.set(obj.uid, finalTile);
       arranged.push({ ...obj, x: finalTile.x, y: finalTile.y });
+    }
+
+    const nextQueue = s.queue.map((q) => {
+      if (q.targetObjectUid && posByUid.has(q.targetObjectUid)) {
+        const nextTile = posByUid.get(q.targetObjectUid)!;
+        return { ...q, targetPos: { x: nextTile.x, y: nextTile.y } };
+      }
+      return q;
+    });
+
+    const activeHead = nextQueue[0];
+    let nextTargetPos = s.targetPos;
+    let nextPos = s.pos;
+    if (activeHead?.targetObjectUid && posByUid.has(activeHead.targetObjectUid)) {
+      const nextTile = posByUid.get(activeHead.targetObjectUid)!;
+      if (activeHead.started) {
+        nextPos = { x: nextTile.x, y: nextTile.y };
+        nextTargetPos = null;
+      } else {
+        nextTargetPos = { x: nextTile.x, y: nextTile.y };
+      }
     }
 
     sfx.play('levelup');
@@ -535,6 +752,9 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
 
     useGameStore.setState({
       objects: arranged,
+      queue: nextQueue,
+      targetPos: nextTargetPos,
+      pos: nextPos,
       notices: [notice, ...s.notices.slice(0, 29)],
       lastToast: notice,
     });

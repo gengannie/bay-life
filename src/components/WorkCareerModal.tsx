@@ -21,6 +21,7 @@ import {
 } from '../store/useGameStore';
 import {
   CommuteModeId,
+  SkillKey,
   TechNodeId,
   WeekdayAttendance,
   WorkMode,
@@ -61,7 +62,7 @@ interface CareerStoreExtensions {
   doWorkExploration?: (taskId: string) => void;
   submitPromoPacket?: () => void;
   unlockTechNode?: (nodeId: TechNodeId) => void;
-  trainTechNodeSkill?: (nodeId: TechNodeId) => void;
+  trainTechNodeSkill?: (nodeId: TechNodeId, preferredSkill?: SkillKey) => void;
 }
 
 type CareerModalTab = 'hybrid' | 'explore' | 'tree' | 'ladder';
@@ -69,10 +70,23 @@ type CareerModalTab = 'hybrid' | 'explore' | 'tree' | 'ladder';
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
 export const WorkCareerModal: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<CareerModalTab>('hybrid');
+  const careerTab = useGameStore((s) => s.careerTab);
+  const lastToast = useGameStore((s) => s.lastToast);
+  const dismissToast = useGameStore((s) => s.dismissToast);
+  const [activeTab, setActiveTabState] = useState<CareerModalTab>(careerTab || 'hybrid');
+  const setActiveTab = (tab: CareerModalTab) => {
+    setActiveTabState(tab);
+    useGameStore.setState({ careerTab: tab });
+  };
+  React.useEffect(() => {
+    if (careerTab && careerTab !== activeTab) {
+      setActiveTabState(careerTab);
+    }
+  }, [careerTab]);
+
   const [selectedLevelIdx, setSelectedLevelIdx] = useState<number | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<TechNodeId>('node_cuda_triton');
-  const [treeZoom, setTreeZoom] = useState<number>(1.15);
+  const [treeZoom, setTreeZoom] = useState<number>(1.0);
   const [treePan, setTreePan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDraggingTree, setIsDraggingTree] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -122,7 +136,7 @@ export const WorkCareerModal: React.FC = () => {
     (s) => (s as typeof s & CareerStoreExtensions).trainTechNodeSkill
   );
 
-  if (!job) {
+  if (!job && activeTab !== 'tree') {
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 backdrop-blur-md"
@@ -144,12 +158,20 @@ export const WorkCareerModal: React.FC = () => {
                 <h2 className="text-lg font-black">Independent Founder / F.I.R.E. Sovereign</h2>
               </div>
             </div>
-            <button
-              onClick={() => setActiveModal(null)}
-              className="btn-press grid size-8 place-items-center rounded-full bg-[var(--mist)]"
-            >
-              <X className="size-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('tree')}
+                className="btn-press rounded-xl bg-amber-500/20 px-3 py-1.5 text-xs font-extrabold text-amber-700 hover:bg-amber-500/30 dark:text-amber-300"
+              >
+                🌳 Skill Tech Tree ({(unlockedTechNodes ?? ['node_git_monorepo']).length}/{SKILL_TREE_NODES.length})
+              </button>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="btn-press grid size-8 place-items-center rounded-full bg-[var(--mist)]"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
 
           <div className="my-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs">
@@ -157,6 +179,12 @@ export const WorkCareerModal: React.FC = () => {
               You have officially resigned from corporate W-2 life! You have zero Hybrid RTO mandates and 100% control over your schedule.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => setActiveTab('tree')}
+                className="btn-press rounded-xl bg-amber-500 px-3.5 py-2 font-extrabold text-white"
+              >
+                🌳 Open Skill Tech Tree
+              </button>
               <button
                 onClick={() => setActiveModal('guide', 'goals')}
                 className="btn-press rounded-xl bg-emerald-600 px-3.5 py-2 font-extrabold text-white"
@@ -210,9 +238,29 @@ export const WorkCareerModal: React.FC = () => {
     );
   }
 
-  const career = CAREER_BY_ID[job.careerId] || CAREERS[0];
-  const currentLevel = career.levels[job.levelIndex] || career.levels[0];
-  const nextLevel = career.levels[job.levelIndex + 1] || null;
+  const effectiveJob = job || {
+    careerId: CAREERS[0].id,
+    levelIndex: 0,
+    performance: 50,
+    shiftsCompleted: 0,
+    shiftsAtLevel: 0,
+    deliverablesCompleted: 0,
+    activeProjectId: WORK_PROJECTS[0].id,
+    projectProgress: 0,
+    completedProjects: [],
+    officeDaysThisWeek: 0,
+    wfhDaysThisWeek: 0,
+    wfaDaysRemaining: 4,
+    weeklyAttendance: ['none', 'none', 'none', 'none', 'none'] as WeekdayAttendance[],
+    lastWorkDayLogged: 0,
+    rtoCompliant: true,
+    autoWork: false,
+    preferredCommute: 'gbus' as CommuteModeId,
+  };
+
+  const career = CAREER_BY_ID[effectiveJob.careerId] || CAREERS[0];
+  const currentLevel = career.levels[effectiveJob.levelIndex] || career.levels[0];
+  const nextLevel = career.levels[effectiveJob.levelIndex + 1] || null;
   const campusLoc = LOCATION_BY_ID[career.locationId];
   const homeDef = HOMES.find((h) => h.id === homeId) || HOMES[0];
   const currentVenue = locationId === 'home' ? null : LOCATION_BY_ID[locationId];
@@ -221,30 +269,30 @@ export const WorkCareerModal: React.FC = () => {
   const isAtHome = locationId === 'home';
 
   // Hybrid Attendance metrics
-  const officeDays = job.officeDaysThisWeek ?? 0;
-  const wfhDays = job.wfhDaysThisWeek ?? 0;
-  const wfaRemaining = job.wfaDaysRemaining ?? 4;
-  const weeklyAttendance: WeekdayAttendance[] = job.weeklyAttendance ?? [
+  const officeDays = effectiveJob.officeDaysThisWeek ?? 0;
+  const wfhDays = effectiveJob.wfhDaysThisWeek ?? 0;
+  const wfaRemaining = effectiveJob.wfaDaysRemaining ?? 4;
+  const weeklyAttendance: WeekdayAttendance[] = effectiveJob.weeklyAttendance ?? [
     'none',
     'none',
     'none',
     'none',
     'none',
   ];
-  const rtoCompliant = job.rtoCompliant !== false;
+  const rtoCompliant = effectiveJob.rtoCompliant !== false;
   const currentDayIdx = Math.floor(time / 1440) % 7; // 0=Mon..4=Fri, 5=Sat, 6=Sun
 
   // Active Work Exploration Project
   const defaultProject =
     WORK_PROJECTS.find((p) => p.careerId === career.id) || WORK_PROJECTS[0];
   const activeProject: WorkProjectDef =
-    (job.activeProjectId && WORK_PROJECT_BY_ID[job.activeProjectId]) || defaultProject;
-  const projectProgress = Math.min(100, Math.max(0, Math.round(job.projectProgress ?? 0)));
-  const deliverablesDone = job.deliverablesCompleted ?? 0;
-  const completedProjects = job.completedProjects ?? [];
+    (effectiveJob.activeProjectId && WORK_PROJECT_BY_ID[effectiveJob.activeProjectId]) || defaultProject;
+  const projectProgress = Math.min(100, Math.max(0, Math.round(effectiveJob.projectProgress ?? 0)));
+  const deliverablesDone = effectiveJob.deliverablesCompleted ?? 0;
+  const completedProjects = effectiveJob.completedProjects ?? [];
 
   // Multi-Gate Promo Checklist calculations
-  const shiftsAtLevel = job.shiftsAtLevel ?? job.shiftsCompleted ?? 0;
+  const shiftsAtLevel = effectiveJob.shiftsAtLevel ?? effectiveJob.shiftsCompleted ?? 0;
   const reqShifts = nextLevel?.minShiftsForPromo ?? 3;
   const reqDeliverables = nextLevel?.requiredDeliverables ?? 1;
   const primarySkillKey = nextLevel?.requiredSkill.skill ?? currentLevel.requiredSkill.skill;
@@ -265,7 +313,7 @@ export const WorkCareerModal: React.FC = () => {
   const gateTechNodePass = !reqTechNodeId || unlockedNodes.includes(reqTechNodeId);
 
   const reqPerfGate = unlockedPerks.includes('perk_exec_halo') ? 82 : 92;
-  const gatePerfPass = Math.round(job.performance) >= reqPerfGate;
+  const gatePerfPass = Math.round(effectiveJob.performance) >= reqPerfGate;
   const gateTenurePass = shiftsAtLevel >= reqShifts;
   const gatePrimaryPass = primarySkillCur >= primarySkillReq;
   const gateSecondaryPass = !secondarySkillKey || secondarySkillCur >= secondarySkillReq;
@@ -285,14 +333,14 @@ export const WorkCareerModal: React.FC = () => {
 
   const selectedNode = SKILL_TREE_NODE_BY_ID[selectedNodeId] || SKILL_TREE_NODES[5];
 
-  const inspectedLevelIdx = selectedLevelIdx !== null ? selectedLevelIdx : job.levelIndex;
+  const inspectedLevelIdx = selectedLevelIdx !== null ? selectedLevelIdx : effectiveJob.levelIndex;
   const inspectedLevel = career.levels[inspectedLevelIdx] || currentLevel;
 
   const handleCommuteAndWork = () => {
     if (isAtCampus) {
       startWorkShift('office');
     } else if (commuteToOfficeAndWork) {
-      commuteToOfficeAndWork(ownedCars.length > 0 ? 'tesla' : job.preferredCommute);
+      commuteToOfficeAndWork(ownedCars.length > 0 ? 'tesla' : effectiveJob.preferredCommute);
     } else {
       startWorkShift('office');
     }
@@ -494,6 +542,32 @@ export const WorkCareerModal: React.FC = () => {
         )}
 
         {/* =========================================================
+            INLINE STATUS / FEEDBACK BANNER (FOR MODAL ACTIONS)
+        ========================================================= */}
+        {lastToast && Math.abs(time - lastToast.time) <= 20 && (
+          <div
+            className={`flex items-center justify-between gap-3 border-b px-6 py-2 text-xs font-extrabold ${
+              lastToast.tone === 'bad'
+                ? 'border-rose-500/30 bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                : lastToast.tone === 'good'
+                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                  : 'border-sky-500/30 bg-sky-500/15 text-sky-700 dark:text-sky-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm">{lastToast.emoji}</span>
+              <span>{lastToast.text}</span>
+            </div>
+            <button
+              onClick={dismissToast}
+              className="btn-press rounded-lg bg-black/10 px-2 py-0.5 text-[10px] font-black hover:bg-black/20 dark:bg-white/10"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* =========================================================
             SCROLLABLE BODY CONTENT
         ========================================================= */}
         <div className="scrollbar-none flex-1 overflow-y-auto p-6 space-y-6">
@@ -664,12 +738,12 @@ export const WorkCareerModal: React.FC = () => {
                       <button
                         onClick={toggleAutoWork}
                         className={`btn-press rounded-full px-3 py-1 text-xs font-extrabold transition-all ${
-                          job.autoWork
+                          effectiveJob.autoWork
                             ? 'bg-emerald-500 text-white shadow-xs'
                             : 'bg-[var(--mist)] text-[var(--ink-soft)]'
                         }`}
                       >
-                        Auto-Commute: {job.autoWork ? 'ON' : 'OFF'}
+                        Auto-Commute: {effectiveJob.autoWork ? 'ON' : 'OFF'}
                       </button>
                     </div>
 
@@ -2287,15 +2361,28 @@ export const WorkCareerModal: React.FC = () => {
                                       <span>
                                         {skMeta?.emoji} {skMeta?.label || req.skill}
                                       </span>
-                                      <span
-                                        className={
-                                          met
-                                            ? 'font-black text-emerald-600 dark:text-emerald-400'
-                                            : 'font-black text-amber-600 dark:text-amber-400'
-                                        }
-                                      >
-                                        {met ? '✓ ' : ''}Lv.{rawVal.toFixed(1)} / Lv.{req.level}
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={
+                                            met
+                                              ? 'font-black text-emerald-600 dark:text-emerald-400'
+                                              : 'font-black text-amber-600 dark:text-amber-400'
+                                          }
+                                        >
+                                          {met ? '✓ ' : ''}Lv.{rawVal.toFixed(1)} / Lv.{req.level}
+                                        </span>
+                                        {!met && (
+                                          <button
+                                            onClick={() =>
+                                              trainTechNodeSkill?.(selectedNode.id, req.skill)
+                                            }
+                                            className="btn-press rounded-lg bg-[#007AFF] px-2 py-0.5 text-[10px] font-black text-white hover:bg-blue-600"
+                                            title={`Deep-Dive Study ${skMeta?.label || req.skill} (-16⚡ Energy · +0.55 XP & +2⚡ Karma)`}
+                                          >
+                                            🔬 Train
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
                                     <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                                       <div
@@ -2502,13 +2589,13 @@ export const WorkCareerModal: React.FC = () => {
                                   : 'font-black text-[#007AFF]'
                               }
                             >
-                              {Math.round(job.performance)}% / {reqPerfGate}%
+                              {Math.round(effectiveJob.performance)}% / {reqPerfGate}%
                             </span>
                           </div>
                           <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-[#007AFF] to-emerald-500 transition-all duration-300"
-                              style={{ width: `${Math.min(100, (job.performance / reqPerfGate) * 100)}%` }}
+                              style={{ width: `${Math.min(100, (effectiveJob.performance / reqPerfGate) * 100)}%` }}
                             />
                           </div>
                         </div>
@@ -2727,7 +2814,7 @@ export const WorkCareerModal: React.FC = () => {
                           const rsuHeight = barHeight - baseHeight;
                           const x = 18 + idx * 56;
                           const yTop = 122 - barHeight;
-                          const isCurrent = idx === job.levelIndex;
+                          const isCurrent = idx === effectiveJob.levelIndex;
                           const isInspected = idx === inspectedLevelIdx;
 
                           return (

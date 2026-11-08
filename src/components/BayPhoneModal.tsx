@@ -832,7 +832,7 @@ export const BayPhoneModal: React.FC = () => {
                     Switch Track · Onsite Interview Loops
                   </div>
                   <button
-                    onClick={() => setActiveModal('career')}
+                    onClick={() => setActiveModal('career', 'tree')}
                     className="btn-press rounded-lg bg-[#007AFF]/15 px-2.5 py-1 text-[10px] font-extrabold text-[#007AFF]"
                   >
                     🌳 Skill Tech Tree & Hub ↗

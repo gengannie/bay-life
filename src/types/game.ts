@@ -840,6 +840,7 @@ export interface GameState {
   simTab: 'needs' | 'skills' | 'relationships' | 'wishes' | 'perks' | 'backpack';
   computerTab?: 'ide' | 'ai_lab' | 'bounties' | 'bluefin' | 'hardware';
   guideTab?: 'goals' | 'tutorial' | 'playbook';
+  careerTab?: 'hybrid' | 'explore' | 'tree' | 'ladder';
   mapHouseHuntMode?: boolean;
   bluefinSelectedHomeId?: string | null;
 
