@@ -113,6 +113,9 @@ export const WorkCareerModal: React.FC = () => {
   const toggleAutoWork = useGameStore((s) => s.toggleAutoWork);
   const setWorkTone = useGameStore((s) => s.setWorkTone);
   const leaveWorkEarly = useGameStore((s) => s.leaveWorkEarly);
+  const setCampusFloor = useGameStore((s) => s.setCampusFloor);
+  const campusFloorIndex = useGameStore((s) => s.campusFloorIndex) ?? 0;
+  const travelTo = useGameStore((s) => s.travelTo);
 
   const startWorkShift = useGameStore(
     (s) => (s as typeof s & CareerStoreExtensions).startWorkShift
@@ -1629,6 +1632,92 @@ export const WorkCareerModal: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Multi-Floor Campus & Desk Directory */}
+              {campusLoc?.floors && campusLoc.floors.length > 0 && (
+                <div className="rounded-3xl border border-black/10 bg-white/70 p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">🏢</span>
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-[var(--ink-soft)]">
+                          CAMPUS FLOORS & DESK DIRECTORY
+                        </div>
+                        <div className="text-sm font-extrabold text-[var(--ink)]">
+                          {career.company} HQ ({campusLoc.name})
+                        </div>
+                      </div>
+                    </div>
+                    {isAtCampus && (
+                      <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-black text-emerald-600 dark:text-emerald-400">
+                        📍 On Campus · Floor {campusLoc.floors[campusFloorIndex]?.code || '1F'}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {campusLoc.floors.map((fl, fIdx) => {
+                      const isCurrentFloor = isAtCampus && campusFloorIndex === fIdx;
+                      return (
+                        <div
+                          key={fl.id}
+                          className={`flex flex-col justify-between rounded-2xl border p-3.5 transition-all ${
+                            isCurrentFloor
+                              ? 'border-[#007AFF] bg-[#007AFF]/10 shadow-sm ring-2 ring-[#007AFF]/30'
+                              : 'border-black/5 bg-[var(--mist)] dark:border-white/10'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-2xl">{fl.emoji}</span>
+                              <span className="rounded-full bg-black/10 px-2 py-0.5 font-mono text-[11px] font-extrabold text-[var(--ink)] dark:bg-white/10">
+                                {fl.code}
+                              </span>
+                            </div>
+                            <div className="mt-2 text-xs font-black text-[var(--ink)] leading-snug">
+                              {fl.name}
+                            </div>
+                            <div className="mt-1 text-[10px] text-[var(--ink-soft)] line-clamp-2">
+                              {fl.subtitle}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/10 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-[var(--ink-soft)]">
+                              {fl.stations.length} stations
+                            </span>
+                            {isAtCampus ? (
+                              <button
+                                onClick={() => {
+                                  setCampusFloor(fIdx);
+                                  setActiveModal(null);
+                                }}
+                                className={`btn-press rounded-xl px-2.5 py-1 text-[10.5px] font-extrabold ${
+                                  isCurrentFloor
+                                    ? 'bg-[#007AFF] text-white shadow-xs'
+                                    : 'bg-black/10 text-[var(--ink)] hover:bg-[#007AFF] hover:text-white dark:bg-white/10'
+                                }`}
+                              >
+                                {isCurrentFloor ? 'Here Now' : '🛗 Elevator'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  travelTo(career.locationId, 'gbus');
+                                  setActiveModal(null);
+                                }}
+                                className="btn-press rounded-xl bg-emerald-600 px-2.5 py-1 text-[10.5px] font-extrabold text-white hover:bg-emerald-500 shadow-xs"
+                              >
+                                🚌 Commute
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Why Can't I Travel During a Shift + Policy Explainer Footer */}
               <div className="grid grid-cols-1 gap-3 rounded-2xl border border-black/8 bg-[var(--mist)] p-4 text-xs sm:grid-cols-3 dark:border-white/10">

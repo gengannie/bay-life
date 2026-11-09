@@ -17,7 +17,7 @@ import {
   isHomePowered,
   useGameStore,
 } from '../store/useGameStore';
-import { SkillKey } from '../types/game';
+import { SkillKey, StartupDifficulty } from '../types/game';
 import {
   Cpu,
   Terminal,
@@ -303,6 +303,7 @@ export const HomeComputerModal: React.FC = () => {
   const sellFurniture = useGameStore((s) => s.sellFurniture);
   const buyFurniture = useGameStore((s) => s.buyFurniture);
   const pitchStartupVC = useGameStore((s) => s.pitchStartupVC);
+  const setStartupDifficulty = useGameStore((s) => s.setStartupDifficulty);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
   const moveHome = useGameStore((s) => s.moveHome);
   const openBluefinMap = useGameStore((s) => s.openBluefinMap);
@@ -1576,58 +1577,156 @@ export const HomeComputerModal: React.FC = () => {
                   </div>
 
                   <div className="space-y-4 lg:col-span-5">
-                    <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-600 dark:text-amber-300">
-                          🦄 {startup.stage}
-                        </span>
-                        <span className="font-mono text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                          {formatCurrency(startup.mrr)}/wk MRR
-                        </span>
-                      </div>
-                      <h4 className="mt-2 text-base font-black">{startup.name}</h4>
-                      <p className="text-xs text-[var(--ink-soft)]">{startup.tagline}</p>
+                    {(() => {
+                      const compStartupDiff = startup.difficultyMode || 'realistic';
+                      const compStageReq = getStartupNextStageRequirements(startup.stage, compStartupDiff);
+                      const compDailyBurn = getStartupDailyBurnRate(startup.stage, compStartupDiff);
+                      const compDisplayDevs = typeof startup.users === 'number' && startup.users > 200_000 ? 42_580 : startup.users;
+                      const compCanPitchVC =
+                        Boolean(compStageReq && compStageReq.nextStage) &&
+                        startup.productProgress >= (compStageReq?.minMvp || 0) &&
+                        compDisplayDevs >= (compStageReq?.minUsers || 0) &&
+                        startup.mrr >= (compStageReq?.minMrr || 0) &&
+                        Math.floor(skills.hustle || 0) >= (compStageReq?.minHustle || 0) &&
+                        Math.floor(skills.systemDesign || 0) >= (compStageReq?.minSysDesign || 0);
 
-                      <div className="mt-3">
-                        <div className="flex justify-between text-xs font-bold">
-                          <span>Product MVP Readiness</span>
-                          <span className="font-mono">{Math.round(startup.productProgress)}%</span>
+                      return (
+                        <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/10 p-4">
+                          <div className="flex items-center justify-between">
+                            <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-600 dark:text-amber-300">
+                              🦄 {startup.stage}
+                            </span>
+                            <span className="font-mono text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                              {formatCurrency(startup.mrr)}/mo MRR
+                            </span>
+                          </div>
+                          <h4 className="mt-2 text-base font-black">{startup.name}</h4>
+                          <p className="text-xs text-[var(--ink-soft)]">{startup.tagline}</p>
+
+                          {/* Difficulty Mode Selector */}
+                          <div className="mt-3 rounded-2xl bg-black/5 p-1 dark:bg-white/5">
+                            <div className="flex items-center gap-1">
+                              {(['easy', 'realistic', 'hardcore'] as const).map((mode) => (
+                                <button
+                                  key={mode}
+                                  onClick={() => setStartupDifficulty(mode)}
+                                  className={`flex-1 rounded-xl py-1 text-[10px] font-extrabold transition-all ${
+                                    compStartupDiff === mode
+                                      ? 'bg-orange-500 text-white shadow-sm'
+                                      : 'text-[var(--ink-soft)] hover:text-black dark:hover:text-white'
+                                  }`}
+                                >
+                                  {mode === 'easy' ? '🌱 Casual' : mode === 'realistic' ? '⚡ Realistic SV' : '🔥 Hardcore'}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="mt-1 px-1 text-center text-[9px] font-medium text-[var(--ink-soft)]">
+                              {compStartupDiff === 'easy' && 'Zero cloud burn · Lenient VCs · No dev churn'}
+                              {compStartupDiff === 'realistic' && `${compDailyBurn > 0 ? `-$${compDailyBurn}/d AWS GPU burn` : 'Modest cloud burn'} · 1.2% dev churn · Traction gates`}
+                              {compStartupDiff === 'hardcore' && `${compDailyBurn > 0 ? `-$${compDailyBurn}/d AWS GPU burn` : 'High GPU burn'} · 2.5% dev churn · Ruthless diligence`}
+                            </div>
+                          </div>
+
+                          {/* Traction Bento */}
+                          <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                            <div className="rounded-xl bg-white/60 p-2 dark:bg-black/30">
+                              <span className="text-[9px] font-bold text-[var(--ink-soft)] uppercase block">Valuation</span>
+                              <span className="font-black text-orange-600">{formatCurrency(startup.valuation)}</span>
+                            </div>
+                            <div className="rounded-xl bg-white/60 p-2 dark:bg-black/30">
+                              <span className="text-[9px] font-bold text-[var(--ink-soft)] uppercase block">Active Devs</span>
+                              <span className="font-black">{compDisplayDevs.toLocaleString()}</span>
+                            </div>
+                            <div className="rounded-xl bg-white/60 p-2 dark:bg-black/30">
+                              <span className="text-[9px] font-bold text-[var(--ink-soft)] uppercase block">Cloud Infra</span>
+                              <span className="font-black text-rose-500">{compDailyBurn > 0 ? `-$${compDailyBurn}/d` : '$0/d'}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3">
+                            <div className="flex justify-between text-xs font-bold">
+                              <span>Product MVP Readiness</span>
+                              <span className="font-mono">{Math.round(startup.productProgress)}%</span>
+                            </div>
+                            <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                              <div
+                                className="h-full rounded-full bg-amber-500 transition-all"
+                                style={{ width: `${Math.min(100, startup.productProgress)}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Next Stage Diligence Milestones */}
+                          {compStageReq && compStageReq.nextStage ? (
+                            <div className="mt-3 rounded-2xl bg-white/60 p-3 text-left dark:bg-black/30 space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px] font-black">
+                                <span className="text-[var(--ink-soft)]">Next Round Target</span>
+                                <span className="text-orange-600 dark:text-orange-400">{compStageReq.stageTitle}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                                <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${startup.productProgress >= compStageReq.minMvp ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-black/5 dark:bg-white/5 text-[var(--ink-soft)]'}`}>
+                                  <span>{startup.productProgress >= compStageReq.minMvp ? '✓' : '○'}</span>
+                                  <span>MVP: {Math.round(startup.productProgress)}%/{compStageReq.minMvp}%</span>
+                                </div>
+                                <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${compDisplayDevs >= compStageReq.minUsers ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-black/5 dark:bg-white/5 text-[var(--ink-soft)]'}`}>
+                                  <span>{compDisplayDevs >= compStageReq.minUsers ? '✓' : '○'}</span>
+                                  <span>Devs: {compDisplayDevs.toLocaleString()}/{compStageReq.minUsers.toLocaleString()}</span>
+                                </div>
+                                <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${startup.mrr >= compStageReq.minMrr ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-black/5 dark:bg-white/5 text-[var(--ink-soft)]'}`}>
+                                  <span>{startup.mrr >= compStageReq.minMrr ? '✓' : '○'}</span>
+                                  <span>MRR: {formatCurrency(startup.mrr)}/{formatCurrency(compStageReq.minMrr)}</span>
+                                </div>
+                                <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${Math.floor(skills.hustle || 0) >= compStageReq.minHustle ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-black/5 dark:bg-white/5 text-[var(--ink-soft)]'}`}>
+                                  <span>{Math.floor(skills.hustle || 0) >= compStageReq.minHustle ? '✓' : '○'}</span>
+                                  <span>Hustle: Lv.{Math.floor(skills.hustle || 0)}/{compStageReq.minHustle}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-3 rounded-2xl bg-amber-500/15 p-2 text-center text-xs font-black text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                              🏆 Generational Decacorn ($10B Market Cap) · Publicly Traded
+                            </div>
+                          )}
+
+                          <div className="mt-4 grid gap-2">
+                            <button
+                              onClick={() => {
+                                enqueueAction('build_startup_mvp', {
+                                  objectUid: installedComputer.placed.uid,
+                                  pos: {
+                                    x: installedComputer.placed.x,
+                                    y: installedComputer.placed.y,
+                                  },
+                                });
+                                setActiveModal(null);
+                              }}
+                              className="btn-press rounded-2xl bg-[#007AFF] py-2.5 text-xs font-extrabold text-white"
+                            >
+                              🚀 Queue Deep-Work MVP Sprint on Sim (90m)
+                            </button>
+
+                            {compStageReq && compStageReq.nextStage ? (
+                              <button
+                                onClick={pitchStartupVC}
+                                className={`btn-press rounded-2xl py-2.5 text-xs font-extrabold text-white ${
+                                  compCanPitchVC
+                                    ? 'bg-emerald-600 animate-pulse hover:bg-emerald-500'
+                                    : 'bg-orange-500/80 hover:bg-orange-500'
+                                }`}
+                              >
+                                {compCanPitchVC
+                                  ? `🦄 Term Sheet Ready · Pitch ${compStageReq.stageTitle}!`
+                                  : `Pitch Sand Hill VCs for ${compStageReq.stageTitle}`}
+                              </button>
+                            ) : (
+                              <div className="rounded-2xl bg-emerald-600/20 py-2.5 text-center text-xs font-extrabold text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                🏆 All Venture Rounds Closed · NASDAQ Bell Rung!
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-amber-500 transition-all"
-                            style={{ width: `${Math.min(100, startup.productProgress)}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-2">
-                        <button
-                          onClick={() => {
-                            enqueueAction('build_startup_mvp', {
-                              objectUid: installedComputer.placed.uid,
-                              pos: {
-                                x: installedComputer.placed.x,
-                                y: installedComputer.placed.y,
-                              },
-                            });
-                            setActiveModal(null);
-                          }}
-                          className="btn-press rounded-2xl bg-[#007AFF] py-2.5 text-xs font-extrabold text-white"
-                        >
-                          🚀 Queue Deep-Work MVP Sprint on Sim (90m)
-                        </button>
-
-                        {startup.productProgress >= 50 && (
-                          <button
-                            onClick={pitchStartupVC}
-                            className="btn-press rounded-2xl bg-emerald-600 py-2.5 text-xs font-extrabold text-white"
-                          >
-                            🦄 Pitch Sand Hill VCs for Next Round!
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
