@@ -1004,20 +1004,60 @@ export const WorldMapModal: React.FC = () => {
                 />
               </circle>
 
-              {/* Region Watermark Labels */}
-              <text x="16" y="6" fontSize="2.2" fontWeight="700" fill="#047857" opacity="0.7">
+              {/* Region Watermark Labels (Subtle Cartographic Depth) */}
+              <text
+                x="16"
+                y="6"
+                fontSize="1.9"
+                fontWeight="700"
+                letterSpacing="0.14em"
+                fill="#047857"
+                opacity="0.45"
+              >
                 MARIN HEADLANDS
               </text>
-              <text x="23" y="21" fontSize="2.3" fontWeight="800" fill="#0F172A" opacity="0.28">
+              <text
+                x="26"
+                y="22"
+                fontSize="2.0"
+                fontWeight="800"
+                letterSpacing="0.16em"
+                fill="#0F172A"
+                opacity="0.12"
+              >
                 SAN FRANCISCO
               </text>
-              <text x="33" y="57" fontSize="2.3" fontWeight="700" fill="#0F172A" opacity="0.28">
+              <text
+                x="33"
+                y="57"
+                fontSize="2.0"
+                fontWeight="700"
+                letterSpacing="0.16em"
+                fill="#0F172A"
+                opacity="0.14"
+              >
                 PENINSULA
               </text>
-              <text x="45" y="96.5" fontSize="2.4" fontWeight="800" fill="#0F172A" opacity="0.35">
+              <text
+                x="45"
+                y="96.5"
+                fontSize="2.1"
+                fontWeight="800"
+                letterSpacing="0.16em"
+                fill="#0F172A"
+                opacity="0.18"
+              >
                 SILICON VALLEY · SOUTH BAY
               </text>
-              <text x="75" y="24" fontSize="2.3" fontWeight="700" fill="#0F172A" opacity="0.34">
+              <text
+                x="75"
+                y="24"
+                fontSize="2.1"
+                fontWeight="700"
+                letterSpacing="0.16em"
+                fill="#0F172A"
+                opacity="0.16"
+              >
                 EAST BAY
               </text>
 

@@ -15,6 +15,8 @@ import {
   WORK_PROJECTS,
   WORK_PROJECT_BY_ID,
   calculateCommuteDetails,
+  getStartupDailyBurnRate,
+  getStartupNextStageRequirements,
 } from '../data/worldData';
 import {
   getRelationshipTierInfo,
@@ -32,7 +34,7 @@ import {
   getDayNumber,
   useGameStore,
 } from '../store/useGameStore';
-import { CommuteModeId, MarketTicker, WorkMode } from '../types/game';
+import { CommuteModeId, MarketTicker, StartupDifficulty, WorkMode } from '../types/game';
 import { Portrait } from './Portrait';
 import {
   Briefcase,
@@ -205,6 +207,8 @@ export const BayPhoneModal: React.FC = () => {
   const orderDoorDash = useGameStore((s) => s.orderDoorDash);
   const pitchStartupVC = useGameStore((s) => s.pitchStartupVC);
   const renameStartup = useGameStore((s) => s.renameStartup);
+  const setStartupDifficulty = useGameStore((s) => s.setStartupDifficulty);
+  const launchStartupProductHunt = useGameStore((s) => s.launchStartupProductHunt);
   const moveHome = useGameStore((s) => s.moveHome);
   const setView = useGameStore((s) => s.setView);
   const openBluefinMap = useGameStore((s) => s.openBluefinMap);
@@ -233,6 +237,19 @@ export const BayPhoneModal: React.FC = () => {
   const [tradeCooldown, setTradeCooldown] = useState(0);
   const [phCooldown, setPhCooldown] = useState(0);
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+
+  const startupDifficulty = startup.difficultyMode || 'realistic';
+  const stageReq = getStartupNextStageRequirements(startup.stage, startupDifficulty);
+  const dailyBurn = getStartupDailyBurnRate(startup.stage, startupDifficulty);
+  const displayDevs = typeof startup.users === 'number' && startup.users > 200_000 ? 42_580 : startup.users;
+
+  const canPitchVC =
+    Boolean(stageReq && stageReq.nextStage) &&
+    startup.productProgress >= (stageReq?.minMvp || 0) &&
+    displayDevs >= (stageReq?.minUsers || 0) &&
+    startup.mrr >= (stageReq?.minMrr || 0) &&
+    Math.floor(skills.hustle || 0) >= (stageReq?.minHustle || 0) &&
+    Math.floor(skills.systemDesign || 0) >= (stageReq?.minSysDesign || 0);
   const [blindTab, setBlindTab] = useState<'dm' | 'feed'>('dm');
   const [selectedDmNpcId, setSelectedDmNpcId] = useState<string | null>(null);
   const [showDmGiftDrawer, setShowDmGiftDrawer] = useState<boolean>(false);
@@ -281,7 +298,7 @@ export const BayPhoneModal: React.FC = () => {
         label: 'YC Studio',
         icon: <Rocket className="size-4" />,
         gradient: 'from-[#FF9500] to-[#FF3B30]',
-        badge: startup.productProgress >= 50 ? '1' : undefined,
+        badge: canPitchVC ? '1' : undefined,
       },
       {
         id: 'doordash',
@@ -365,16 +382,8 @@ export const BayPhoneModal: React.FC = () => {
 
   const handleProductHuntLaunch = () => {
     if (phCooldown > 0) return;
-    setPhCooldown(15);
-    triggerMicroReward({
-      cashDelta: 480,
-      startupDelta: 14,
-      skill: 'hustle',
-      skillDelta: 0.3,
-      karmaDelta: 1,
-      toastText: 'Trending #1 on ProductHunt! +14% MVP, +$480 Stripe MRR & +1 ⚡ Karma',
-      emoji: '🚀',
-    });
+    setPhCooldown(45);
+    launchStartupProductHunt();
   };
 
   const handleLikeBlindPost = (postId: string) => {

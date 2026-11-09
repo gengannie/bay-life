@@ -26,6 +26,7 @@ import { ActionDef, FurnitureDef, NeedKey, NPCDef, PlacedObject, VenueStation } 
 import { Portrait } from './Portrait';
 import {
   ArrowUpCircle,
+  Briefcase,
   Compass,
   Home,
   Map,
@@ -238,6 +239,8 @@ export const IsometricScene: React.FC = () => {
   const setActiveModal = useGameStore((s) => s.setActiveModal);
   const openBluefinMap = useGameStore((s) => s.openBluefinMap);
   const travelTo = useGameStore((s) => s.travelTo);
+  const campusFloorIndex = useGameStore((s) => s.campusFloorIndex) ?? 0;
+  const setCampusFloor = useGameStore((s) => s.setCampusFloor);
 
   // Furnishing Mode Store State
   const catalogDrag = useFurnishStore((s) => s.catalogDrag);
