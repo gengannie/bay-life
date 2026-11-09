@@ -823,9 +823,11 @@ export const IsometricScene: React.FC = () => {
                   ? isNight
                     ? homeDef.architecture.wallLeftNight[0]
                     : homeDef.architecture.wallLeftGrad[0]
-                  : isNight
-                    ? '#1E293B'
-                    : '#F8FAFC'
+                  : activeCampusFloor?.wallLeftGrad
+                    ? activeCampusFloor.wallLeftGrad[0]
+                    : isNight
+                      ? '#1E293B'
+                      : '#F8FAFC'
               }
             />
             <stop
@@ -835,9 +837,11 @@ export const IsometricScene: React.FC = () => {
                   ? isNight
                     ? homeDef.architecture.wallLeftNight[1]
                     : homeDef.architecture.wallLeftGrad[1]
-                  : isNight
-                    ? '#0F172A'
-                    : '#E2E8F0'
+                  : activeCampusFloor?.wallLeftGrad
+                    ? activeCampusFloor.wallLeftGrad[1]
+                    : isNight
+                      ? '#0F172A'
+                      : '#E2E8F0'
               }
             />
           </linearGradient>
@@ -849,9 +853,11 @@ export const IsometricScene: React.FC = () => {
                   ? isNight
                     ? homeDef.architecture.wallRightNight[0]
                     : homeDef.architecture.wallRightGrad[0]
-                  : isNight
-                    ? '#334155'
-                    : '#F1F5F9'
+                  : activeCampusFloor?.wallRightGrad
+                    ? activeCampusFloor.wallRightGrad[0]
+                    : isNight
+                      ? '#334155'
+                      : '#F1F5F9'
               }
             />
             <stop
@@ -861,9 +867,11 @@ export const IsometricScene: React.FC = () => {
                   ? isNight
                     ? homeDef.architecture.wallRightNight[1]
                     : homeDef.architecture.wallRightGrad[1]
-                  : isNight
-                    ? '#1E293B'
-                    : '#CBD5E1'
+                  : activeCampusFloor?.wallRightGrad
+                    ? activeCampusFloor.wallRightGrad[1]
+                    : isNight
+                      ? '#1E293B'
+                      : '#CBD5E1'
               }
             />
           </linearGradient>
@@ -1438,7 +1446,9 @@ export const IsometricScene: React.FC = () => {
               >
                 {isHome
                   ? `${homeDef.emoji} ${(homeDef.shortName || homeDef.name).toUpperCase()} · T${homeDef.tier}`
-                  : `${venueDef?.emoji || '📍'} ${venueDef?.shortName.toUpperCase()}`}
+                  : activeCampusFloor
+                    ? `${activeCampusFloor.emoji} ${venueDef?.shortName.toUpperCase()} · ${activeCampusFloor.code}`
+                    : `${venueDef?.emoji || '📍'} ${venueDef?.shortName.toUpperCase()}`}
               </text>
             </g>
           </g>
