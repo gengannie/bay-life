@@ -94,6 +94,14 @@ export const GoalsGuideModal: React.FC = () => {
     unlockedPerks.includes('perk_exec_halo') ||
     unlockedPerks.includes('perk_diamond_hands');
   const nonSalaryWeekly = cf.weeklyStartupRev + cf.weeklyDividendYield;
+  const totalMilestoneCash = activeEval.stages.reduce(
+    (sum, s) => sum + (s.stage.rewardCash || 0),
+    0
+  );
+  const totalMilestoneKarma = activeEval.stages.reduce(
+    (sum, s) => sum + (s.stage.rewardKarma || 0),
+    0
+  );
 
   const handleActionTrigger = (actionType: AspirationActionType) => {
     switch (actionType) {
@@ -319,7 +327,9 @@ export const GoalsGuideModal: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-700 uppercase dark:text-amber-300">
-                      {job ? '🔒 W-2 Handcuffs' : '🔓 Sovereign · W-2 Free'}
+                      {job
+                        ? `🔒 ${careerDef ? `${careerDef.company} ${levelDef?.code || ''}`.trim() : 'W-2'} Handcuffs`
+                        : '🔓 Sovereign · W-2 Free'}
                     </span>
                     <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 font-mono text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
                       🔥 {cf.passiveCoveragePct}% Burn Covered
@@ -393,10 +403,10 @@ export const GoalsGuideModal: React.FC = () => {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black uppercase tracking-wider text-[#007AFF]">
-                      🏆 4 Milestones
+                      🏆 {activeEval.stages.length} Milestones
                     </span>
                     <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
-                      +$73.5k · +60⚡ Total
+                      +{formatCurrency(totalMilestoneCash)} · +{totalMilestoneKarma}⚡ Total
                     </span>
                   </div>
 

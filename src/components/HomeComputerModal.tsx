@@ -288,6 +288,8 @@ export const HomeComputerModal: React.FC = () => {
   const homeId = useGameStore((s) => s.homeId);
   const locationId = useGameStore((s) => s.locationId);
   const objects = useGameStore((s) => s.objects);
+  const pgePowerOn = useGameStore((s) => s.pgePowerOn);
+  const inventory = useGameStore((s) => s.inventory);
   const job = useGameStore((s) => s.job);
   const workShift = useGameStore((s) => s.workShift);
   const startup = useGameStore((s) => s.startup);
@@ -308,8 +310,13 @@ export const HomeComputerModal: React.FC = () => {
   const moveHome = useGameStore((s) => s.moveHome);
   const openBluefinMap = useGameStore((s) => s.openBluefinMap);
 
-  const state = useGameStore.getState();
-  const powered = isHomePowered(state);
+  const powered = isHomePowered({
+    ...useGameStore.getState(),
+    homeId,
+    pgePowerOn,
+    objects,
+    inventory,
+  });
   const installedComputer = useMemo(
     () => getInstalledHomeComputer({ objects }),
     [objects]
@@ -432,9 +439,17 @@ export const HomeComputerModal: React.FC = () => {
 
   const handleSolveCodeReview = (opt: { label: string; fix: string; optimal?: boolean }) => {
     if (!installedComputer || !powered) return;
-    if (opt.optimal) {
+    if (needs.energy < 8) {
+      triggerMicroReward({
+        toastText: 'Too exhausted to review PRs! Grab an espresso or rest first (Need 8⚡ Energy).',
+        emoji: '☕',
+      });
+      return;
+    }
+    const isOptimal = Boolean(opt.optimal);
+    if (isOptimal) {
       const rewardCash = Math.round(210 * yieldMult);
-      setBugFeedback(`✅ LGTM! ${opt.fix} (+${formatCurrency(rewardCash)} · +0.18 Coding XP)`);
+      setBugFeedback(`✅ LGTM! ${opt.fix} (+${formatCurrency(rewardCash)} · +0.18 Coding XP · -6⚡ Energy)`);
       setBugIdx((i) => i + 1);
       triggerMicroReward({
         cashDelta: rewardCash,
@@ -442,14 +457,20 @@ export const HomeComputerModal: React.FC = () => {
         skillDelta: +(0.18 * yieldMult).toFixed(2),
         performanceDelta: 3,
         karmaDelta: 1,
+        needKey: 'energy',
+        needDelta: -6,
+        ...({ needsDelta: { energy: -6, fun: isOptimal ? 2 : -2 } } as Record<string, unknown>),
         toastText: `Squashed P0 Bug in Code Review! +${formatCurrency(rewardCash)}`,
         emoji: '🐛',
       });
     } else {
-      setBugFeedback(`⚠️ CI Rejected: ${opt.fix}. Try the optimal fix!`);
+      setBugFeedback(`⚠️ CI Rejected: ${opt.fix}. Try the optimal fix! (-6⚡ Energy)`);
       triggerMicroReward({
         skill: 'coding',
         skillDelta: 0.04,
+        needKey: 'energy',
+        needDelta: -6,
+        ...({ needsDelta: { energy: -6, fun: isOptimal ? 2 : -2 } } as Record<string, unknown>),
       });
     }
   };
@@ -547,8 +568,8 @@ export const HomeComputerModal: React.FC = () => {
               <Monitor className="size-4 text-sky-400" />
               <span className="text-xs font-black tracking-tight sm:text-sm">
                 {installedComputer
-                  ? `${installedComputer.def.emoji} ${installedComputer.def.name}`
-                  : '🖥️ Home Computer Workstation (Optional Purchase)'}
+                  ? installedComputer.def.name
+                  : 'Home Computer Workstation (Optional Purchase)'}
               </span>
               {currentSpec && (
                 <span className="hidden rounded-full bg-sky-500/20 px-2.5 py-0.5 font-mono text-[10px] font-extrabold text-sky-300 sm:inline-block">
@@ -600,7 +621,7 @@ export const HomeComputerModal: React.FC = () => {
                     }`}
                 >
                   <Terminal className="size-3.5" />
-                  <span>💻 Cursor IDE & Terminal</span>
+                  <span>Cursor IDE & Terminal</span>
                 </button>
 
                 <button
@@ -611,7 +632,7 @@ export const HomeComputerModal: React.FC = () => {
                     }`}
                 >
                   <Cpu className="size-3.5" />
-                  <span>🧠 Local AI & GPU Lab</span>
+                  <span>Local AI & GPU Lab</span>
                 </button>
 
                 <button
@@ -622,7 +643,7 @@ export const HomeComputerModal: React.FC = () => {
                     }`}
                 >
                   <Rocket className="size-3.5" />
-                  <span>🚀 Bounties & Startup</span>
+                  <span>Bounties & Startup</span>
                 </button>
 
                 <button
@@ -633,7 +654,7 @@ export const HomeComputerModal: React.FC = () => {
                     }`}
                 >
                   <Home className="size-3.5" />
-                  <span>🐟 Bluefin Real Estate</span>
+                  <span>Bluefin Real Estate</span>
                 </button>
 
                 <button
@@ -644,7 +665,7 @@ export const HomeComputerModal: React.FC = () => {
                     }`}
                 >
                   <HardDrive className="size-3.5" />
-                  <span>⚙️ WFH, Queue & Upgrade Rig</span>
+                  <span>WFH, Queue & Upgrade Rig</span>
                 </button>
               </>
             ) : (
@@ -657,7 +678,7 @@ export const HomeComputerModal: React.FC = () => {
                     }`}
                 >
                   <HardDrive className="size-3.5" />
-                  <span>🖥️ Hardware Showroom</span>
+                  <span>Hardware Showroom</span>
                 </button>
 
                 <button
@@ -668,7 +689,7 @@ export const HomeComputerModal: React.FC = () => {
                     }`}
                 >
                   <Home className="size-3.5" />
-                  <span>🐟 Bluefin Real Estate</span>
+                  <span>Bluefin Real Estate</span>
                 </button>
               </>
             )}
@@ -1351,15 +1372,16 @@ export const HomeComputerModal: React.FC = () => {
                       </div>
 
                       <p className="mt-2.5 text-[11px] font-bold text-[var(--ink-soft)]">
-                        Select the optimal patch to approve & merge:
+                        Select the optimal patch to approve & merge (-6⚡ Energy):
                       </p>
 
                       <div className="mt-2 grid gap-2">
                         {activeBug.options.map((opt, idx) => (
                           <button
                             key={idx}
+                            disabled={needs.energy < 8}
                             onClick={() => handleSolveCodeReview(opt)}
-                            className="btn-press rounded-2xl border border-black/5 bg-white/80 p-3 text-left text-xs transition-all hover:border-[#007AFF] dark:border-white/10 dark:bg-white/5"
+                            className="btn-press rounded-2xl border border-black/5 bg-white/80 p-3 text-left text-xs transition-all hover:border-[#007AFF] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
                           >
                             <div className="font-extrabold text-[var(--ink)]">{opt.label}</div>
                             <div className="mt-0.5 text-[10px] text-[var(--ink-soft)]">

@@ -335,7 +335,7 @@ export const WorkCareerModal: React.FC = () => {
   const completedProjects = effectiveJob.completedProjects ?? [];
 
   // Multi-Gate Promo Checklist calculations
-  const shiftsAtLevel = Math.max(effectiveJob.shiftsAtLevel ?? 0, effectiveJob.shiftsCompleted ?? 0);
+  const shiftsAtLevel = effectiveJob.shiftsAtLevel ?? 0;
   const reqShifts = nextLevel?.minShiftsForPromo ?? 3;
   const reqDeliverables = nextLevel?.requiredDeliverables ?? 1;
   const primarySkillKey = nextLevel?.requiredSkill.skill ?? currentLevel.requiredSkill.skill;
@@ -925,7 +925,7 @@ export const WorkCareerModal: React.FC = () => {
                 }`}
               >
                 <Building2 className="size-3.5 text-[#007AFF]" />
-                <span>🏢 Hybrid & Shifts</span>
+                <span>Hybrid & Shifts</span>
               </button>
               <button
                 onClick={() => setActiveTab('explore')}
@@ -936,7 +936,7 @@ export const WorkCareerModal: React.FC = () => {
                 }`}
               >
                 <Cpu className="size-3.5 text-purple-500" />
-                <span>🔬 Exploration</span>
+                <span>Exploration</span>
                 <span className="rounded-full bg-purple-500/20 px-1.5 py-0.2 text-[10px] font-black text-purple-600 dark:text-purple-300">
                   {projectProgress}%
                 </span>
@@ -950,7 +950,7 @@ export const WorkCareerModal: React.FC = () => {
                 }`}
               >
                 <Layers className="size-3.5 text-amber-500" />
-                <span>🌳 Skill Tech Tree</span>
+                <span>Skill Tech Tree</span>
                 <span className="rounded-full bg-amber-500/20 px-1.5 py-0.2 text-[10px] font-black text-amber-600 dark:text-amber-300">
                   {unlockedNodes.length}/{SKILL_TREE_NODES.length}
                 </span>
@@ -964,7 +964,7 @@ export const WorkCareerModal: React.FC = () => {
                 }`}
               >
                 <TrendingUp className="size-3.5 text-emerald-500" />
-                <span>📈 Promo & Ladder</span>
+                <span>Promo & Ladder</span>
                 {nextLevel && (
                   <span
                     className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
@@ -986,7 +986,7 @@ export const WorkCareerModal: React.FC = () => {
                 }`}
               >
                 <Briefcase className="size-3.5 text-indigo-500" />
-                <span>🌉 Switch Track</span>
+                <span>Switch Track</span>
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
                     qualifiedCareerCount > 1
@@ -1987,7 +1987,7 @@ export const WorkCareerModal: React.FC = () => {
                   {WORK_EXPLORATION_TASKS.map((task) => {
                     const skMeta = SKILLS_META.find((s) => s.key === task.skill);
                     const needsCampus = Boolean(task.requiresOffice && !isAtCampus);
-                    const lowEnergy = needs.energy < task.energyCost + 4;
+                    const lowEnergy = needs.energy < task.energyCost;
 
                     return (
                       <div
@@ -2698,17 +2698,26 @@ export const WorkCareerModal: React.FC = () => {
                                     const skMeta = SKILLS_META.find((m) => m.key === req.skill);
                                     const curLv = Math.floor(skills[req.skill] ?? 0);
                                     const met = curLv >= req.level;
-                                    const pillX = cx - 86 + rIdx * 88;
+                                    const isThreePlus = node.requiredSkills.length >= 3;
+                                    const pillW = isThreePlus ? 58 : 82;
+                                    const pillStep = isThreePlus ? 60 : 88;
+                                    const pillX = (isThreePlus ? cx - 89 : cx - 86) + rIdx * pillStep;
                                     const pillY = cy + 23;
-                                    const shortSkLabel =
-                                      skMeta?.label.split(' ')[0] || req.skill;
+                                    const rawShort = skMeta?.label.split(' ')[0] || req.skill;
+                                    const shortSkLabel = isThreePlus
+                                      ? req.skill === 'coding'
+                                        ? 'Code'
+                                        : req.skill === 'systemDesign'
+                                          ? 'SysDes'
+                                          : rawShort.slice(0, 6)
+                                      : rawShort;
 
                                     return (
                                       <g key={req.skill}>
                                         <rect
                                           x={pillX}
                                           y={pillY}
-                                          width="82"
+                                          width={pillW}
                                           height="17"
                                           rx="5"
                                           fill={
@@ -2724,9 +2733,9 @@ export const WorkCareerModal: React.FC = () => {
                                           strokeWidth="1"
                                         />
                                         <text
-                                          x={pillX + 41}
+                                          x={pillX + pillW / 2}
                                           y={pillY + 11.5}
-                                          fontSize="8.5"
+                                          fontSize={isThreePlus ? '7.5' : '8.5'}
                                           fontWeight="800"
                                           fill={met ? '#6EE7B7' : '#CBD5E1'}
                                           textAnchor="middle"
@@ -3039,7 +3048,7 @@ export const WorkCareerModal: React.FC = () => {
                               <span>🔬 Deep-Dive Lab Study ({selectedNode.codeName})</span>
                             </span>
                             <span className="rounded-lg bg-[#007AFF] px-2 py-0.5 text-[10px] font-black text-white">
-                              -16⚡ Energy · +0.55 Skill & +6⚡
+                              -16⚡ Energy · +0.55 Skill & +2–6⚡
                             </span>
                           </button>
                         </div>
@@ -3372,29 +3381,29 @@ export const WorkCareerModal: React.FC = () => {
 
                         {/* Gate 6: Shipped Deliverables (Work Exploration) */}
                         <div className="rounded-2xl bg-[var(--mist)] p-3">
-                          <div className="flex items-center justify-between text-xs font-bold">
+                          <div className="flex items-center justify-between gap-2 text-xs font-bold">
                             <span className="flex items-center gap-1.5">
                               {gateDeliverablesPass ? (
-                                <CheckCircle2 className="size-4 text-emerald-500" />
+                                <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
                               ) : (
-                                <AlertCircle className="size-4 text-amber-500" />
+                                <AlertCircle className="size-4 shrink-0 text-amber-500" />
                               )}
                               <span>6. Shipped Deliverables (Work Exploration)</span>
                             </span>
-                            <div className="flex items-center gap-2">
+                            <div className="flex shrink-0 items-center gap-2">
                               <span
-                                className={
+                                className={`whitespace-nowrap shrink-0 ${
                                   gateDeliverablesPass
                                     ? 'font-black text-emerald-600 dark:text-emerald-400'
                                     : 'font-black text-purple-600 dark:text-purple-400'
-                                }
+                                }`}
                               >
                                 {deliverablesDone} / {reqDeliverables} deliverables
                               </span>
                               {!gateDeliverablesPass && (
                                 <button
                                   onClick={() => setActiveTab('explore')}
-                                  className="btn-press rounded-lg bg-purple-500/20 px-2 py-0.5 text-[10px] font-black text-purple-700 hover:bg-purple-500/30 dark:text-purple-300"
+                                  className="btn-press whitespace-nowrap shrink-0 rounded-lg bg-purple-500/20 px-2 py-0.5 text-[10px] font-black text-purple-700 hover:bg-purple-500/30 dark:text-purple-300"
                                 >
                                   🚀 Ship Charter →
                                 </button>
@@ -3458,7 +3467,7 @@ export const WorkCareerModal: React.FC = () => {
                         {!gatePrimaryPass && <li>• Primary Skill: Need {primarySkillMeta?.label || primarySkillKey} Lv.{primarySkillReq} (currently Lv.{primarySkillCur})</li>}
                         {!gateSecondaryPass && secondarySkillKey && <li>• Secondary Skill: Need {secondarySkillMeta?.label || secondarySkillKey} Lv.{secondarySkillReq} (currently Lv.{secondarySkillCur})</li>}
                         {!gateTechNodePass && <li>• Tech Tree: Unlock {reqTechNodeDef ? `${reqTechNodeDef.emoji} ${reqTechNodeDef.title}` : 'Required Spec Node'}</li>}
-                        {!gateDeliverablesPass && <li>• Deliverables: Ship {reqDeliverables} charter deliverables (currently {deliverablesDone})</li>}
+                        {!gateDeliverablesPass && <li>• Deliverables: Ship {reqDeliverables} charter deliverable{reqDeliverables === 1 ? '' : 's'} (currently {deliverablesDone})</li>}
                         {!gateRtoPass && <li>• Hybrid RTO: Need 3/3 campus office days (currently {effectiveJob.officeDaysThisWeek ?? 0}/3)</li>}
                       </ul>
                     </div>

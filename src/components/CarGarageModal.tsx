@@ -12,7 +12,7 @@ import {
   hasPersonalCar,
   useGameStore,
 } from '../store/useGameStore';
-import { Car, Compass, Navigation, Sparkles, X, Zap, Check, ShieldCheck } from 'lucide-react';
+import { Car, Compass, X, Zap, Check, ShieldCheck } from 'lucide-react';
 
 const QUICK_DESTINATIONS = [
   { id: 'dolores_park', label: 'Dolores Park', sub: 'Mission Sunny Lawn' },
@@ -67,12 +67,12 @@ export const CarGarageModal: React.FC = () => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/90 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-[#007AFF] text-white shadow-md">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/90 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-[#007AFF] text-white shadow-md">
               <Car className="size-5" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-extrabold tracking-tight">
                   Apple CarPlay & Bay Area EV Garage
@@ -87,14 +87,14 @@ export const CarGarageModal: React.FC = () => {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-[var(--ink-soft)]">
+              <p className="truncate text-xs text-[var(--ink-soft)]">
                 Your personal vehicle hub: compare EVs, launch 1-tap CarPlay drives anywhere in the
                 Bay, or take a scenic joyride
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2.5">
             <div className="rounded-2xl bg-emerald-500/12 px-3.5 py-1.5 text-right">
               <div className="text-[10px] font-extrabold tracking-wider text-emerald-700 uppercase dark:text-emerald-300">
                 Available Cash
@@ -345,20 +345,20 @@ export const CarGarageModal: React.FC = () => {
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex min-w-0 items-center gap-2.5">
                           <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/85 text-2xl shadow-xs dark:bg-white/10">
                             {veh.emoji}
                           </span>
-                          <div>
-                            <span className="rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[9.5px] font-black text-[#007AFF] uppercase">
+                          <div className="min-w-0">
+                            <span className="inline-flex items-center rounded-full bg-[#007AFF]/15 px-2 py-0.5 text-[9px] font-black whitespace-nowrap text-[#007AFF] uppercase">
                               {veh.tierLabel || veh.brand}
                             </span>
-                            <h4 className="mt-0.5 text-sm font-extrabold leading-tight">
+                            <h4 className="mt-1 text-sm font-extrabold leading-tight">
                               {veh.name}
                             </h4>
                           </div>
                         </div>
-                        <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
+                        <span className="shrink-0 font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(veh.price)}
                         </span>
                       </div>

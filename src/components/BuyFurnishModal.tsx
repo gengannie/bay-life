@@ -138,6 +138,7 @@ export const BuyFurnishModal: React.FC = () => {
   const ownedCars = useGameStore((s) => s.ownedCars);
   const homeId = useGameStore((s) => s.homeId);
   const locationId = useGameStore((s) => s.locationId);
+  const workShift = useGameStore((s) => s.workShift);
   const objects = useGameStore((s) => s.objects);
   const inventory = useGameStore((s) => s.inventory || []);
   const setView = useGameStore((s) => s.setView);
@@ -341,19 +342,31 @@ export const BuyFurnishModal: React.FC = () => {
             You must be at your apartment to buy or arrange furniture
           </h2>
           <p className="mt-1.5 text-xs font-medium text-[var(--ink-soft)]">
-            Head back to {homeDef.name} to install new gear or rearrange your floor plan.
+            {workShift
+              ? `You are currently clocked into a live work shift (${workShift.mode?.toUpperCase() || 'OFFICE'}). Finish or leave your shift before traveling back to ${homeDef.name}.`
+              : `Head back to ${homeDef.name} to install new gear or rearrange your floor plan.`}
           </p>
           <div className="mt-5 flex w-full flex-col gap-2 sm:flex-row">
-            <button
-              onClick={() => {
-                travelTo('home', ownedCars.length > 0 ? 'tesla' : 'gbus');
-                skipTravelNow();
-              }}
-              className="btn-press flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#007AFF] px-4 py-3 text-xs font-extrabold text-white shadow-sm hover:bg-[#0066CC]"
-            >
-              <Home className="size-4" />
-              🏠 Travel Home
-            </button>
+            {workShift ? (
+              <button
+                onClick={() => setView('live')}
+                className="btn-press flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#007AFF] px-4 py-3 text-xs font-extrabold text-white shadow-sm hover:bg-[#0066CC]"
+              >
+                <Home className="size-4" />
+                Return to Live Shift View
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  travelTo('home', ownedCars.length > 0 ? 'tesla' : 'gbus');
+                  skipTravelNow();
+                }}
+                className="btn-press flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#007AFF] px-4 py-3 text-xs font-extrabold text-white shadow-sm hover:bg-[#0066CC]"
+              >
+                <Home className="size-4" />
+                Travel Home
+              </button>
+            )}
             <button
               onClick={() => setView('live')}
               className="apple-pill btn-press flex items-center justify-center gap-1.5 rounded-2xl px-4 py-3 text-xs font-bold"

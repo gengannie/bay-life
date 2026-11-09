@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { FURNITURE_BY_ID, GOALS, HOMES } from '../data/worldData';
 import { FurnitureDef, PlacedObject } from '../types/game';
 import { sfx } from '../utils/sound';
-import { formatCurrency, useGameStore } from './useGameStore';
+import { ensureFinanceState, formatCurrency, recordCashFlow, useGameStore } from './useGameStore';
 
 export const ISO_TILE_W = 68;
 export const ISO_TILE_H = 35;
@@ -427,10 +427,19 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
       time: s.time,
     };
 
+    const fin = recordCashFlow(ensureFinanceState(s), {
+      time: s.time,
+      label: `Bought Furniture: ${def.name}`,
+      emoji: def.emoji,
+      amount: -def.price,
+      category: 'upgrades',
+    });
+
     useGameStore.setState({
       cash: s.cash - def.price + bonusCash,
       karma,
       goalIndex,
+      finance: fin,
       objects: [...s.objects, newPlaced],
       notices: [notice, ...s.notices.slice(0, 29)],
       lastToast: notice,
@@ -507,10 +516,19 @@ export const useFurnishStore = create<FurnishStoreState>((set, get) => ({
       time: s.time,
     };
 
+    const fin = recordCashFlow(ensureFinanceState(s), {
+      time: s.time,
+      label: `Upgraded Furniture → ${upgradeDef.name} (Trade-in +${formatCurrency(resaleValue)})`,
+      emoji: upgradeDef.emoji,
+      amount: -netCost,
+      category: 'upgrades',
+    });
+
     useGameStore.setState({
       cash: s.cash - netCost + bonusCash,
       karma,
       goalIndex,
+      finance: fin,
       objects: nextObjects,
       notices: [notice, ...s.notices.slice(0, 29)],
       lastToast: notice,

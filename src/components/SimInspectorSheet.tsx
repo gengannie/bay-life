@@ -157,7 +157,7 @@ export const SimInspectorSheet: React.FC = () => {
         </div>
 
         {/* Tab Body */}
-        <div className="flex-1 space-y-3.5 overflow-y-auto pr-1">
+        <div className="flex-1 space-y-3.5 overflow-x-hidden overflow-y-auto pr-1">
           {/* NEEDS & MOODLETS (Apple Fitness Ring Style) */}
           {simTab === 'needs' && (
             <div className="space-y-3.5">
@@ -987,10 +987,10 @@ export const SimInspectorSheet: React.FC = () => {
             );
             const avgBond = Math.round(totalBond / NPCS.length);
             const innerCircleCount = NPCS.filter(
-              (n) => (relationships[n.id]?.score ?? 12) >= 52
+              (n) => (relationships[n.id]?.score ?? 12) >= 50
             ).length;
             const cofounderCount = NPCS.filter(
-              (n) => (relationships[n.id]?.score ?? 12) >= 68
+              (n) => (relationships[n.id]?.score ?? 12) >= 70
             ).length;
             const partnerCount = NPCS.filter(
               (n) => (relationships[n.id]?.score ?? 12) >= 85
@@ -1093,7 +1093,7 @@ export const SimInspectorSheet: React.FC = () => {
                       <button
                         key={npc.id}
                         onClick={() => setSelectedRelNpcId(npc.id)}
-                        className={`btn-press relative flex flex-col justify-between gap-1.5 rounded-2xl border p-2.5 text-left transition-all ${
+                        className={`btn-press relative flex min-w-0 flex-col justify-between gap-1.5 rounded-2xl border p-2.5 text-left transition-all ${
                           isSelected
                             ? 'border-[#007AFF] bg-[#007AFF]/12 ring-2 ring-[#007AFF]/30'
                             : 'border-black/5 bg-[var(--mist)] hover:bg-black/10 dark:border-white/10 dark:hover:bg-white/10'
@@ -1101,7 +1101,7 @@ export const SimInspectorSheet: React.FC = () => {
                       >
                         {(hasUnclaimedMilestone || hasActiveTopic) && (
                           <span
-                            className={`absolute -top-1.5 -right-1.5 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm ${
+                            className={`absolute -top-1 right-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm ${
                               hasUnclaimedMilestone
                                 ? 'animate-bounce bg-amber-500'
                                 : 'animate-pulse bg-[#007AFF]'
@@ -1465,13 +1465,17 @@ export const SimInspectorSheet: React.FC = () => {
                         {NPC_INTERACTIONS.map((def) => {
                           const unlocked = score >= def.minScore;
                           const count = rel?.interactionCounts?.[def.id] || 0;
+                          const lacksEnergy = needs.energy < def.energyCost;
+                          const lacksCash = Boolean(def.cashCost && cash < def.cashCost);
+                          const insufficientResources = lacksEnergy || lacksCash;
 
                           return (
                             <button
                               key={def.id}
+                              disabled={!unlocked || insufficientResources}
                               onClick={() => interactWithNpc(selectedNpc.id, def.id)}
-                              className={`btn-press flex flex-col justify-between gap-2 rounded-2xl border p-3 text-left transition-all ${
-                                unlocked
+                              className={`btn-press flex flex-col justify-between gap-2 rounded-2xl border p-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-55 ${
+                                unlocked && !insufficientResources
                                   ? 'border-black/10 bg-[var(--mist)] hover:border-[#007AFF]/50 dark:border-white/10'
                                   : 'border-black/5 bg-black/5 opacity-65 dark:border-white/5 dark:bg-white/5'
                               }`}
@@ -1774,7 +1778,12 @@ export const SimInspectorSheet: React.FC = () => {
                         📱 Recent iMessage Thread with {selectedNpc.name}
                       </span>
                       <button
-                        onClick={() => setActiveModal('phone', 'messages')}
+                        onClick={() =>
+                          setActiveModal(
+                            'phone',
+                            `messages:${selectedNpc.id}` as unknown as 'messages'
+                          )
+                        }
                         className="btn-press rounded-full bg-[#007AFF]/15 px-2.5 py-0.5 text-[10px] font-extrabold text-[#007AFF]"
                       >
                         💬 Open Full Phone iMessage

@@ -582,6 +582,19 @@ export const AppleHUD: React.FC = () => {
         return;
       }
 
+      if (key === 'escape') {
+        if (s.activeModal) {
+          e.preventDefault();
+          setActiveModal(null);
+          return;
+        }
+        if (s.view === 'map') {
+          e.preventDefault();
+          setView('live');
+          return;
+        }
+      }
+
       if (e.code === 'Space') {
         e.preventDefault();
         setSpeed(s.speed === 0 ? 1 : 0);
@@ -621,9 +634,19 @@ export const AppleHUD: React.FC = () => {
       } else if (key === 's') {
         e.preventDefault();
         setActiveModal(s.activeModal === 'account' ? null : 'account');
-      } else if (key === 'q' || key === 'h') {
+      } else if (key === 'q') {
         e.preventDefault();
         setActiveModal(s.activeModal === 'guide' ? null : 'guide', 'goals');
+      } else if (key === 'h') {
+        e.preventDefault();
+        if (s.locationId !== 'home' && !s.workShift && !s.travel) {
+          travelTo(
+            'home',
+            hasPersonalCar({ ownedCars: s.ownedCars }) ? 'tesla' : s.job?.preferredCommute || 'caltrain'
+          );
+        } else {
+          setView('live');
+        }
       } else if (key === 'a') {
         e.preventDefault();
         handleSmartNext();
@@ -645,7 +668,7 @@ export const AppleHUD: React.FC = () => {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSmartNext, quickSaveNow, resolveEventChoice, setActiveModal, setSpeed, setView]);
+  }, [handleSmartNext, quickSaveNow, resolveEventChoice, setActiveModal, setSpeed, setView, travelTo]);
 
   const activeVehicle = getActiveVehicle({ ownedCars, activeCarId });
   const totalPackCount = inventory.reduce((sum, entry) => sum + entry.quantity, 0);
@@ -835,7 +858,9 @@ export const AppleHUD: React.FC = () => {
           >
             <span className="shrink-0 text-base">{lastToast.emoji}</span>
             <span className="line-clamp-2 max-w-md text-xs font-bold leading-tight">
-              {lastToast.text}
+              {lastToast.emoji && lastToast.text.startsWith(lastToast.emoji)
+                ? lastToast.text.slice(lastToast.emoji.length).trimStart()
+                : lastToast.text}
             </span>
             <button
               onClick={dismissToast}
@@ -850,7 +875,11 @@ export const AppleHUD: React.FC = () => {
 
       {/* SUB-HEADER: COMPACT LEFT RAIL FOR NORTH STAR GOAL, STARTER TUTORIAL & LIVE ACTION QUEUE */}
       {view === 'live' && (
-        <div className="pointer-events-none fixed top-15 left-3 z-20 flex w-72 flex-col items-start gap-2 sm:left-5 sm:w-80">
+        <div
+          className={`pointer-events-none fixed top-24 left-3 z-20 flex w-72 flex-col items-start gap-2 sm:top-15 sm:left-5 sm:w-80 ${
+            workShift ? 'hidden sm:flex' : 'flex'
+          }`}
+        >
           {/* Interactive North Star Goal & Guided Starter Quest Card */}
           <div className="apple-glass-heavy pointer-events-auto flex w-full flex-col gap-2 rounded-2xl p-3 text-[var(--ink)] shadow-md">
             <div className="flex items-center justify-between gap-2">
@@ -1078,7 +1107,7 @@ export const AppleHUD: React.FC = () => {
 
       {/* INTERACTIVE WORK SHIFT MINI-GAME ("LIVE CODE SPRINT & BUG SQUASH") — DOCKED TO TOP-RIGHT RAIL IN LIVE VIEW ONLY */}
       {view === 'live' && !activeModal && workShift && job && careerDef && levelDef && (
-        <div className="pointer-events-none fixed top-16 right-3 z-20 w-[calc(100%-24px)] max-w-[385px] sm:right-5">
+        <div className="pointer-events-none fixed top-24 right-3 z-20 w-[calc(100%-24px)] max-w-[385px] sm:top-16 sm:right-5">
           <div className="apple-glass-heavy pointer-events-auto relative overflow-hidden rounded-3xl p-3.5 shadow-xl">
             {/* Floating +$$$ / +Promo Micro-Reward Popups */}
             <div className="pointer-events-none absolute top-3 right-12 z-40 flex flex-col items-end gap-1">
@@ -1232,7 +1261,7 @@ export const AppleHUD: React.FC = () => {
                             />
                           </div>
                           <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
-                            Shifts: {Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted ?? 0)}/{nextLevel?.minShiftsForPromo || 3} req
+                            Shifts: {job.shiftsAtLevel ?? 0}/{nextLevel?.minShiftsForPromo || 3} req
                           </div>
                         </div>
 
@@ -1251,7 +1280,7 @@ export const AppleHUD: React.FC = () => {
                           </div>
                           <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
                             Deliverables {job.deliverablesCompleted || 0}/
-                            {nextLevel?.requiredDeliverables || 1} · Shifts {Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted ?? 0)}/
+                            {nextLevel?.requiredDeliverables || 1} · Shifts {job.shiftsAtLevel ?? 0}/
                             {nextLevel?.minShiftsForPromo || 3}
                           </div>
                         </div>
@@ -1599,7 +1628,7 @@ export const AppleHUD: React.FC = () => {
         </div>
 
         {/* Right: Primary Navigation Dock + "✨ Smart Next" Apple Intelligence Button */}
-        <div className="apple-glass-heavy pointer-events-auto flex items-center gap-1 rounded-3xl p-1.5">
+        <div className="apple-glass-heavy scrollbar-none pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-3xl p-1.5">
           {/* "✨ Smart Next" Apple Intelligence 1-Tap Button */}
           <button
             onClick={handleSmartNext}

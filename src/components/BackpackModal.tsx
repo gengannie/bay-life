@@ -7,7 +7,7 @@ import {
   MOODLETS,
 } from '../data/worldData';
 import { formatCurrency, useGameStore } from '../store/useGameStore';
-import { Backpack, Package, ShoppingBag, Sparkles, X, Zap, Home, ArrowDownToLine } from 'lucide-react';
+import { Backpack, ShoppingBag, Sparkles, X, Zap, Home, ArrowDownToLine } from 'lucide-react';
 
 type PackTab = 'pack' | 'shop' | 'room';
 type PackFilter = 'all' | 'consumable' | 'edc' | 'furniture';
@@ -41,6 +41,19 @@ export const BackpackModal: React.FC = () => {
 
   const hasMacbook = inventory.some((i) => i.itemId === 'edc_macbook' && i.quantity > 0);
   const hasPowerBank = inventory.some((i) => i.itemId === 'edc_anker_bank' && i.quantity > 0);
+  const extraEdcBuffItems = inventory
+    .filter(
+      (entry) =>
+        entry.kind !== 'furniture' &&
+        entry.quantity > 0 &&
+        entry.itemId !== 'edc_macbook' &&
+        entry.itemId !== 'edc_anker_bank'
+    )
+    .map((entry) => BACKPACK_ITEM_BY_ID[entry.itemId])
+    .filter(
+      (def): def is NonNullable<typeof def> =>
+        Boolean(def && !def.consumable && (def.passiveBadge || def.passiveBoost))
+    );
 
   const filteredInventory = inventory.filter((entry) => {
     if (entry.quantity <= 0) return false;
@@ -126,6 +139,14 @@ export const BackpackModal: React.FC = () => {
             >
               🔋 {hasPowerBank ? 'Anker Prime (PG&E Outage Shield Active)' : 'No Portable Power Bank'}
             </span>
+            {extraEdcBuffItems.map((item) => (
+              <span
+                key={item.id}
+                className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[10.5px] font-extrabold text-indigo-700 dark:text-indigo-300"
+              >
+                {item.emoji} {item.name} ({item.passiveBoost || item.passiveBadge})
+              </span>
+            ))}
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10.5px] font-extrabold text-amber-700 dark:text-amber-300">

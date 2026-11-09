@@ -172,6 +172,7 @@ export function extractSerializableState(state: GameState): SerializableGameStat
     freeWill: state.freeWill,
     homeId: state.homeId,
     locationId: state.locationId,
+    campusFloorIndex: state.campusFloorIndex,
     objects: state.objects,
     pos: state.pos,
     targetPos: state.targetPos,
@@ -190,6 +191,8 @@ export function extractSerializableState(state: GameState): SerializableGameStat
     rentOwed: state.rentOwed,
     stats: state.stats,
     goalIndex: state.goalIndex,
+    claimedAspirationStages: state.claimedAspirationStages,
+    resignedJobOnce: state.resignedJobOnce,
   };
 }
 

@@ -346,6 +346,63 @@ export function recordCashFlow(
   };
 }
 
+export function getTechNodeMultipliers(unlockedTechNodes?: TechNodeId[]) {
+  const set = new Set<TechNodeId>(unlockedTechNodes ?? ['node_git_monorepo']);
+  return {
+    codingXpMult: 1 + (set.has('node_git_monorepo') ? 0.1 : 0) + (set.has('node_cxx_memory') ? 0.12 : 0),
+    sysDesignXpMult:
+      1 + (set.has('node_distributed_rpc') ? 0.12 : 0) + (set.has('node_metal_shaders') ? 0.15 : 0),
+    aiXpMult:
+      1 + (set.has('node_pytorch_autodiff') ? 0.15 : 0) + (set.has('node_cuda_triton') ? 0.15 : 0),
+    hustleXpMult: 1 + (set.has('node_yc_pmf') ? 0.15 : 0) + (set.has('node_growth_loops') ? 0.15 : 0),
+    charismaXpMult: 1 + (set.has('node_spatial_os') ? 0.2 : 0),
+    investingXpMult: 1 + (set.has('node_cap_table_alpha') ? 0.15 : 0) + (set.has('node_midas_kingmaker') ? 0.2 : 0),
+    charterSpeedMult: 1 + (set.has('node_spanner_sharding') ? 0.15 : 0),
+    shiftPayMult: 1 + (set.has('node_ane_silicon') ? 0.15 : 0) + (set.has('node_cap_table_alpha') ? 0.15 : 0),
+    rsuMult:
+      1 +
+      (set.has('node_borg_orchestrator') ? 0.15 : 0) +
+      (set.has('node_agi_scaling_laws') ? 0.2 : 0) +
+      (set.has('node_spatial_os') ? 0.2 : 0) +
+      (set.has('node_midas_kingmaker') ? 0.25 : 0),
+    perfMult: 1 + (set.has('node_rlhf_posttrain') ? 0.18 : 0),
+    startupMult: 1 + (set.has('node_yc_pmf') ? 0.15 : 0) + (set.has('node_growth_loops') ? 0.15 : 0),
+  };
+}
+
+export function findOpenSpawnTile(
+  gridSize: number,
+  occupiedCoords: Array<{ x: number; y: number }>,
+  preferred?: { x: number; y: number }
+): { x: number; y: number } {
+  const center = preferred || { x: Math.floor(gridSize / 2), y: Math.floor(gridSize / 2) };
+  const isOccupied = (tx: number, ty: number) =>
+    occupiedCoords.some((o) => o.x === tx && o.y === ty);
+  if (
+    center.x >= 0 &&
+    center.x < gridSize &&
+    center.y >= 0 &&
+    center.y < gridSize &&
+    !isOccupied(center.x, center.y)
+  ) {
+    return center;
+  }
+  let best = { x: clamp(center.x, 0, gridSize - 1), y: clamp(center.y, 0, gridSize - 1) };
+  let bestDist = Infinity;
+  for (let y = 0; y < gridSize; y++) {
+    for (let x = 0; x < gridSize; x++) {
+      if (!isOccupied(x, y)) {
+        const d = Math.abs(x - center.x) + Math.abs(y - center.y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = { x, y };
+        }
+      }
+    }
+  }
+  return best;
+}
+
 export function calculateCashFlowMetrics(state: GameState) {
   const fin = ensureFinanceState(state);
   const career = state.job ? CAREER_BY_ID[state.job.careerId] : null;
@@ -353,9 +410,10 @@ export function calculateCashFlowMetrics(state: GameState) {
   const homeDef = HOMES.find((h) => h.id === state.homeId) || HOMES[1];
   const isHomeOwned = state.ownedHomes.includes(state.homeId);
 
+  const techMults = getTechNodeMultipliers(state.unlockedTechNodes);
   const execHaloMult = state.unlockedPerks.includes('perk_exec_halo') ? 1.25 : 1.0;
-  const shiftCashPay = lvl ? Math.round(lvl.shiftPay * execHaloMult) : 0;
-  const shiftRsuPay = lvl ? Math.round(lvl.rsuPerShift * execHaloMult) : 0;
+  const shiftCashPay = lvl ? Math.round(lvl.shiftPay * execHaloMult * techMults.shiftPayMult) : 0;
+  const shiftRsuPay = lvl ? Math.round(lvl.rsuPerShift * execHaloMult * techMults.rsuMult) : 0;
   const weeklySalaryCash = shiftCashPay * 5;
   const weeklySalaryRsu = shiftRsuPay * 5;
 
@@ -468,8 +526,8 @@ export function evaluateAspirationProgress(
   const nw = calculateNetWorth(state);
   const cf = calculateCashFlowMetrics(state);
   const relValues = Object.values(state.relationships || {});
-  const rels38 = relValues.filter((r) => r.score >= 38).length;
-  const rels65 = relValues.filter((r) => r.score >= 65).length;
+  const rels30 = relValues.filter((r) => r.score >= 30).length;
+  const rels70 = relValues.filter((r) => r.score >= 70).length;
   const rels75 = relValues.filter((r) => r.score >= 75).length;
   const maxTechSkill = Math.max(
     state.skills.coding || 0,
@@ -568,11 +626,18 @@ export function evaluateAspirationProgress(
         break;
       }
       case 'unicorn_2': {
+        const reqMvp =
+          getStartupNextStageRequirements(
+            'Weekend Prototype',
+            state.startup.difficultyMode || 'realistic'
+          )?.minMvp ?? 65;
         met =
           state.startup.ycAccepted ||
           ['YC Batch', 'Seed Funded', 'Series A Unicorn', 'Decacorn IPO'].includes(state.startup.stage);
-        pct = met ? 100 : clamp(Math.round((state.startup.productProgress / 50) * 100), 0, 95);
-        progressText = met ? 'YC S26 Batch Accepted!' : `${Math.round(state.startup.productProgress)}/50% MVP to Pitch YC`;
+        pct = met ? 100 : clamp(Math.round((state.startup.productProgress / reqMvp) * 100), 0, 95);
+        progressText = met
+          ? 'YC S26 Batch Accepted!'
+          : `${Math.round(state.startup.productProgress)}/${reqMvp}% MVP to Pitch YC`;
         break;
       }
       case 'unicorn_3': {
@@ -663,21 +728,21 @@ export function evaluateAspirationProgress(
 
       // 6. Cerebral Valley Super-Connector
       case 'conn_1': {
-        pct = clamp(rels38 * 100, 0, 100);
-        met = rels38 >= 1;
-        progressText = `${rels38} / 1 Coffee Buddy (38+ Score)`;
+        pct = clamp(rels30 * 100, 0, 100);
+        met = rels30 >= 1;
+        progressText = `${rels30} / 1 Coffee Buddy (30+ Score)`;
         break;
       }
       case 'conn_2': {
-        pct = clamp(Math.round((rels38 / 3) * 100), 0, 100);
-        met = rels38 >= 3;
-        progressText = `${rels38} / 3 Coffee Buddies (38+ Score)`;
+        pct = clamp(Math.round((rels30 / 3) * 100), 0, 100);
+        met = rels30 >= 3;
+        progressText = `${rels30} / 3 Coffee Buddies (30+ Score)`;
         break;
       }
       case 'conn_3': {
-        pct = clamp(Math.round((rels65 / 2) * 100), 0, 100);
-        met = rels65 >= 2;
-        progressText = `${rels65} / 2 Co-Founder Ties (65+ Score)`;
+        pct = clamp(Math.round((rels70 / 2) * 100), 0, 100);
+        met = rels70 >= 2;
+        progressText = `${rels70} / 2 Co-Founder Ties (70+ Score)`;
         break;
       }
       case 'conn_4': {
@@ -751,7 +816,20 @@ export function calculateOverallMood(state: GameState): {
     return acc + (def ? def.delta : 0);
   }, 0);
   const bionicBonus = state.unlockedPerks.includes('perk_bionic_flow') ? 12 : 0;
-  const score = clamp(Math.round(baseAvg + moodletSum * 0.5 + bionicBonus), 0, 100);
+  const hasLeica = (state.inventory || []).some(
+    (i) => i.itemId === 'edc_leica_q3' && i.quantity > 0
+  );
+  const edcMoodBonus = hasLeica ? 4 : 0;
+  const totalFurnQuality = (state.objects || []).reduce(
+    (sum, o) => sum + (FURNITURE_BY_ID[o.objectId]?.quality || 1),
+    0
+  );
+  const roomVibeBonus = Math.min(6, Math.floor(totalFurnQuality / 6));
+  const score = clamp(
+    Math.round(baseAvg + moodletSum * 0.5 + bionicBonus + edcMoodBonus + roomVibeBonus),
+    0,
+    100
+  );
   if (score >= 82) return { score, label: 'Flow State', color: '#34C759' };
   if (score >= 66) return { score, label: 'Dialed In', color: '#007AFF' };
   if (score >= 48) return { score, label: 'Stable', color: '#FF9500' };
@@ -841,8 +919,15 @@ function logShiftAttendance(
       };
     }
     if (mode === 'wfa') {
+      const upgradedWfa =
+        dayIdx >= 0 && dayIdx < 5 && weekly[dayIdx] !== 'wfa'
+          ? Math.max(0, (job.wfaDaysRemaining ?? 4) - 1)
+          : job.wfaDaysRemaining ?? 4;
+      if (dayIdx >= 0 && dayIdx < 5) weekly[dayIdx] = 'wfa';
       return {
         ...job,
+        wfaDaysRemaining: upgradedWfa,
+        weeklyAttendance: weekly,
         rtoCompliant: true,
       };
     }
@@ -882,9 +967,9 @@ function logShiftAttendance(
 function getRelStatus(score: number): RelationshipStatus {
   if (score >= 95) return 'Ride-or-Die';
   if (score >= 85) return 'Partner';
-  if (score >= 68) return 'Co-Founder Material';
-  if (score >= 52) return 'Inner Circle';
-  if (score >= 38) return 'Coffee Buddy';
+  if (score >= 70) return 'Co-Founder Material';
+  if (score >= 50) return 'Inner Circle';
+  if (score >= 30) return 'Coffee Buddy';
   if (score >= 15) return 'LinkedIn 1st';
   return 'Stranger';
 }
@@ -1076,13 +1161,18 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
       x: o.x,
       y: o.y,
     })),
-    pos: { x: Math.floor(homeDef.gridSize / 2), y: Math.floor(homeDef.gridSize / 2) },
+    pos: findOpenSpawnTile(homeDef.gridSize, homeDef.starterObjects),
     targetPos: null,
     facing: 'se',
     queue: [],
 
     job: {
-      careerId: 'bigtech_swe',
+      careerId:
+        profile.origin === 'nepo'
+          ? 'sandhill_vc'
+          : profile.origin === 'ycdropout'
+            ? 'frontier_ai'
+            : 'bigtech_swe',
       levelIndex: 0,
       performance: 22,
       shiftsCompleted: 0,
@@ -1191,7 +1281,7 @@ interface GameActions {
   leaveWorkEarly: () => void;
   setWorkTone: (tone: WorkToneId) => void;
   toggleAutoWork: () => void;
-  applyJob: (careerId: string) => void;
+  applyJob: (careerId: string, targetLevelIndex?: number) => void;
   openInterviewLoop: (careerId: string) => void;
   completeInterviewLoop: (
     careerId: string,
@@ -1616,6 +1706,10 @@ export const useGameStore = create<GameState & GameActions>()(
           unlockedTechNodes: Array.isArray(raw.unlockedTechNodes)
             ? raw.unlockedTechNodes
             : fallback.unlockedTechNodes,
+          claimedAspirationStages: Array.isArray(raw.claimedAspirationStages)
+            ? raw.claimedAspirationStages
+            : fallback.claimedAspirationStages,
+          resignedJobOnce: Boolean(raw.resignedJobOnce),
           speed: raw.speed === 2 || raw.speed === 3 ? raw.speed : 1,
         };
 
@@ -1667,10 +1761,11 @@ export const useGameStore = create<GameState & GameActions>()(
 
         sfx.play('tap');
         const targetFloor = loc.floors[floorIdx];
-        const centerPos = {
-          x: Math.floor((loc.gridSize || 9) / 2),
-          y: Math.floor((loc.gridSize || 9) / 2),
-        };
+        const centerPos = findOpenSpawnTile(loc.gridSize || 9, targetFloor.stations || []);
+        const floorStationIds = new Set((targetFloor.stations || []).map((st) => st.id));
+        const nextQueue = s.queue.filter(
+          (q) => !q.targetStationId || floorStationIds.has(q.targetStationId)
+        );
         const notice = {
           id: uid(),
           text: `${targetFloor.emoji} Arrived at ${targetFloor.name}`,
@@ -1682,6 +1777,7 @@ export const useGameStore = create<GameState & GameActions>()(
           campusFloorIndex: floorIdx,
           pos: centerPos,
           targetPos: null,
+          queue: nextQueue,
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
         });
@@ -1864,9 +1960,21 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
+        let fin = ensureFinanceState(s);
+        if (actualFare > 0) {
+          fin = recordCashFlow(fin, {
+            time: s.time,
+            label: `Transit (${modeDef.name} → ${destId === 'home' ? 'Home' : LOCATION_BY_ID[destId]?.shortName || destId})`,
+            emoji: modeDef.emoji,
+            amount: -actualFare,
+            category: 'living',
+          });
+        }
+
         sfx.play('open');
         set({
           cash: s.cash - actualFare,
+          finance: fin,
           queue: [],
           view: 'live',
           activeModal: null,
@@ -1945,6 +2053,14 @@ export const useGameStore = create<GameState & GameActions>()(
         };
 
         const shouldStartShift = Boolean(s.travel.autoStartShiftOnArrival);
+        const destHome = HOMES.find((h) => h.id === s.homeId) || HOMES[1];
+        const destVenue = dest !== 'home' ? LOCATION_BY_ID[dest] : null;
+        const destGridSize = dest === 'home' ? destHome.gridSize : destVenue?.gridSize || 7;
+        const destOccupied =
+          dest === 'home'
+            ? s.objects
+            : destVenue?.floors?.[0]?.stations || destVenue?.stations || [];
+        const spawnPos = findOpenSpawnTile(destGridSize, destOccupied);
 
         sfx.play('tap');
         set({
@@ -1952,7 +2068,7 @@ export const useGameStore = create<GameState & GameActions>()(
           locationId: dest,
           campusFloorIndex: 0,
           travel: null,
-          pos: { x: 3, y: 3 },
+          pos: spawnPos,
           targetPos: null,
           moodlets: nextMoodlets,
           wishes,
@@ -2136,11 +2252,8 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        const chosenMode = hasPersonalCar(s)
-          ? mode && mode !== s.job.preferredCommute
-            ? mode
-            : 'tesla'
-          : mode || s.job.preferredCommute || 'gbus';
+        const chosenMode =
+          mode || (hasPersonalCar(s) ? 'tesla' : s.job.preferredCommute || 'gbus');
         const modeDef = COMMUTE_MODES.find((m) => m.id === chosenMode) || COMMUTE_MODES[0];
         const commuteMode: CommuteModeId =
           modeDef.requiresCar && !hasPersonalCar(s) ? 'gbus' : chosenMode;
@@ -2158,9 +2271,21 @@ export const useGameStore = create<GameState & GameActions>()(
           ? Math.max(8, Math.round(commuteEst.durationMinutes * 0.8))
           : commuteEst.durationMinutes;
 
+        let fin = ensureFinanceState(s);
+        if (actualFare > 0) {
+          fin = recordCashFlow(fin, {
+            time: s.time,
+            label: `Commute (${modeDef.name} → ${career.company})`,
+            emoji: modeDef.emoji,
+            amount: -actualFare,
+            category: 'living',
+          });
+        }
+
         sfx.play('open');
         set({
           cash: Math.max(0, s.cash - actualFare),
+          finance: fin,
           job: { ...s.job, preferredCommute: commuteMode },
           queue: [],
           view: 'live',
@@ -2241,6 +2366,21 @@ export const useGameStore = create<GameState & GameActions>()(
         const proj = WORK_PROJECT_BY_ID[activeProjId] || WORK_PROJECTS[0];
         const isCampusBonus = s.locationId === career.locationId ? 1.2 : 1.0;
         const overclockBonus = s.unlockedPerks.includes('perk_h100_overclock') ? 1.25 : 1.0;
+        const techMults = getTechNodeMultipliers(s.unlockedTechNodes);
+        const techSkillMult =
+          task.skill === 'coding'
+            ? techMults.codingXpMult
+            : task.skill === 'systemDesign'
+              ? techMults.sysDesignXpMult
+              : task.skill === 'aiResearch'
+                ? techMults.aiXpMult
+                : task.skill === 'hustle'
+                  ? techMults.hustleXpMult
+                  : task.skill === 'charisma'
+                    ? techMults.charismaXpMult
+                    : task.skill === 'investing'
+                      ? techMults.investingXpMult
+                      : 1.0;
         const flowPerkMult =
           s.unlockedPerks.includes('perk_flow_state') &&
             (task.skill === 'coding' || task.skill === 'systemDesign' || task.skill === 'aiResearch')
@@ -2251,7 +2391,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const nextSkills = {
           ...s.skills,
           [task.skill]: clamp(
-            +(s.skills[task.skill] + task.skillGain * flowPerkMult * principalPerkMult).toFixed(2),
+            +(s.skills[task.skill] + task.skillGain * flowPerkMult * principalPerkMult * techSkillMult).toFixed(2),
             0,
             10
           ),
@@ -2263,9 +2403,9 @@ export const useGameStore = create<GameState & GameActions>()(
 
         let nextProgress =
           (s.job.projectProgress || 0) +
-          Math.round(task.projectProgressGain * isCampusBonus * overclockBonus);
+          Math.round(task.projectProgressGain * isCampusBonus * overclockBonus * techMults.charterSpeedMult);
         let nextPerf = clamp(
-          s.job.performance + Math.round(task.performanceGain * isCampusBonus),
+          s.job.performance + Math.round(task.performanceGain * isCampusBonus * techMults.perfMult),
           0,
           100
         );
@@ -2278,7 +2418,7 @@ export const useGameStore = create<GameState & GameActions>()(
         let notice;
 
         let nextShiftsCompleted = s.job.shiftsCompleted ?? 0;
-        let nextShiftsAtLevel = Math.max(s.job.shiftsAtLevel ?? 0, nextShiftsCompleted);
+        let nextShiftsAtLevel = s.job.shiftsAtLevel ?? 0;
         const isOnCampus = s.locationId === career.locationId;
 
         if (nextProgress >= 100) {
@@ -2384,7 +2524,7 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        const shiftsAtLevel = Math.max(s.job.shiftsAtLevel ?? 0, s.job.shiftsCompleted ?? 0);
+        const shiftsAtLevel = s.job.shiftsAtLevel ?? 0;
         const reqShifts = nextLvl.minShiftsForPromo ?? 3;
         const reqDeliverables = nextLvl.requiredDeliverables ?? 1;
         const deliverablesDone = s.job.deliverablesCompleted ?? 0;
@@ -2435,7 +2575,7 @@ export const useGameStore = create<GameState & GameActions>()(
               ...s.job,
               levelIndex: s.job.levelIndex + 1,
               performance: 42,
-              shiftsAtLevel,
+              shiftsAtLevel: 0,
             },
             stats: {
               ...s.stats,
@@ -2662,7 +2802,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const ratio = Math.max(0.1, s.workShift.elapsedMinutes / s.workShift.totalMinutes);
         const earnedPartialShift = ratio >= 0.5;
         const nextShiftsCompleted = (s.job.shiftsCompleted ?? 0) + (earnedPartialShift ? 1 : 0);
-        const nextShiftsAtLevel = Math.max(s.job.shiftsAtLevel ?? 0, s.job.shiftsCompleted ?? 0) + (earnedPartialShift ? 1 : 0);
+        const nextShiftsAtLevel = (s.job.shiftsAtLevel ?? 0) + (earnedPartialShift ? 1 : 0);
         const execHaloMult = s.unlockedPerks.includes('perk_exec_halo') ? 1.25 : 1.0;
         const earnedCash = Math.round(lvl.shiftPay * ratio * 0.75 * execHaloMult);
         const earnedRsu = Math.round(lvl.rsuPerShift * ratio * 0.75 * execHaloMult);
@@ -2828,6 +2968,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const energyCost = entryReq?.interviewEnergyCost ?? 15;
         const nextPrimary = clamp((s.skills[primarySkill] ?? 0) + 0.35, 0, 10);
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `${career.company} Sign-On Bonus (${lvl.code})`,
+          emoji: career.emoji,
+          amount: totalSignOn,
+          category: 'salary',
+        });
 
         sfx.play('levelup');
         const notice = {
@@ -2847,12 +2994,14 @@ export const useGameStore = create<GameState & GameActions>()(
             ...s.skills,
             [primarySkill]: nextPrimary,
           },
+          finance: fin,
+          campusFloorIndex: 0,
           job: {
             careerId,
             levelIndex: qualifiedIndex,
             performance: roundsPassed === 3 ? 48 : 38,
             shiftsCompleted: s.job?.shiftsCompleted ?? 0,
-            shiftsAtLevel: Math.max(s.job?.shiftsAtLevel ?? 0, s.job?.shiftsCompleted ?? 0),
+            shiftsAtLevel: 0,
             deliverablesCompleted: s.job?.deliverablesCompleted ?? 0,
             activeProjectId: getNextCareerProject(careerId, undefined, s.job?.completedProjects),
             projectProgress: 0,
@@ -2879,7 +3028,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      applyJob: (careerId) => {
+      applyJob: (careerId, targetLevelIndex) => {
         const s = get();
         const career = CAREER_BY_ID[careerId];
         if (!career) return;
@@ -2888,15 +3037,35 @@ export const useGameStore = create<GameState & GameActions>()(
         const isStarterInit =
           s.time === 450 && s.stats.daysLived <= 1 && (s.job?.shiftsCompleted ?? 0) === 0 && !s.activeModal;
         if (isStarterInit) {
+          const resolvedLevelIdx =
+            typeof targetLevelIndex === 'number'
+              ? clamp(targetLevelIndex, 0, career.levels.length - 1)
+              : 0;
+          const targetLvlDef = career.levels[resolvedLevelIdx];
           const starterNodes = new Set<TechNodeId>([
             ...(s.unlockedTechNodes ?? ['node_git_monorepo']),
             ...(career.entryRequirements?.requiredTechNodes ?? []),
+            ...(targetLvlDef?.requiredTechNode ? [targetLvlDef.requiredTechNode] : []),
           ]);
+          const nextSkills = { ...s.skills };
+          if (targetLvlDef?.requiredSkill) {
+            nextSkills[targetLvlDef.requiredSkill.skill] = Math.max(
+              nextSkills[targetLvlDef.requiredSkill.skill] ?? 0,
+              targetLvlDef.requiredSkill.level
+            );
+          }
+          if (targetLvlDef?.secondarySkill) {
+            nextSkills[targetLvlDef.secondarySkill.skill] = Math.max(
+              nextSkills[targetLvlDef.secondarySkill.skill] ?? 0,
+              targetLvlDef.secondarySkill.level
+            );
+          }
           set({
             unlockedTechNodes: Array.from(starterNodes),
+            skills: nextSkills,
             job: {
               careerId,
-              levelIndex: 0,
+              levelIndex: resolvedLevelIdx,
               performance: 40,
               shiftsCompleted: 0,
               shiftsAtLevel: 0,
@@ -3055,12 +3224,13 @@ export const useGameStore = create<GameState & GameActions>()(
             [primarySkill]: nextPrimary,
           },
           finance: fin,
+          campusFloorIndex: 0,
           job: {
             careerId,
             levelIndex: qualifiedIndex,
             performance: 42,
             shiftsCompleted: s.job?.shiftsCompleted ?? 0,
-            shiftsAtLevel: Math.max(s.job?.shiftsAtLevel ?? 0, s.job?.shiftsCompleted ?? 0),
+            shiftsAtLevel: 0,
             deliverablesCompleted: s.job?.deliverablesCompleted ?? 0,
             activeProjectId: getNextCareerProject(careerId, undefined, s.job?.completedProjects),
             projectProgress: 0,
@@ -3650,6 +3820,14 @@ export const useGameStore = create<GameState & GameActions>()(
           karma += GOALS[4].rewardKarma;
         }
 
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `Bought Furniture: ${def.name}`,
+          emoji: def.emoji,
+          amount: -def.price,
+          category: 'upgrades',
+        });
+
         sfx.play('cash');
         const notice = {
           id: uid(),
@@ -3666,6 +3844,7 @@ export const useGameStore = create<GameState & GameActions>()(
           cash: s.cash - def.price + bonusCash,
           karma,
           goalIndex,
+          finance: fin,
           objects: [
             ...s.objects,
             {
@@ -3787,10 +3966,22 @@ export const useGameStore = create<GameState & GameActions>()(
         if (!found) return;
         const def = FURNITURE_BY_ID[found.objectId];
         const resale = def ? Math.round(def.price * 0.65) : 200;
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `Sold Furniture: ${def?.name || 'Gear'}`,
+          emoji: def?.emoji || '🛋️',
+          amount: resale,
+          category: 'bounties',
+        });
+        const nextQueue = s.queue.filter((q) => q.targetObjectUid !== objUid);
+        const headRemoved = s.queue[0]?.targetObjectUid === objUid;
         sfx.play('cash');
         set({
           cash: s.cash + resale,
+          finance: fin,
           objects: s.objects.filter((o) => o.uid !== objUid),
+          queue: nextQueue,
+          targetPos: headRemoved ? null : s.targetPos,
         });
       },
 
@@ -3815,6 +4006,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // If already living in this home and just purchasing the deed, keep existing room layout intact
         if (s.homeId === newHomeId && purchase) {
+          const fin = recordCashFlow(ensureFinanceState(s), {
+            time: s.time,
+            label: `Purchased Property Deed: ${homeDef.name}`,
+            emoji: '🔑',
+            amount: -cost,
+            category: 'upgrades',
+          });
           sfx.play('levelup');
           const notice = {
             id: uid(),
@@ -3825,6 +4023,7 @@ export const useGameStore = create<GameState & GameActions>()(
           };
           set({
             cash: s.cash - cost,
+            finance: fin,
             ownedHomes: Array.from(new Set([...s.ownedHomes, newHomeId])),
             notices: [notice, ...s.notices.slice(0, 29)],
             lastToast: notice,
@@ -3845,14 +4044,27 @@ export const useGameStore = create<GameState & GameActions>()(
         for (const prevPlaced of s.objects) {
           const prevDef = FURNITURE_BY_ID[prevPlaced.objectId];
           if (!prevDef) continue;
-          // Check if the new home has an item in the same category with lower quality
-          const sameCatIdx = newObjects.findIndex((no) => {
+          // Check if the new home has a lower-quality starter item with overlapping actions (so a shower never overwrites a toilet)
+          const sameSlotIdx = newObjects.findIndex((no) => {
             const noDef = FURNITURE_BY_ID[no.objectId];
-            return noDef && noDef.category === prevDef.category && noDef.quality < prevDef.quality;
+            if (!noDef || noDef.category !== prevDef.category || noDef.quality >= prevDef.quality) {
+              return false;
+            }
+            const sharesActionDomain =
+              prevDef.category !== 'bath' ||
+              prevDef.actions.some((a) =>
+                noDef.actions.some(
+                  (na) =>
+                    (a.includes('shower') && na.includes('shower')) ||
+                    ((a.includes('restroom') || a.includes('washlet')) &&
+                      (na.includes('restroom') || na.includes('washlet')))
+                )
+              );
+            return sharesActionDomain;
           });
-          if (sameCatIdx !== -1) {
-            newObjects[sameCatIdx] = {
-              ...newObjects[sameCatIdx],
+          if (sameSlotIdx !== -1) {
+            newObjects[sameSlotIdx] = {
+              ...newObjects[sameSlotIdx],
               objectId: prevDef.id,
             };
             carriedOverCount++;
@@ -3889,6 +4101,21 @@ export const useGameStore = create<GameState & GameActions>()(
                 nextInventory.push({ itemId: prevDef.id, kind: 'furniture', quantity: 1 });
               }
             }
+          } else if (
+            !homeDef.starterObjects.some((so) => so.objectId === prevDef.id)
+          ) {
+            // Player owned duplicate custom item: pack into Backpack rather than dropping it
+            const existingIdx = nextInventory.findIndex(
+              (entry) => entry.itemId === prevDef.id && entry.kind === 'furniture'
+            );
+            if (existingIdx !== -1) {
+              nextInventory[existingIdx] = {
+                ...nextInventory[existingIdx],
+                quantity: nextInventory[existingIdx].quantity + 1,
+              };
+            } else {
+              nextInventory.push({ itemId: prevDef.id, kind: 'furniture', quantity: 1 });
+            }
           }
         }
 
@@ -3900,6 +4127,14 @@ export const useGameStore = create<GameState & GameActions>()(
           ...s.moodlets.filter((m) => !allHomeMoodletIds.has(m.id)),
           { id: homeDef.bonuses.ambientMoodletId, expiresAt: s.time + 1440 },
         ];
+
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `${purchase ? 'Purchased Deed' : 'Leased Residence'}: ${homeDef.name}`,
+          emoji: homeDef.emoji,
+          amount: -cost,
+          category: purchase ? 'upgrades' : 'rent',
+        });
 
         sfx.play('levelup');
         const perkSummary = homeDef.perks.map((p) => `${p.emoji} ${p.label}`).join(' · ');
@@ -3913,6 +4148,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         set({
           cash: s.cash - cost,
+          finance: fin,
           homeId: newHomeId,
           locationId: 'home',
           view: 'live',
@@ -3922,7 +4158,7 @@ export const useGameStore = create<GameState & GameActions>()(
           objects: newObjects,
           inventory: nextInventory,
           moodlets: updatedMoodlets,
-          pos: { x: Math.floor(homeDef.gridSize / 2), y: Math.floor(homeDef.gridSize / 2) },
+          pos: findOpenSpawnTile(homeDef.gridSize, newObjects),
           targetPos: null,
           activeModal: null,
           notices: [notice, ...s.notices.slice(0, 29)],
@@ -3943,6 +4179,14 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         const vehId: VehicleId =
           carMode === 'prius' || carMode === 'tesla' || carMode === 'taycan' ? carMode : 'tesla';
+        const vehDef = VEHICLE_BY_ID[vehId];
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `Bought EV: ${vehDef?.name || vehId}`,
+          emoji: vehDef?.emoji || '🏎️',
+          amount: -price,
+          category: 'upgrades',
+        });
         sfx.play('levelup');
         const notice = {
           id: uid(),
@@ -3953,7 +4197,8 @@ export const useGameStore = create<GameState & GameActions>()(
         };
         set({
           cash: s.cash - price,
-          ownedCars: Array.from(new Set([...s.ownedCars, carMode, 'tesla'])),
+          finance: fin,
+          ownedCars: Array.from(new Set([...s.ownedCars, vehId])),
           activeCarId: vehId,
           job: s.job ? { ...s.job, preferredCommute: 'tesla' } : s.job,
           notices: [notice, ...s.notices.slice(0, 29)],
@@ -3981,6 +4226,13 @@ export const useGameStore = create<GameState & GameActions>()(
           set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
           return;
         }
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `Bought EV: ${veh.name}`,
+          emoji: veh.emoji,
+          amount: -veh.price,
+          category: 'upgrades',
+        });
         sfx.play('levelup');
         const moodDef = MOODLETS[veh.moodletId];
         const nextMoodlets = moodDef
@@ -3998,7 +4250,8 @@ export const useGameStore = create<GameState & GameActions>()(
         };
         set({
           cash: s.cash - veh.price,
-          ownedCars: Array.from(new Set([...s.ownedCars, vehicleId, 'tesla'])),
+          finance: fin,
+          ownedCars: Array.from(new Set([...s.ownedCars, vehicleId])),
           activeCarId: vehicleId,
           job: s.job ? { ...s.job, preferredCommute: 'tesla' } : s.job,
           moodlets: nextMoodlets,
@@ -4120,8 +4373,16 @@ export const useGameStore = create<GameState & GameActions>()(
           tone: 'good' as const,
           time: s.time,
         };
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `Backpack Gear: ${def.name}`,
+          emoji: def.emoji,
+          amount: -def.price,
+          category: def.consumable ? 'living' : 'upgrades',
+        });
         set({
           cash: s.cash - def.price,
+          finance: fin,
           inventory: inv,
           sim: nextSim,
           notices: [notice, ...s.notices.slice(0, 29)],
@@ -4160,9 +4421,15 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
+        const isCoffeeOrMatcha = itemId === 'snack_bluebottle' || itemId === 'snack_matcha_tin';
+        const coffeeSnobMult =
+          isCoffeeOrMatcha && s.sim.traits.includes('coffeeSnob') ? 1.35 : 1.0;
+
         const nextNeeds = { ...s.needs };
         (Object.keys(nd) as NeedKey[]).forEach((k) => {
-          const delta = nd[k] || 0;
+          const rawDelta = nd[k] || 0;
+          const delta =
+            k === 'energy' && rawDelta > 0 ? Math.round(rawDelta * coffeeSnobMult) : rawDelta;
           nextNeeds[k] = clamp(nextNeeds[k] + delta, 0, 100);
         });
 
@@ -4186,6 +4453,8 @@ export const useGameStore = create<GameState & GameActions>()(
             ...s.startup,
             productProgress: clamp(s.startup.productProgress + def.startupDelta, 0, 100),
             users: s.startup.users + Math.round(def.startupDelta * 15),
+            mrr: s.startup.mrr + Math.round(def.startupDelta * 10),
+            lastActivityDay: getDayNumber(s.time),
           }
           : s.startup;
 
@@ -4195,7 +4464,10 @@ export const useGameStore = create<GameState & GameActions>()(
           const mDef = MOODLETS[def.moodletId];
           nextMoodlets = [
             ...nextMoodlets.filter((m) => m.id !== mDef.id),
-            { id: mDef.id, expiresAt: s.time + mDef.durationMinutes },
+            {
+              id: mDef.id,
+              expiresAt: s.time + Math.round(mDef.durationMinutes * coffeeSnobMult),
+            },
           ];
         }
 
@@ -4262,9 +4534,13 @@ export const useGameStore = create<GameState & GameActions>()(
           tone: 'info' as const,
           time: s.time,
         };
+        const nextQueue = s.queue.filter((q) => q.targetObjectUid !== placedUid);
+        const headRemoved = s.queue[0]?.targetObjectUid === placedUid;
         set({
           objects: s.objects.filter((o) => o.uid !== placedUid),
           inventory: inv,
+          queue: nextQueue,
+          targetPos: headRemoved ? null : s.targetPos,
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
         });
@@ -4282,18 +4558,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const homeDef = HOMES.find((h) => h.id === s.homeId) || HOMES[1];
         const gridSize = homeDef.gridSize;
-        let placedX = 2;
-        let placedY = 2;
-        outerPlace: for (let y = 0; y < gridSize; y++) {
-          for (let x = 0; x < gridSize; x++) {
-            const occupied = s.objects.some((o) => o.x === x && o.y === y);
-            if (!occupied) {
-              placedX = x;
-              placedY = y;
-              break outerPlace;
-            }
-          }
-        }
+        const openSpot = findOpenSpawnTile(gridSize, s.objects, { x: 2, y: 2 });
 
         if (inv[idx].quantity <= 1) {
           inv.splice(idx, 1);
@@ -4312,14 +4577,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
         set({
           inventory: inv,
-          locationId: 'home',
           objects: [
             ...s.objects,
             {
               uid: uid(),
               objectId: def.id,
-              x: placedX,
-              y: placedY,
+              x: openSpot.x,
+              y: openSpot.y,
             },
           ],
           notices: [notice, ...s.notices.slice(0, 29)],
@@ -4349,6 +4613,14 @@ export const useGameStore = create<GameState & GameActions>()(
           inv[idx] = { ...inv[idx], quantity: inv[idx].quantity - 1 };
         }
 
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `Sold Backpack Item: ${itemName}`,
+          emoji: '💵',
+          amount: resale,
+          category: 'bounties',
+        });
+
         sfx.play('cash');
         const notice = {
           id: uid(),
@@ -4360,6 +4632,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         set({
           cash: s.cash + resale,
+          finance: fin,
           inventory: inv,
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
@@ -4394,6 +4667,19 @@ export const useGameStore = create<GameState & GameActions>()(
             id: uid(),
             text: `Need ${formatCurrency(interactionDef.cashCost)} for ${interactionDef.label} with ${npc.name}.`,
             emoji: '💳',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
+        if (interactionDef.energyCost && s.needs.energy < interactionDef.energyCost) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `Too exhausted for ${interactionDef.label} with ${npc.name} (Need ${interactionDef.energyCost}⚡ Energy). Grab an espresso or rest!`,
+            emoji: '☕',
             tone: 'bad' as const,
             time: s.time,
           };
@@ -4482,6 +4768,8 @@ export const useGameStore = create<GameState & GameActions>()(
                 ...s.startup,
                 productProgress: clamp(s.startup.productProgress + startupBoost, 0, 100),
                 users: s.startup.users + Math.round(startupBoost * 8),
+                mrr: s.startup.mrr + Math.round(startupBoost * 6),
+                lastActivityDay: getDayNumber(s.time),
               }
             : s.startup;
 
@@ -4621,9 +4909,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const nextTrust = clamp((currentRel.trust ?? 15) + trustGain, 0, 100);
         const nextRomance = clamp((currentRel.romance ?? 5) + romanceGain, 0, 100);
+        const skillCheckMeta = choice.skillCheck
+          ? SKILLS_META.find((m) => m.key === choice.skillCheck?.skill)
+          : null;
         const npcReply = passedCheck
           ? choice.npcResponse
-          : (choice.failNpcResponse || choice.npcResponse);
+          : choice.failNpcResponse ||
+            `Interesting perspective, though the deeper ${skillCheckMeta?.label || choice.skillCheck?.skill || 'technical'} nuances there take a bit more seasoning (Need Lv.${choice.skillCheck?.level}). Let's revisit this once you've leveled up!`;
 
         const nextMessages: RelationshipMessage[] = [
           ...currentRel.messages.slice(-24),
@@ -4727,9 +5019,9 @@ export const useGameStore = create<GameState & GameActions>()(
           karma += GOALS[3].rewardKarma;
         }
 
-        const nextCompletedTopics = Array.from(
-          new Set([...(currentRel.completedTopics || []), topicId])
-        );
+        const nextCompletedTopics = passedCheck
+          ? Array.from(new Set([...(currentRel.completedTopics || []), topicId]))
+          : [...(currentRel.completedTopics || [])];
         const nextAvailTopics = getAvailableTopicsForNpc(npcId, newScore, nextCompletedTopics);
         const nextActiveTopicId = nextAvailTopics[0]?.id ?? null;
 
@@ -5069,6 +5361,20 @@ export const useGameStore = create<GameState & GameActions>()(
         const npc = NPCS.find((n) => n.id === npcId);
         if (!npc) return;
 
+        const hangoutEnergyCost = 12;
+        if (s.needs.energy < hangoutEnergyCost) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `Too exhausted to hang out with ${npc.name} (Need ${hangoutEnergyCost}⚡ Energy). Grab an espresso or rest first!`,
+            emoji: '☕',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
         const currentRel = ensureRelationshipState(npcId, s.relationships[npcId]);
         const spotDef = LOCATION_BY_ID[npc.favoriteSpot];
         const spotName = spotDef?.name || npc.favoriteSpot.replace(/_/g, ' ');
@@ -5167,7 +5473,16 @@ export const useGameStore = create<GameState & GameActions>()(
           time: s.time,
         };
 
+        const spotSpawnPos = spotDef
+          ? findOpenSpawnTile(
+              spotDef.gridSize || 7,
+              spotDef.floors?.[0]?.stations || spotDef.stations || [],
+              { x: 3, y: 4 }
+            )
+          : { x: 3, y: 4 };
+
         set({
+          time: s.time + 20,
           cash,
           karma,
           goalIndex,
@@ -5175,13 +5490,15 @@ export const useGameStore = create<GameState & GameActions>()(
           ...(canMoveToSpot && s.locationId !== npc.favoriteSpot
             ? {
                 locationId: npc.favoriteSpot,
+                campusFloorIndex: 0,
                 view: 'live' as const,
-                pos: { x: 3, y: 4 },
+                pos: spotSpawnPos,
                 targetPos: null,
               }
             : {}),
           needs: {
             ...s.needs,
+            energy: clamp(s.needs.energy - hangoutEnergyCost, 0, 100),
             social: clamp(s.needs.social + 30),
             fun: clamp(s.needs.fun + 25),
           },
@@ -5265,8 +5582,8 @@ export const useGameStore = create<GameState & GameActions>()(
       pitchStartupVC: () => {
         const s = get();
         let st = { ...s.startup };
-        if (typeof st.users === 'number' && st.users > 200_000) {
-          st.users = 42_580;
+        if (typeof st.users === 'number' && st.users > 50_000_000) {
+          st.users = 50_000_000;
         }
 
         const difficulty = st.difficultyMode || 'realistic';
@@ -5363,7 +5680,10 @@ export const useGameStore = create<GameState & GameActions>()(
           time: s.time,
         };
 
-        const nextProductProgress = nextStage === 'Decacorn IPO' ? 100 : 20;
+        const nextProductProgress =
+          nextStage === 'Decacorn IPO'
+            ? 100
+            : Math.max(25, Math.round(st.productProgress * 0.55));
 
         set({
           cash: s.cash + founderLiquidity,
@@ -5393,8 +5713,8 @@ export const useGameStore = create<GameState & GameActions>()(
       setStartupDifficulty: (mode: StartupDifficulty) => {
         const s = get();
         let st = { ...s.startup };
-        if (typeof st.users === 'number' && st.users > 200_000) {
-          st.users = 42_580;
+        if (typeof st.users === 'number' && st.users > 50_000_000) {
+          st.users = 50_000_000;
         }
         sfx.play('tap');
         const labels: Record<StartupDifficulty, string> = {
@@ -5419,8 +5739,8 @@ export const useGameStore = create<GameState & GameActions>()(
       launchStartupProductHunt: () => {
         const s = get();
         let st = { ...s.startup };
-        if (typeof st.users === 'number' && st.users > 200_000) {
-          st.users = 42_580;
+        if (typeof st.users === 'number' && st.users > 50_000_000) {
+          st.users = 50_000_000;
         }
 
         const difficulty = st.difficultyMode || 'realistic';
@@ -5687,7 +6007,35 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         const nextSkills = { ...s.skills };
         if (opts.skill && opts.skillDelta) {
-          nextSkills[opts.skill] = clamp(nextSkills[opts.skill] + opts.skillDelta, 0, 10);
+          const sk = opts.skill;
+          const prevFloor = Math.floor((nextSkills[sk] ?? 0) + 0.001);
+          const isStarterInit = s.time === 450 && s.stats.daysLived <= 1 && !s.activeModal;
+          const techMults = getTechNodeMultipliers(s.unlockedTechNodes);
+          const techNodeSkMult =
+            sk === 'coding'
+              ? techMults.codingXpMult
+              : sk === 'systemDesign'
+                ? techMults.sysDesignXpMult
+                : sk === 'aiResearch'
+                  ? techMults.aiXpMult
+                  : sk === 'hustle'
+                    ? techMults.hustleXpMult
+                    : sk === 'charisma'
+                      ? techMults.charismaXpMult
+                      : sk === 'investing'
+                        ? techMults.investingXpMult
+                        : 1.0;
+          const effectiveDelta = isStarterInit
+            ? opts.skillDelta
+            : +(opts.skillDelta * techNodeSkMult).toFixed(2);
+          nextSkills[sk] = clamp((nextSkills[sk] ?? 0) + effectiveDelta, 0, 10);
+          const newFloor = Math.floor(nextSkills[sk] + 0.001);
+          if (!isStarterInit && newFloor > prevFloor) {
+            karmaAdd += 3;
+            if (s.unlockedPerks.includes('perk_principal_architect')) {
+              cashAdd += 1500;
+            }
+          }
         }
         const nextNeeds = { ...s.needs };
         if (opts.needKey && opts.needDelta) {
@@ -5702,6 +6050,8 @@ export const useGameStore = create<GameState & GameActions>()(
             ...s.startup,
             productProgress: clamp(s.startup.productProgress + opts.startupDelta, 0, 100),
             users: s.startup.users + Math.max(0, Math.round(opts.startupDelta * 18)),
+            mrr: s.startup.mrr + Math.max(0, Math.round(opts.startupDelta * 12)),
+            lastActivityDay: getDayNumber(s.time),
           }
           : s.startup;
 
@@ -5717,8 +6067,13 @@ export const useGameStore = create<GameState & GameActions>()(
           }
           : null;
 
+        const isQuickStartAdjustment =
+          s.time === 450 && s.stats.daysLived <= 1 && !s.activeModal && opts.cashDelta !== undefined;
+        const targetCash = Math.max(0, s.cash + cashAdd);
         let fin = ensureFinanceState(s);
-        if (cashAdd !== 0) {
+        if (isQuickStartAdjustment) {
+          fin = buildInitialFinanceState(s.portfolioValue || 0, targetCash, s.time);
+        } else if (cashAdd !== 0) {
           fin = recordCashFlow(fin, {
             time: s.time,
             label: opts.toastText ? opts.toastText.split('!')[0] : 'Micro-Action Cash Flow',
@@ -5728,8 +6083,18 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
+        const nextWishes = s.wishes.map((w) => {
+          if (w.kind === 'action' && w.targetKey === 'grind_leetcode' && opts.skill === 'coding') {
+            return { ...w, progress: Math.min(w.targetValue, w.progress + 1) };
+          }
+          if (w.kind === 'startup' && opts.startupDelta && opts.startupDelta > 0) {
+            return { ...w, progress: Math.min(w.targetValue, w.progress + opts.startupDelta) };
+          }
+          return w;
+        });
+
         set({
-          cash: Math.max(0, s.cash + cashAdd),
+          cash: targetCash,
           karma: Math.max(0, s.karma + karmaAdd),
           goalIndex,
           finance: fin,
@@ -5737,6 +6102,7 @@ export const useGameStore = create<GameState & GameActions>()(
           needs: nextNeeds,
           job: nextJob,
           startup: nextStartup,
+          wishes: nextWishes,
           stats: {
             ...s.stats,
             earnedToday: s.stats.earnedToday + Math.max(0, cashAdd),
@@ -5840,6 +6206,7 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         // 1. Day rollover: Stock Market Close/Open, Dividends, RSU vesting, Startup MRR, Weekly Rent, Weather
+        let rentOwed = s.rentOwed || 0;
         if (newDay > prevDay) {
           stats.daysLived = newDay;
           stats.earnedToday = 0;
@@ -5957,8 +6324,8 @@ export const useGameStore = create<GameState & GameActions>()(
           }
 
           // Startup daily revenue payout & cloud burn
-          if (typeof startup.users === 'number' && startup.users > 200_000) {
-            startup.users = 42_580;
+          if (typeof startup.users === 'number' && startup.users > 50_000_000) {
+            startup.users = 50_000_000;
           }
           const startupDiff = startup.difficultyMode || 'realistic';
           const dailyCloudBurn = getStartupDailyBurnRate(startup.stage, startupDiff);
@@ -6028,6 +6395,18 @@ export const useGameStore = create<GameState & GameActions>()(
           }
 
           // Weekly rent every 7 days if home is not owned
+          if (rentOwed > 0 && cash > 0) {
+            const settleAmt = Math.min(cash, rentOwed);
+            cash -= settleAmt;
+            rentOwed -= settleAmt;
+            finance = recordCashFlow(finance, {
+              time: newTime,
+              label: `Settled Past-Due Rent Balance`,
+              emoji: '🏠',
+              amount: -settleAmt,
+              category: 'rent',
+            });
+          }
           if (newDay % 7 === 0 && !s.ownedHomes.includes(s.homeId)) {
             const homeDef = HOMES.find((h) => h.id === s.homeId) || HOMES[1];
             const rentMult = s.unlockedPerks.includes('perk_renaissance_quant') ? 0.75 : 1.0;
@@ -6047,8 +6426,21 @@ export const useGameStore = create<GameState & GameActions>()(
                 'info'
               );
             } else {
+              const paidPart = Math.max(0, cash);
+              const unpaidPart = actualWeeklyRent - paidPart;
+              cash -= paidPart;
+              rentOwed += unpaidPart;
+              if (paidPart > 0) {
+                finance = recordCashFlow(finance, {
+                  time: newTime,
+                  label: `Partial Weekly Rent (${homeDef.shortName})`,
+                  emoji: '🏠',
+                  amount: -paidPart,
+                  category: 'rent',
+                });
+              }
               pushNotice(
-                `Rent is due (${formatCurrency(actualWeeklyRent)})! Vest RSUs or ship a freelance bounty.`,
+                `Rent shortfall! Paid ${formatCurrency(paidPart)}, added ${formatCurrency(unpaidPart)} to rent arrears (${formatCurrency(rentOwed)} owed).`,
                 '⚠️',
                 'bad'
               );
@@ -6061,11 +6453,9 @@ export const useGameStore = create<GameState & GameActions>()(
             const officeLogged = job.officeDaysThisWeek ?? 0;
             const wfaLogged = (job.weeklyAttendance || []).filter((a) => a === 'wfa').length;
             const officeAndWfa = officeLogged + wfaLogged;
-            const wfhLogged = job.wfhDaysThisWeek ?? 0;
             const career = CAREER_BY_ID[job.careerId];
             const isCompliant =
               officeAndWfa >= 3 ||
-              (officeAndWfa >= 1 && wfhLogged <= 2) ||
               (job.shiftsCompleted ?? 0) <= 2;
 
             if (isCompliant) {
@@ -6169,16 +6559,21 @@ export const useGameStore = create<GameState & GameActions>()(
         const caffeinePerk = s.unlockedPerks.includes('perk_caffeine_synth') ? 0.7 : 1.0;
         const zenPerk = s.unlockedPerks.includes('perk_zero_burnout') ? 0.65 : 1.0;
         const circadianPerk = s.unlockedPerks.includes('perk_circadian_pod') ? 0.7 : 1.0;
+        const hasAirpodsMax = (s.inventory || []).some((i) => i.itemId === 'edc_airpods_max' && i.quantity > 0);
+        const hasWhoopBand = (s.inventory || []).some((i) => i.itemId === 'edc_whoop_band' && i.quantity > 0);
+        const edcEnergyDecayMult = (hasAirpodsMax ? 0.9 : 1.0) * (hasWhoopBand ? 0.9 : 1.0);
+        const edcFunDecayMult = hasAirpodsMax ? 0.9 : 1.0;
+        const techMults = getTechNodeMultipliers(s.unlockedTechNodes);
 
         needs.hunger = clamp(needs.hunger - 3.2 * hoursElapsed * circadianPerk * homeDecayMult);
         needs.energy = clamp(
-          needs.energy - 2.8 * hoursElapsed * biohackerMult * caffeinePerk * homeDecayMult
+          needs.energy - 2.8 * hoursElapsed * biohackerMult * caffeinePerk * homeDecayMult * edcEnergyDecayMult
         );
         needs.hygiene = clamp(
           needs.hygiene - 2.0 * hoursElapsed * biohackerMult * circadianPerk * homeDecayMult
         );
         needs.bladder = clamp(needs.bladder - 3.6 * hoursElapsed * circadianPerk * homeDecayMult);
-        needs.fun = clamp(needs.fun - 2.5 * hoursElapsed * zenPerk * homeDecayMult);
+        needs.fun = clamp(needs.fun - 2.5 * hoursElapsed * zenPerk * homeDecayMult * edcFunDecayMult);
         needs.social = clamp(needs.social - 2.1 * hoursElapsed * zenPerk * homeDecayMult);
 
         // 4. Travel Progression
@@ -6189,7 +6584,17 @@ export const useGameStore = create<GameState & GameActions>()(
             locationId = dest;
             campusFloorIndex = 0;
             travel = null;
-            pos = { x: 3, y: 3 };
+            const destLocDef = LOCATION_BY_ID[dest];
+            const destGridSize =
+              dest === 'home' ? (HOME_BY_ID[s.homeId]?.gridSize ?? 8) : (destLocDef?.gridSize ?? 8);
+            const destOccupied =
+              dest === 'home'
+                ? s.objects.map((o) => ({ x: o.x, y: o.y }))
+                : (destLocDef?.floors?.[0]?.stations ?? destLocDef?.stations ?? []).map((st) => ({
+                    x: st.x,
+                    y: st.y,
+                  }));
+            pos = findOpenSpawnTile(destGridSize, destOccupied, { x: 3, y: 3 });
             targetPos = null;
             if (!stats.placesVisited.includes(dest)) {
               stats.placesVisited = [...stats.placesVisited, dest];
@@ -6333,20 +6738,23 @@ export const useGameStore = create<GameState & GameActions>()(
           const promoPerk = s.unlockedPerks.includes('perk_promo_magnet') ? 1.3 : 1.0;
           const officeBonus = workShift.mode === 'office' ? 1.18 : 1.0;
 
-          const perfGain = (dt / 60) * 1.55 * toneDef.perfMult * leetcodeMult * promoPerk * officeBonus;
+          const perfGain =
+            (dt / 60) * 1.55 * toneDef.perfMult * leetcodeMult * promoPerk * officeBonus * techMults.perfMult;
           job.performance = clamp(job.performance + perfGain, 0, 100);
           const charterPerkMult = s.unlockedPerks.includes('perk_promo_magnet') ? 1.15 : 1.0;
           const nextProjProg =
             (job.projectProgress || 0) +
-            (dt / 60) * 3.2 * toneDef.perfMult * officeBonus * charterPerkMult;
+            (dt / 60) * 3.2 * toneDef.perfMult * officeBonus * charterPerkMult * techMults.charterSpeedMult;
           if (nextProjProg >= 100) {
             const finishedId = job.activeProjectId || getNextCareerProject(job.careerId, undefined, job.completedProjects);
             const projDef = WORK_PROJECT_BY_ID[finishedId];
             const completedList = job.completedProjects || [];
             const nextCompleted = completedList.includes(finishedId) ? completedList : [...completedList, finishedId];
             const bonusCash = projDef?.rewardCash ?? 1400;
+            const bonusRsu = Math.round((projDef?.rewardRsu ?? 0) * techMults.rsuMult);
             const bonusPerf = projDef?.promoPerfBoost ?? 10;
             cash += bonusCash;
+            unvestedRsu += bonusRsu;
             karma += 4;
             stats.earnedToday += bonusCash;
             stats.earnedTotal += bonusCash;
@@ -6363,7 +6771,7 @@ export const useGameStore = create<GameState & GameActions>()(
             job.projectProgress = 0;
             job.performance = clamp(job.performance + bonusPerf, 0, 100);
             pushNotice(
-              `Shipped Charter Milestone "${projDef?.title || 'Core Initiative'}" during shift! +1 Deliverable, +4 ⚡ Karma & +${formatCurrency(bonusCash)} spot bonus!`,
+              `Shipped Charter Milestone "${projDef?.title || 'Core Initiative'}" during shift! +1 Deliverable, +4 ⚡ Karma & +${formatCurrency(bonusCash)} spot bonus${bonusRsu > 0 ? ` + ${formatCurrency(bonusRsu)} RSU` : ''}!`,
               projDef?.emoji || '🚀',
               'good'
             );
@@ -6374,7 +6782,14 @@ export const useGameStore = create<GameState & GameActions>()(
           needs.energy = clamp(
             needs.energy - (dt / 60) * 2.2 * toneDef.energyDrainMult * shiftDrainMult
           );
-          needs.social = clamp(needs.social + (dt / 60) * (toneDef.socialBonus * 0.25));
+          const blindPosterWatercoolerMult =
+            s.sim.traits.includes('blindPoster') && workShift.tone === 'watercooler' ? 1.3 : 1.0;
+          needs.social = clamp(
+            needs.social + (dt / 60) * (toneDef.socialBonus * 0.25) * blindPosterWatercoolerMult
+          );
+          if (s.sim.traits.includes('blindPoster') && workShift.tone === 'watercooler') {
+            needs.fun = clamp(needs.fun + (dt / 60) * 1.5);
+          }
 
           // Mid-shift interactive dilemma (once per shift around 45% mark)
           if (
@@ -6391,8 +6806,8 @@ export const useGameStore = create<GameState & GameActions>()(
           if (workShift.elapsedMinutes >= workShift.totalMinutes) {
             // Shift complete!
             const execHaloMult = s.unlockedPerks.includes('perk_exec_halo') ? 1.25 : 1.0;
-            const payCash = Math.round(lvl.shiftPay * execHaloMult);
-            const payRsu = Math.round(lvl.rsuPerShift * execHaloMult);
+            const payCash = Math.round(lvl.shiftPay * execHaloMult * techMults.shiftPayMult);
+            const payRsu = Math.round(lvl.rsuPerShift * execHaloMult * techMults.rsuMult);
             cash += payCash;
             unvestedRsu += payRsu;
             job.shiftsCompleted += 1;
@@ -6409,10 +6824,10 @@ export const useGameStore = create<GameState & GameActions>()(
 
             // Multi-gate Promotion Committee Check!
             const nextLvl = career.levels[job.levelIndex + 1];
-            const reqShifts = nextLvl?.minShiftsForPromo ?? 4;
+            const reqShifts = nextLvl?.minShiftsForPromo ?? 3;
             const reqDeliv = nextLvl?.requiredDeliverables ?? 1;
             const reqPerf = s.unlockedPerks.includes('perk_exec_halo') ? 82 : 92;
-            const currentShifts = Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted ?? 0);
+            const currentShifts = job.shiftsAtLevel ?? 0;
             const hasPrimary = nextLvl
               ? Math.floor((skills[nextLvl.requiredSkill.skill] ?? 0) + 0.001) >= nextLvl.requiredSkill.level
               : false;
@@ -6436,7 +6851,7 @@ export const useGameStore = create<GameState & GameActions>()(
             ) {
               job.levelIndex += 1;
               job.performance = 42;
-              job.shiftsAtLevel = currentShifts;
+              job.shiftsAtLevel = 0;
               const spotBonus = Math.round(nextLvl.baseSalary * 0.06);
               cash += spotBonus;
               karma += 12;
@@ -6474,14 +6889,44 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // 7. Tile-by-Tile Movement & Action Queue Execution
         if (!travel) {
+          if (queue.length > 0 && !queue[0].started) {
+            const firstItem = { ...queue[0] };
+            const firstDef = ACTIONS[firstItem.actionId];
+            if (firstDef) {
+              firstItem.started = true;
+              if (firstItem.targetPos) {
+                targetPos = firstItem.targetPos;
+              }
+              if (firstDef.cost) {
+                cash = Math.max(0, cash - firstDef.cost);
+                finance = recordCashFlow(finance, {
+                  time: newTime,
+                  label: firstDef.label,
+                  emoji: firstDef.emoji,
+                  amount: -firstDef.cost,
+                  category: 'living',
+                });
+              }
+              if (firstDef.requiresPantry) {
+                pantryMeals = Math.max(0, pantryMeals - firstDef.requiresPantry);
+              }
+              queue[0] = firstItem;
+            }
+          }
+
           if (targetPos && (pos.x !== targetPos.x || pos.y !== targetPos.y)) {
-            const dx = targetPos.x - pos.x;
-            const dy = targetPos.y - pos.y;
-            const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
-            const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
-            pos = { x: pos.x + stepX, y: pos.y + stepY };
-            if (pos.x === targetPos.x && pos.y === targetPos.y) {
-              targetPos = null;
+            const maxSteps = Math.max(1, s.speed);
+            for (let step = 0; step < maxSteps; step++) {
+              if (!targetPos || (pos.x === targetPos.x && pos.y === targetPos.y)) break;
+              const dx = targetPos.x - pos.x;
+              const dy = targetPos.y - pos.y;
+              const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
+              const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
+              pos = { x: pos.x + stepX, y: pos.y + stepY };
+              if (pos.x === targetPos.x && pos.y === targetPos.y) {
+                targetPos = null;
+                break;
+              }
             }
           }
 
@@ -6490,27 +6935,7 @@ export const useGameStore = create<GameState & GameActions>()(
             const def = ACTIONS[current.actionId];
             if (!def) {
               queue.shift();
-            } else {
-              if (!current.started) {
-                current.started = true;
-                if (current.targetPos) {
-                  targetPos = current.targetPos;
-                }
-                if (def.cost) {
-                  cash = Math.max(0, cash - def.cost);
-                  finance = recordCashFlow(finance, {
-                    time: newTime,
-                    label: def.label,
-                    emoji: def.emoji,
-                    amount: -def.cost,
-                    category: 'living',
-                  });
-                }
-                if (def.requiresPantry) {
-                  pantryMeals = Math.max(0, pantryMeals - def.requiresPantry);
-                }
-              }
-
+            } else if (!targetPos || (pos.x === targetPos.x && pos.y === targetPos.y)) {
               current.elapsedMinutes += dt;
               const progressStep = dt / current.totalMinutes;
 
@@ -6520,65 +6945,108 @@ export const useGameStore = create<GameState & GameActions>()(
               const circadianRecoveryMult = s.unlockedPerks.includes('perk_circadian_pod')
                 ? 1.3
                 : 1.0;
+              const isCoffeeAction =
+                def.id === 'brew_pourover' ||
+                def.id === 'pull_espresso_shot' ||
+                def.id === 'whisk_matcha';
+              const coffeeSnobMult =
+                s.sim.traits.includes('coffeeSnob') && isCoffeeAction ? 1.35 : 1.0;
+              const blindPosterActionMult =
+                s.sim.traits.includes('blindPoster') && def.id === 'doomscroll_blind' ? 1.3 : 1.0;
+
               (Object.keys(def.needsDelta) as NeedKey[]).forEach((k) => {
                 const rawDelta = def.needsDelta[k] || 0;
+                const traitBoost =
+                  rawDelta > 0
+                    ? (k === 'energy' ? coffeeSnobMult : 1.0) *
+                      (k === 'fun' || k === 'social' ? blindPosterActionMult : 1.0)
+                    : 1.0;
                 const scaledDelta =
                   rawDelta > 0
                     ? rawDelta *
-                    circadianRecoveryMult *
-                    (k === 'energy' || k === 'hygiene' || k === 'fun' ? homeCareMult : 1.0)
+                      traitBoost *
+                      circadianRecoveryMult *
+                      (k === 'energy' || k === 'hygiene' || k === 'fun' ? homeCareMult : 1.0)
                     : rawDelta;
                 const delta = scaledDelta * progressStep;
                 needs[k] = clamp(needs[k] + delta);
               });
 
-              // Apply skill gains proportionally (boosted by Home Luxury Studio XP multiplier & Karma Tree perks)
+              // Apply skill gains proportionally (boosted by Home Luxury Studio XP multiplier, Karma Tree perks, Tech Nodes & EDC)
               if (def.skillGain) {
                 const sk = def.skillGain.skill;
                 const homeSkillMult =
                   locationId === 'home' ? currentHomeDef.bonuses?.skillXpMult ?? 1.0 : 1.0;
                 const tenXMult =
                   s.sim.traits.includes('tenXEngineer') &&
-                    (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
+                  (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
                     ? 1.3
                     : 1.0;
                 const rubberDuckMult =
                   s.unlockedPerks.includes('perk_rubber_duck') &&
-                    (sk === 'coding' || sk === 'systemDesign')
+                  (sk === 'coding' || sk === 'systemDesign')
                     ? 1.15
                     : 1.0;
                 const perkMult =
                   s.unlockedPerks.includes('perk_flow_state') &&
-                    (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
+                  (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
                     ? 1.3
                     : 1.0;
                 const superConnSkillMult =
                   s.unlockedPerks.includes('perk_super_connector') &&
-                    (sk === 'charisma' || sk === 'hustle')
+                  (sk === 'charisma' || sk === 'hustle')
                     ? 1.5
                     : 1.0;
                 const principalMult = s.unlockedPerks.includes('perk_principal_architect')
                   ? 1.35
                   : 1.0;
+                const inv = s.inventory || [];
+                const hasEdc = (id: string) => inv.some((i) => i.itemId === id && i.quantity > 0);
                 const edcMacbookMult =
-                  (s.inventory || []).some((i) => i.itemId === 'edc_macbook' && i.quantity > 0) &&
-                    (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
+                  hasEdc('edc_macbook') &&
+                  (sk === 'coding' || sk === 'systemDesign' || sk === 'aiResearch')
                     ? 1.05
                     : 1.0;
+                const edcKeebMult =
+                  hasEdc('edc_hhkb_keeb') && (sk === 'coding' || sk === 'systemDesign') ? 1.08 : 1.0;
+                const edcWhoopMult = hasEdc('edc_whoop_band') && sk === 'fitness' ? 1.08 : 1.0;
+                const edcFieldNotesMult =
+                  hasEdc('edc_field_notes') && (sk === 'hustle' || sk === 'investing') ? 1.08 : 1.0;
+                const edcLeicaMult = hasEdc('edc_leica_q3') && sk === 'charisma' ? 1.08 : 1.0;
+                const techNodeSkillMult =
+                  sk === 'coding'
+                    ? techMults.codingXpMult
+                    : sk === 'systemDesign'
+                      ? techMults.sysDesignXpMult
+                      : sk === 'aiResearch'
+                        ? techMults.aiXpMult
+                        : sk === 'hustle'
+                          ? techMults.hustleXpMult
+                          : sk === 'charisma'
+                            ? techMults.charismaXpMult
+                            : sk === 'investing'
+                              ? techMults.investingXpMult
+                              : 1.0;
+
                 const prevFloor = Math.floor(skills[sk]);
                 skills[sk] = Math.min(
                   10,
                   +(
                     skills[sk] +
                     (def.skillGain.amount / 100) *
-                    progressStep *
-                    tenXMult *
-                    rubberDuckMult *
-                    perkMult *
-                    superConnSkillMult *
-                    principalMult *
-                    edcMacbookMult *
-                    homeSkillMult
+                      progressStep *
+                      tenXMult *
+                      rubberDuckMult *
+                      perkMult *
+                      superConnSkillMult *
+                      principalMult *
+                      edcMacbookMult *
+                      edcKeebMult *
+                      edcWhoopMult *
+                      edcFieldNotesMult *
+                      edcLeicaMult *
+                      techNodeSkillMult *
+                      homeSkillMult
                   ).toFixed(3)
                 );
                 const newFloor = Math.floor(skills[sk]);
@@ -6592,6 +7060,13 @@ export const useGameStore = create<GameState & GameActions>()(
                     cash += royaltyBonus;
                     stats.earnedToday += royaltyBonus;
                     stats.earnedTotal += royaltyBonus;
+                    finance = recordCashFlow(finance, {
+                      time: newTime,
+                      label: `Patent Royalty (${sk.replace(/([A-Z])/g, ' $1')} L${newFloor})`,
+                      emoji: '📜',
+                      amount: royaltyBonus,
+                      category: 'bounties',
+                    });
                   }
                   pushNotice(
                     `Level Up! Reached Level ${newFloor} in ${sk.replace(/([A-Z])/g, ' $1')} (+3 Karma ⚡${royaltyBonus > 0 ? ` & +${formatCurrency(royaltyBonus)} patent royalty` : ''})!`,
@@ -6601,16 +7076,21 @@ export const useGameStore = create<GameState & GameActions>()(
                 }
               }
 
-              // Startup progress (boosted by Home Founder Incubator/Loft multiplier & Angel Scout perk)
+              // Startup progress (boosted by Home Founder Incubator/Loft multiplier, Angel Scout perk & Tech Nodes)
               if (def.startupProgress) {
                 const homeStartupMult =
                   locationId === 'home' ? currentHomeDef.bonuses?.startupMult ?? 1.0 : 1.0;
                 const angelMult = s.unlockedPerks.includes('perk_angel_scout') ? 1.25 : 1.0;
                 const angelUserMult = s.unlockedPerks.includes('perk_angel_scout') ? 1.3 : 1.0;
-                const gain = def.startupProgress * progressStep * homeStartupMult * angelMult;
+                const gain =
+                  def.startupProgress * progressStep * homeStartupMult * angelMult * techMults.startupMult;
                 startup.productProgress = clamp(startup.productProgress + gain, 0, 100);
-                startup.users += Math.round(gain * 12 * angelUserMult);
-                if (startup.users > 200_000) startup.users = 42_580;
+                const newUsers = Math.round(gain * 12 * angelUserMult);
+                startup.users += newUsers;
+                if (startup.productProgress >= 25 && newUsers > 0) {
+                  startup.mrr += Math.max(1, Math.round(newUsers * 1.5));
+                  startup.valuation = Math.max(startup.valuation, startup.mrr * 12 * 15);
+                }
                 startup.lastActivityDay = newDay;
               }
 
@@ -6652,15 +7132,18 @@ export const useGameStore = create<GameState & GameActions>()(
 
                 if (def.moodletGranted && MOODLETS[def.moodletGranted]) {
                   const mDef = MOODLETS[def.moodletGranted];
+                  const durationMult =
+                    s.sim.traits.includes('coffeeSnob') && isCoffeeAction ? 1.35 : 1.0;
                   moodlets = [
                     ...moodlets.filter((m) => m.id !== mDef.id),
-                    { id: mDef.id, expiresAt: newTime + mDef.durationMinutes },
+                    { id: mDef.id, expiresAt: newTime + Math.round(mDef.durationMinutes * durationMult) },
                   ];
                 }
 
                 if (job && def.workPerformanceDelta) {
-                  job.performance = clamp(job.performance + def.workPerformanceDelta, 0, 100);
-                  pushNotice(`Work Calibration: +${def.workPerformanceDelta}% performance rating!`, '📈', 'good');
+                  const scaledPerfDelta = Math.round(def.workPerformanceDelta * techMults.perfMult);
+                  job.performance = clamp(job.performance + scaledPerfDelta, 0, 100);
+                  pushNotice(`Work Calibration: +${scaledPerfDelta}% performance rating!`, '📈', 'good');
                 }
 
                 if (job && (def.category === 'work' || locationId === CAREER_BY_ID[job.careerId]?.locationId)) {
@@ -6671,14 +7154,17 @@ export const useGameStore = create<GameState & GameActions>()(
                   const activeProjId =
                     job.activeProjectId || getNextCareerProject(job.careerId, undefined, job.completedProjects);
                   const currentProg = job.projectProgress || 0;
-                  const nextProg = currentProg + def.projectProgressDelta;
+                  const scaledProjDelta = Math.round(def.projectProgressDelta * techMults.charterSpeedMult);
+                  const nextProg = currentProg + scaledProjDelta;
                   if (nextProg >= 100) {
                     const projDef = WORK_PROJECT_BY_ID[activeProjId];
                     const completedList = job.completedProjects || [];
                     const nextCompleted = completedList.includes(activeProjId) ? completedList : [...completedList, activeProjId];
                     const bonusCash = projDef?.rewardCash ?? 1400;
+                    const bonusRsu = Math.round((projDef?.rewardRsu ?? 0) * techMults.rsuMult);
                     const bonusPerf = projDef?.promoPerfBoost ?? 10;
                     cash += bonusCash;
+                    unvestedRsu += bonusRsu;
                     karma += 4;
                     stats.earnedToday += bonusCash;
                     stats.earnedTotal += bonusCash;
@@ -6691,34 +7177,31 @@ export const useGameStore = create<GameState & GameActions>()(
                     });
                     job.deliverablesCompleted = (job.deliverablesCompleted ?? 0) + 1;
                     job.shiftsCompleted = (job.shiftsCompleted ?? 0) + 1;
-                    job.shiftsAtLevel = Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted);
+                    job.shiftsAtLevel = (job.shiftsAtLevel ?? 0) + 1;
                     job.completedProjects = nextCompleted;
                     job.activeProjectId = getNextCareerProject(job.careerId, activeProjId, nextCompleted);
                     job.projectProgress = 0;
                     job.performance = clamp(job.performance + bonusPerf, 0, 100);
                     pushNotice(
-                      `Shipped Charter Milestone "${projDef?.title || 'Core Initiative'}"! +1 Deliverable, +4 ⚡ Karma & +${formatCurrency(bonusCash)} spot bonus!`,
+                      `Shipped Charter Milestone "${projDef?.title || 'Core Initiative'}"! +1 Deliverable, +4 ⚡ Karma & +${formatCurrency(bonusCash)} spot bonus${bonusRsu > 0 ? ` + ${formatCurrency(bonusRsu)} RSU` : ''}!`,
                       projDef?.emoji || '🚀',
                       'good'
                     );
                   } else {
                     job.projectProgress = nextProg;
-                    pushNotice(`R&D Project Progress: +${def.projectProgressDelta}% (${nextProg}%)`, '🚀', 'good');
+                    pushNotice(`R&D Project Progress: +${scaledProjDelta}% (${nextProg}%)`, '🚀', 'good');
                   }
                 }
 
                 if (def.rsuBonus) {
-                  unvestedRsu += def.rsuBonus;
-                  pushNotice(`Spot Equity Grant: +$${def.rsuBonus.toLocaleString()} Unvested RSUs!`, '💎', 'cash');
+                  const scaledRsu = Math.round(def.rsuBonus * techMults.rsuMult);
+                  unvestedRsu += scaledRsu;
+                  pushNotice(`Spot Equity Grant: +$${scaledRsu.toLocaleString()} Unvested RSUs!`, '💎', 'cash');
                 }
 
                 if (def.id === 'grind_leetcode') stats.leetCodeSolved += 1;
                 if (def.category === 'skill' || def.category === 'hustle' || def.category === 'work') stats.commitsPushed += 1;
-                if (
-                  def.id === 'brew_pourover' ||
-                  def.id === 'pull_espresso_shot' ||
-                  def.id === 'whisk_matcha'
-                ) {
+                if (isCoffeeAction) {
                   stats.coffeeConsumed += 1;
                 }
 
@@ -6740,13 +7223,7 @@ export const useGameStore = create<GameState & GameActions>()(
                   if (w.kind === 'action' && w.targetKey === def.id) {
                     return { ...w, progress: Math.min(w.targetValue, w.progress + 1) };
                   }
-                  if (
-                    w.kind === 'action' &&
-                    w.targetKey === 'coffee' &&
-                    (def.id === 'brew_pourover' ||
-                      def.id === 'pull_espresso_shot' ||
-                      def.id === 'whisk_matcha')
-                  ) {
+                  if (w.kind === 'action' && w.targetKey === 'coffee' && isCoffeeAction) {
                     return { ...w, progress: Math.min(w.targetValue, w.progress + 1) };
                   }
                   if (w.kind === 'startup' && def.startupProgress) {
@@ -6762,13 +7239,18 @@ export const useGameStore = create<GameState & GameActions>()(
               } else {
                 queue[0] = current;
               }
+            } else {
+              queue[0] = current;
             }
           } else if (s.freeWill && !workShift && locationId === 'home') {
             // Autonomous Free Will when idle at home!
             let chosenAction: string | null = null;
             let chosenObjUid: string | undefined;
+            const homePoweredNow = pgePowerOn || hasHomeBackupPower(s);
 
             const findObjWithAction = (actId: string) => {
+              const actDef = ACTIONS[actId];
+              if (actDef?.requiresPower && !homePoweredNow) return undefined;
               for (const placed of s.objects) {
                 const fDef = FURNITURE_BY_ID[placed.objectId];
                 if (fDef?.actions.includes(actId)) return placed;
@@ -6780,7 +7262,9 @@ export const useGameStore = create<GameState & GameActions>()(
               const obj =
                 findObjWithAction('use_smart_washlet') || findObjWithAction('use_restroom');
               if (obj) {
-                chosenAction = FURNITURE_BY_ID[obj.objectId].actions[0];
+                chosenAction = FURNITURE_BY_ID[obj.objectId].actions.includes('use_smart_washlet') && homePoweredNow
+                  ? 'use_smart_washlet'
+                  : 'use_restroom';
                 chosenObjUid = obj.uid;
               }
             } else if (needs.energy < 26) {
@@ -6793,13 +7277,18 @@ export const useGameStore = create<GameState & GameActions>()(
                 chosenObjUid = obj.uid;
               }
             } else if (needs.hunger < 30) {
-              const obj =
-                findObjWithAction('drink_soylent') ||
-                findObjWithAction('brew_pourover') ||
-                findObjWithAction('pull_espresso_shot');
-              if (obj) {
-                chosenAction = obj ? FURNITURE_BY_ID[obj.objectId].actions[0] : null;
-                chosenObjUid = obj.uid;
+              const preferCook = pantryMeals >= 1 && findObjWithAction('cook_hellofresh');
+              const preferRamen = pantryMeals >= 1 && findObjWithAction('eat_ramen');
+              const preferSoylent = findObjWithAction('drink_soylent');
+              if (preferCook) {
+                chosenAction = 'cook_hellofresh';
+                chosenObjUid = preferCook.uid;
+              } else if (preferRamen) {
+                chosenAction = 'eat_ramen';
+                chosenObjUid = preferRamen.uid;
+              } else if (preferSoylent) {
+                chosenAction = 'drink_soylent';
+                chosenObjUid = preferSoylent.uid;
               }
             } else if (needs.hygiene < 28) {
               const obj =
@@ -6934,6 +7423,7 @@ export const useGameStore = create<GameState & GameActions>()(
           activeEvent,
           goalIndex,
           claimedAspirationStages: Array.from(claimedStages),
+          rentOwed,
           stats,
         });
       },
@@ -7010,9 +7500,6 @@ export const useGameStore = create<GameState & GameActions>()(
           }
           state.relationships = normalizedRels;
           if (state.startup) {
-            if (typeof state.startup.users === 'number' && state.startup.users > 200_000) {
-              state.startup.users = 42_580;
-            }
             if (!state.startup.difficultyMode) {
               state.startup.difficultyMode = 'realistic';
             }

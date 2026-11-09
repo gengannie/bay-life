@@ -17,10 +17,11 @@ import { AccountSaveModal } from './components/AccountSaveModal';
 import { GoalsGuideModal } from './components/GoalsGuideModal';
 
 function getBaySkyGradient(hour: number, isDarkTheme: boolean): string {
+  if (isDarkTheme) {
+    return 'linear-gradient(180deg, #090d16 0%, #0f172a 65%, #1e1b4b 100%)';
+  }
   if (hour >= 7 && hour < 17.5) {
-    return isDarkTheme
-      ? 'linear-gradient(180deg, #1e293b 0%, #334155 60%, #475569 100%)'
-      : 'linear-gradient(180deg, #bae6fd 0%, #e0f2fe 58%, #f1f5f9 100%)';
+    return 'linear-gradient(180deg, #bae6fd 0%, #e0f2fe 58%, #f1f5f9 100%)';
   }
   if (hour >= 5.5 && hour < 7) {
     return 'linear-gradient(180deg, #7dd3fc 0%, #fdba74 68%, #fef3c7 100%)';

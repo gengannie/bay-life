@@ -115,6 +115,7 @@ export const WorldMapModal: React.FC = () => {
   const objects = useGameStore((s) => s.objects);
   const ownedCars = useGameStore((s) => s.ownedCars);
   const activeCarId = useGameStore((s) => s.activeCarId);
+  const unlockedPerks = useGameStore((s) => s.unlockedPerks);
   const job = useGameStore((s) => s.job);
   const workShift = useGameStore((s) => s.workShift);
   const setView = useGameStore((s) => s.setView);
@@ -324,17 +325,32 @@ export const WorldMapModal: React.FC = () => {
       ? getNpcsAtLocation(selectedTarget.loc.id, time)
       : [];
 
+  const allVenueStations =
+    selectedTarget.kind === 'venue'
+      ? selectedTarget.loc.floors
+        ? selectedTarget.loc.floors.flatMap((f) => f.stations)
+        : selectedTarget.loc.stations
+      : [];
+
   const venueActions =
     selectedTarget.kind === 'venue'
       ? Array.from(
-        new Set(selectedTarget.loc.stations.flatMap((st) => st.actionIds))
+        new Set(allVenueStations.flatMap((st) => st.actionIds))
       )
         .map((id) => ACTIONS[id])
         .filter(Boolean)
       : [];
 
+  const hasClipperVip = unlockedPerks.includes('perk_clipper_vip');
+
   const handleReturnHomeNow = () => {
-    const gbusEst = calculateCommuteDetails(locationId, 'home', homeId, 'gbus');
+    const gbusEst = calculateCommuteDetails(
+      locationId,
+      'home',
+      homeId,
+      'gbus',
+      activeVehicle?.id
+    );
     const selEst = calculateCommuteDetails(
       locationId,
       'home',
@@ -344,12 +360,14 @@ export const WorldMapModal: React.FC = () => {
     );
     const activeModeDef =
       COMMUTE_MODES.find((m) => m.id === selectedMode) || COMMUTE_MODES[0];
+    const selFare = hasClipperVip ? 0 : selEst.fare;
+    const gbusFare = hasClipperVip ? 0 : gbusEst.fare;
     const modeToUse: CommuteModeId =
       hasCar
         ? 'tesla'
-        : cash >= selEst.fare && !activeModeDef.requiresCar
+        : cash >= selFare && !activeModeDef.requiresCar
           ? selectedMode
-          : cash >= gbusEst.fare
+          : cash >= gbusFare
             ? 'gbus'
             : 'caltrain';
     travelTo('home', modeToUse);
@@ -362,8 +380,12 @@ export const WorldMapModal: React.FC = () => {
         : selectedTarget.home.name
       : selectedTarget.loc.name;
 
+  const effectiveSelectedFare = hasClipperVip ? 0 : activeCommuteEst.fare;
+  const cannotAffordSelectedFare =
+    effectiveSelectedFare > 0 && cash < effectiveSelectedFare;
+
   const selectedFareLabel =
-    activeCommuteEst.fare === 0 ? 'FREE' : formatCurrency(activeCommuteEst.fare);
+    effectiveSelectedFare === 0 ? 'FREE' : formatCurrency(effectiveSelectedFare);
 
   // Inverse scale so pins stay crisp & separated when zooming in
   const pinScale = +(1 / Math.pow(mapZoom, 0.52)).toFixed(3);
@@ -401,7 +423,7 @@ export const WorldMapModal: React.FC = () => {
             >
               <Home className="size-3.5" />
               <span>
-                🏠 Return Home ({calculateCommuteDetails(locationId, 'home', homeId, selectedMode).durationMinutes}m)
+                🏠 Return Home ({calculateCommuteDetails(locationId, 'home', homeId, selectedMode, activeVehicle?.id).durationMinutes}m)
               </span>
             </button>
           )}
@@ -639,86 +661,89 @@ export const WorldMapModal: React.FC = () => {
             if (mapZoom >= 1.8) setMapPan({ x: 0, y: 0 });
           }}
         >
-          {/* Top-Left Map Legend Pill */}
-          <div className="pointer-events-none absolute top-2.5 left-2.5 z-30 flex flex-wrap items-center gap-2 rounded-full bg-white/92 px-3 py-1 text-[10px] font-extrabold text-slate-700 shadow-sm backdrop-blur-md dark:bg-slate-900/92 dark:text-slate-200">
-            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <span className="size-2 rounded-full bg-emerald-500 ring-2 ring-emerald-300" />
-              📍 Here
-            </span>
-            <span className="inline-flex items-center gap-1 text-[#007AFF]">
-              <span className="size-2 rounded-full bg-[#007AFF]" />
-              🏢 Venue
-            </span>
-            {mapHouseHuntMode ? (
-              <span className="inline-flex items-center gap-1 text-[#0284C7] dark:text-sky-400">
-                <span className="size-2 rounded-full bg-[#0284C7]" />
-                🐟 Bluefin Homes (T1–T5)
-              </span>
-            ) : (
+          {/* Top Overlay Flex Header: Compact Legend Pill + Active Route Pill (Never Collides) */}
+          <div className="pointer-events-none absolute top-2.5 right-2.5 left-2.5 z-30 flex flex-wrap items-start justify-between gap-2">
+            {/* Compact Map Legend Pill */}
+            <div className="pointer-events-none flex flex-wrap items-center gap-2 rounded-full bg-white/92 px-3 py-1 text-[10px] font-extrabold text-slate-700 shadow-sm backdrop-blur-md dark:bg-slate-900/92 dark:text-slate-200">
               <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                <span className="size-2 rounded-full bg-emerald-600" />
-                🏠 Your Home
+                <span className="size-2 rounded-full bg-emerald-500 ring-2 ring-emerald-300" />
+                Here
               </span>
-            )}
-            <span className="hidden text-slate-400 xl:inline">·</span>
-            <span className="hidden text-[9px] font-bold text-slate-500 xl:inline dark:text-slate-400">
-              {mapHouseHuntMode
-                ? 'Click Any Home Pin to Compare Commutes & Leases'
-                : 'Click Venue to Inspect · Use Bluefin to House Hunt'}
-            </span>
-          </div>
-
-          {/* Top-Right Apple Maps Docked Route HUD Pill (Never Collides with Map Pins) */}
-          {!isAlreadyHere && (
-            <div
-              className=" absolute top-2.5 right-2.5 z-30 flex items-center gap-2 rounded-full border border-white/70 bg-slate-900/92 py-1 pr-1.5 pl-3 text-[10px] font-extrabold text-white shadow-lg backdrop-blur-md dark:border-white/15"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <span className="inline-flex items-center gap-1 text-emerald-300">
-                <span>{currentPlaceEmoji}</span>
-                <span className="max-w-[92px] truncate">{currentPlaceShortName}</span>
+              <span className="text-slate-300 dark:text-slate-600">·</span>
+              <span className="inline-flex items-center gap-1 text-[#007AFF]">
+                <span className="size-2 rounded-full bg-[#007AFF]" />
+                Venue
               </span>
-              <ArrowRight className="size-3 shrink-0 text-sky-400" />
-              <span className="inline-flex items-center gap-1 text-white">
-                <span>
-                  {selectedTarget.kind === 'home'
-                    ? selectedTarget.home.emoji
-                    : selectedTarget.loc.emoji}
+              <span className="text-slate-300 dark:text-slate-600">·</span>
+              {mapHouseHuntMode ? (
+                <span className="inline-flex items-center gap-1 text-[#0284C7] dark:text-sky-400">
+                  <span className="size-2 rounded-full bg-[#0284C7]" />
+                  Homes
                 </span>
-                <span className="max-w-[105px] truncate">{selectedVenueName}</span>
-              </span>
-              <span className="rounded-full bg-white/15 px-2 py-0.5 font-mono text-[9.5px] text-sky-200">
-                {activeCommuteEst.miles} mi · {activeCommuteEst.durationMinutes}m
-              </span>
-              {!workShift && (
-                <button
-                  onClick={() => {
-                    if (isInspectingOtherHome && selectedTarget.kind === 'home') {
-                      moveHome(selectedTarget.home.id, false);
-                    } else {
-                      travelTo(
-                        selectedTarget.kind === 'home' ? 'home' : selectedTarget.loc.id,
-                        selectedMode
-                      );
-                    }
-                  }}
-                  disabled={
-                    isInspectingOtherHome &&
-                    selectedTarget.kind === 'home' &&
-                    !ownedHomes.includes(selectedTarget.home.id) &&
-                    cash < selectedTarget.home.weeklyRent
-                  }
-                  className={`btn-press rounded-full px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs disabled:opacity-45 ${isInspectingOtherHome
-                      ? 'bg-amber-500 hover:bg-amber-600'
-                      : 'bg-[#007AFF] hover:bg-[#0066CC]'
-                    }`}
-                >
-                  {isInspectingOtherHome ? '🏡 Lease' : `🚀 Go (${selectedFareLabel})`}
-                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <span className="size-2 rounded-full bg-emerald-600" />
+                  Home
+                </span>
               )}
             </div>
-          )}
+
+            {/* Top-Right Apple Maps Docked Route HUD Pill */}
+            {!isAlreadyHere && (
+              <div
+                className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/70 bg-slate-900/92 py-1 pr-1.5 pl-2.5 text-[10px] font-extrabold text-white shadow-lg backdrop-blur-md dark:border-white/15"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="inline-flex items-center gap-1 text-emerald-300">
+                  <span>{currentPlaceEmoji}</span>
+                  <span className="max-w-[78px] truncate">{currentPlaceShortName}</span>
+                </span>
+                <ArrowRight className="size-3 shrink-0 text-sky-400" />
+                <span className="inline-flex items-center gap-1 text-white">
+                  <span>
+                    {selectedTarget.kind === 'home'
+                      ? selectedTarget.home.emoji
+                      : selectedTarget.loc.emoji}
+                  </span>
+                  <span className="max-w-[92px] truncate">{selectedVenueName}</span>
+                </span>
+                <span className="rounded-full bg-white/15 px-2 py-0.5 font-mono text-[9.5px] text-sky-200 whitespace-nowrap">
+                  {activeCommuteEst.miles} mi · {activeCommuteEst.durationMinutes}m
+                </span>
+                {!workShift && (
+                  <button
+                    onClick={() => {
+                      if (isInspectingOtherHome && selectedTarget.kind === 'home') {
+                        moveHome(selectedTarget.home.id, false);
+                      } else {
+                        travelTo(
+                          selectedTarget.kind === 'home' ? 'home' : selectedTarget.loc.id,
+                          selectedMode
+                        );
+                      }
+                    }}
+                    disabled={
+                      isInspectingOtherHome && selectedTarget.kind === 'home'
+                        ? !ownedHomes.includes(selectedTarget.home.id) &&
+                          cash < selectedTarget.home.weeklyRent
+                        : cannotAffordSelectedFare
+                    }
+                    className={`btn-press whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-black text-white shadow-xs disabled:cursor-not-allowed disabled:opacity-45 ${isInspectingOtherHome
+                        ? 'bg-amber-500 hover:bg-amber-600'
+                        : 'bg-[#007AFF] hover:bg-[#0066CC]'
+                      }`}
+                  >
+                    {isInspectingOtherHome
+                      ? '🏡 Lease'
+                      : cannotAffordSelectedFare
+                        ? `Need ${selectedFareLabel} Fare`
+                        : `🚀 Go (${selectedFareLabel})`}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Bottom-Left Floating Map Zoom & Region Quick-Focus Controls */}
           <div
@@ -813,6 +838,7 @@ export const WorldMapModal: React.FC = () => {
               </defs>
 
               {/* Bay & Pacific Water */}
+              <rect width="100" height="100" fill="#bae6fd" className="dark:fill-slate-900" />
               <rect width="100" height="100" fill="url(#waterGrad)" />
 
               {/* Animated Golden Gate & Bay Water Waves */}
@@ -845,7 +871,7 @@ export const WorldMapModal: React.FC = () => {
 
               {/* Marin Headlands (North) */}
               <path
-                d="M 8,0 L 42,0 L 36,9 L 18,10 L 8,5 Z"
+                d="M 0,0 L 42,0 L 36,9 L 18,10 L 0,7 Z"
                 fill="#A7F3D0"
                 opacity="0.78"
                 stroke="#10B981"
@@ -883,7 +909,7 @@ export const WorldMapModal: React.FC = () => {
 
               {/* SF Peninsula & South Bay Landmass */}
               <path
-                d="M 10,14 L 50,12 L 56,46 L 64,64 L 86,74 L 94,100 L 8,100 L 8,48 Z"
+                d="M 0,14 L 50,12 L 56,46 L 64,64 L 86,74 L 94,100 L 0,100 L 0,48 Z"
                 fill="#ECFDF5"
                 className="dark:fill-slate-800"
                 stroke="#10B981"
@@ -1494,13 +1520,15 @@ export const WorldMapModal: React.FC = () => {
                             h.id,
                             hubId,
                             h.id,
-                            selectedMode
+                            selectedMode,
+                            activeVehicle?.id
                           );
                           const fromCurrentHome = calculateCommuteDetails(
                             homeId,
                             hubId,
                             homeId,
-                            selectedMode
+                            selectedMode,
+                            activeVehicle?.id
                           );
                           const timeDiff =
                             fromThisHome.durationMinutes - fromCurrentHome.durationMinutes;
@@ -1663,6 +1691,7 @@ export const WorldMapModal: React.FC = () => {
                     </p>
                     {!workShift && (
                       <button
+                        disabled={!isAlreadyHere && cannotAffordSelectedFare}
                         onClick={() => {
                           if (isAlreadyHere) {
                             startWorkShift('office');
@@ -1671,10 +1700,12 @@ export const WorldMapModal: React.FC = () => {
                           }
                           setView('live');
                         }}
-                        className="btn-press mt-2.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-xs font-extrabold text-white shadow-sm hover:bg-indigo-700"
+                        className="btn-press mt-2.5 flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-xs font-extrabold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <span>
-                          🚌 Commute & Badge In for Office Shift ({activeCommuteEst.durationMinutes}m · {selectedFareLabel})
+                          {!isAlreadyHere && cannotAffordSelectedFare
+                            ? `Need ${selectedFareLabel} Fare to Commute`
+                            : `🚌 Commute & Badge In for Office Shift (${activeCommuteEst.durationMinutes}m · ${selectedFareLabel})`}
                         </span>
                       </button>
                     )}
@@ -1802,6 +1833,9 @@ export const WorldMapModal: React.FC = () => {
                       m.id,
                       activeVehicle?.id
                     );
+                    const effectiveModeFare = hasClipperVip ? 0 : modeEst.fare;
+                    const unaffordableMode =
+                      !isLocked && effectiveModeFare > 0 && cash < effectiveModeFare;
 
                     return (
                       <button
@@ -1818,7 +1852,7 @@ export const WorldMapModal: React.FC = () => {
                             ? 'border-[#007AFF] bg-[#007AFF]/15 ring-2 ring-[#007AFF]/30 shadow-sm'
                             : lockedCar
                               ? 'border-[#007AFF]/35 bg-[#007AFF]/8 hover:border-[#007AFF]'
-                              : isLocked
+                              : isLocked || unaffordableMode
                                 ? 'cursor-not-allowed border-rose-500/25 bg-[var(--mist)] opacity-75'
                                 : 'border-transparent bg-[var(--mist)] hover:border-[#007AFF]/40'
                           }`}
@@ -1827,14 +1861,16 @@ export const WorldMapModal: React.FC = () => {
                           <span className="text-base">{cardEmoji}</span>
                           <div className="flex items-center gap-1">
                             <span
-                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${modeEst.fare === 0
+                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${effectiveModeFare === 0
                                   ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-white/80 text-slate-800 dark:bg-white/10 dark:text-slate-100'
+                                  : unaffordableMode
+                                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                                    : 'bg-white/80 text-slate-800 dark:bg-white/10 dark:text-slate-100'
                                 }`}
                             >
-                              {modeEst.fare === 0
+                              {effectiveModeFare === 0
                                 ? 'FREE'
-                                : formatCurrency(modeEst.fare)}
+                                : formatCurrency(effectiveModeFare)}
                             </span>
                             <span className="rounded-md bg-black/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--ink-soft)] dark:bg-white/10">
                               {modeEst.durationMinutes}m
@@ -1854,6 +1890,10 @@ export const WorldMapModal: React.FC = () => {
                             <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-extrabold text-rose-600 dark:text-rose-400">
                               <Lock className="size-2.5 shrink-0" />
                               <span>🔒 Need Big Tech Job</span>
+                            </div>
+                          ) : unaffordableMode ? (
+                            <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-extrabold text-rose-600 dark:text-rose-400">
+                              <span>Need {formatCurrency(effectiveModeFare)} Fare</span>
                             </div>
                           ) : (
                             <div className="text-[10px] font-medium leading-tight text-[var(--ink-soft)]">
@@ -1912,18 +1952,20 @@ export const WorldMapModal: React.FC = () => {
               </button>
             ) : (
               <button
+                disabled={cannotAffordSelectedFare}
                 onClick={() =>
                   travelTo(
                     selectedTarget.kind === 'home' ? 'home' : selectedTarget.loc.id,
                     selectedMode
                   )
                 }
-                className="btn-press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#007AFF] px-4 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-[#007AFF]/30 hover:bg-[#0066CC]"
+                className="btn-press flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#007AFF] px-4 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-[#007AFF]/30 hover:bg-[#0066CC] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Rocket className="size-4 shrink-0" />
                 <span>
-                  🚀 Travel to {selectedVenueName} ({selectedFareLabel} ·{' '}
-                  {activeCommuteEst.durationMinutes}m · {activeCommuteEst.miles} mi)
+                  {cannotAffordSelectedFare
+                    ? `Need ${selectedFareLabel} Fare to Travel to ${selectedVenueName}`
+                    : `🚀 Travel to ${selectedVenueName} (${selectedFareLabel} · ${activeCommuteEst.durationMinutes}m · ${activeCommuteEst.miles} mi)`}
                 </span>
               </button>
             )}

@@ -888,7 +888,16 @@ export interface GameState {
   | 'computer'
   | 'account'
   | 'guide';
-  phoneApp: 'messages' | 'levels' | 'wealth' | 'doordash' | 'startup' | 'bluefin' | 'zillow' | 'blind';
+  phoneApp:
+    | 'messages'
+    | 'levels'
+    | 'wealth'
+    | 'doordash'
+    | 'startup'
+    | 'bluefin'
+    | 'zillow'
+    | 'blind'
+    | `messages:${string}`;
   simTab: 'needs' | 'skills' | 'relationships' | 'wishes' | 'perks' | 'backpack';
   computerTab?: 'ide' | 'ai_lab' | 'bounties' | 'bluefin' | 'hardware';
   guideTab?: 'goals' | 'tutorial' | 'playbook';
@@ -989,6 +998,8 @@ export type SerializableGameState = Omit<
   | 'simTab'
   | 'computerTab'
   | 'guideTab'
+  | 'careerTab'
+  | 'interviewTargetCareerId'
   | 'mapHouseHuntMode'
   | 'bluefinSelectedHomeId'
   | 'lastToast'

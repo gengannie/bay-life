@@ -140,16 +140,24 @@ const SPARKLINE_SERIES: Record<'1D' | '1W' | '1M' | 'ALL', { points: string; gai
   },
 };
 
+let persistedPhCooldownUntil = 0;
+let persistedTradeCooldownUntil = 0;
+const persistedLikedPosts = new Set<string>();
+
 export const BayPhoneModal: React.FC = () => {
   const rawPhoneApp = useGameStore((s) => s.phoneApp);
+  const rawPhoneAppStr = String(rawPhoneApp || 'levels');
   const phoneApp =
-    rawPhoneApp === 'messages'
+    rawPhoneAppStr === 'messages' ||
+    rawPhoneAppStr.startsWith('messages:') ||
+    rawPhoneAppStr.startsWith('blind:')
       ? 'blind'
-      : rawPhoneApp === 'zillow'
+      : rawPhoneAppStr === 'zillow'
         ? 'bluefin'
         : rawPhoneApp;
   const setActiveModal = useGameStore((s) => s.setActiveModal);
   const cash = useGameStore((s) => s.cash);
+  const needs = useGameStore((s) => s.needs);
   const vestedRsu = useGameStore((s) => s.vestedRsu);
   const unvestedRsu = useGameStore((s) => s.unvestedRsu);
   const portfolioValue = useGameStore((s) => s.portfolioValue);
@@ -205,14 +213,12 @@ export const BayPhoneModal: React.FC = () => {
   const executeOptionsStrategy = useGameStore((s) => s.executeOptionsStrategy);
   const financeRaw = useGameStore((s) => s.finance);
   const payLoan = useGameStore((s) => s.payLoan);
-  const buyCar = useGameStore((s) => s.buyCar);
   const orderDoorDash = useGameStore((s) => s.orderDoorDash);
   const pitchStartupVC = useGameStore((s) => s.pitchStartupVC);
   const renameStartup = useGameStore((s) => s.renameStartup);
   const setStartupDifficulty = useGameStore((s) => s.setStartupDifficulty);
   const launchStartupProductHunt = useGameStore((s) => s.launchStartupProductHunt);
   const moveHome = useGameStore((s) => s.moveHome);
-  const setView = useGameStore((s) => s.setView);
   const openBluefinMap = useGameStore((s) => s.openBluefinMap);
   const interactWithNpc = useGameStore((s) => s.interactWithNpc);
   const answerNpcTopic = useGameStore((s) => s.answerNpcTopic);
@@ -229,6 +235,11 @@ export const BayPhoneModal: React.FC = () => {
   const [startupTagInput, setStartupTagInput] = useState(startup.tagline);
   const [editingDeck, setEditingDeck] = useState(false);
 
+  useEffect(() => {
+    setStartupNameInput(startup.name);
+    setStartupTagInput(startup.tagline);
+  }, [startup.name, startup.tagline]);
+
   const [blitzIdx, setBlitzIdx] = useState(() => stats.leetCodeSolved % LEETCODE_BLITZ_PROBLEMS.length);
   const [blitzStreak, setBlitzStreak] = useState(1);
   const [blitzFeedback, setBlitzFeedback] = useState<'win' | 'miss' | null>(null);
@@ -237,11 +248,21 @@ export const BayPhoneModal: React.FC = () => {
   const [wealthSubTab, setWealthSubTab] = useState<'market' | 'cashflow' | 'equity'>('market');
   const [selectedTicker, setSelectedTicker] = useState<MarketTicker>('NVDAX');
   const [ledgerFilter, setLedgerFilter] = useState<'all' | 'inflow' | 'outflow' | 'trade'>('all');
-  const [tradeCooldown, setTradeCooldown] = useState(0);
-  const [phCooldown, setPhCooldown] = useState(0);
-  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const [tradeCooldown, setTradeCooldown] = useState(() =>
+    Math.max(0, Math.ceil((persistedTradeCooldownUntil - Date.now()) / 1000))
+  );
+  const [phCooldown, setPhCooldown] = useState(() =>
+    Math.max(0, Math.ceil((persistedPhCooldownUntil - Date.now()) / 1000))
+  );
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    persistedLikedPosts.forEach((id) => {
+      initial[id] = true;
+    });
+    return initial;
+  });
 
-  const startupDifficulty = startup.difficultyMode || 'realistic';
+  const startupDifficulty: StartupDifficulty = startup.difficultyMode || 'realistic';
   const stageReq = getStartupNextStageRequirements(startup.stage, startupDifficulty);
   const dailyBurn = getStartupDailyBurnRate(startup.stage, startupDifficulty);
   const displayDevs = typeof startup.users === 'number' && startup.users > 200_000 ? 42_580 : startup.users;
@@ -259,10 +280,26 @@ export const BayPhoneModal: React.FC = () => {
   const [bluefinFilter, setBluefinFilter] = useState<'all' | 'starter' | 'luxury' | 'owned'>('all');
 
   useEffect(() => {
+    const appStr = String(rawPhoneApp || '');
+    if (appStr.startsWith('messages:') || appStr.startsWith('blind:')) {
+      const rawTarget = appStr.split(':')[1] || '';
+      const matchedNpc = NPCS.find(
+        (n) => n.id === rawTarget || n.id === `npc_${rawTarget}`
+      );
+      setBlindTab('dm');
+      if (matchedNpc) {
+        setSelectedDmNpcId(matchedNpc.id);
+      }
+      setActiveModal('phone', 'blind');
+    }
+  }, [rawPhoneApp, setActiveModal]);
+
+  useEffect(() => {
     if (tradeCooldown <= 0 && phCooldown <= 0) return;
     const t = window.setInterval(() => {
-      setTradeCooldown((c) => Math.max(0, c - 1));
-      setPhCooldown((c) => Math.max(0, c - 1));
+      const now = Date.now();
+      setTradeCooldown(Math.max(0, Math.ceil((persistedTradeCooldownUntil - now) / 1000)));
+      setPhCooldown(Math.max(0, Math.ceil((persistedPhCooldownUntil - now) / 1000)));
     }, 1000);
     return () => window.clearInterval(t);
   }, [tradeCooldown, phCooldown]);
@@ -274,6 +311,23 @@ export const BayPhoneModal: React.FC = () => {
   const currentCareer = job ? CAREER_BY_ID[job.careerId] : null;
   const currentLevel = currentCareer && job ? currentCareer.levels[job.levelIndex] : null;
   const nextLevel = currentCareer && job ? currentCareer.levels[job.levelIndex + 1] : null;
+
+  const blindNotificationCount = NPCS.reduce((acc, npc) => {
+    const rel = relationships[npc.id];
+    const score = rel?.score ?? 12;
+    const claimedIds = rel?.claimedMilestones || [];
+    const unclaimedMilestonesCount = getNpcMilestones(npc.id).filter(
+      (m) =>
+        (score >= m.threshold || (rel?.unlockedMilestones || []).includes(m.id)) &&
+        !claimedIds.includes(m.id)
+    ).length;
+    const availableTopicsCount = getAvailableTopicsForNpc(
+      npc.id,
+      score,
+      rel?.completedTopics || []
+    ).length;
+    return acc + unclaimedMilestonesCount + availableTopicsCount;
+  }, 0);
 
   const APPS: Array<{
     id: typeof phoneApp;
@@ -321,7 +375,7 @@ export const BayPhoneModal: React.FC = () => {
         label: 'Blind',
         icon: <MessageSquare className="size-4" />,
         gradient: 'from-[#AF52DE] to-[#EC4899]',
-        badge: '3',
+        badge: blindNotificationCount > 0 ? String(blindNotificationCount) : undefined,
       },
     ];
 
@@ -357,8 +411,14 @@ export const BayPhoneModal: React.FC = () => {
   };
 
   const handleAiMomentumTrade = () => {
-    if (tradeCooldown > 0) return;
+    const now = Date.now();
+    if (tradeCooldown > 0 || persistedTradeCooldownUntil > now) return;
+    persistedTradeCooldownUntil = now + 5000;
     setTradeCooldown(5);
+    if (cash >= 600) {
+      executeOptionsStrategy('earnings_straddle');
+      return;
+    }
     const quantBonus = Math.floor(skills.investing * 90);
     const win = Math.random() < 0.78;
     if (win) {
@@ -384,13 +444,16 @@ export const BayPhoneModal: React.FC = () => {
   };
 
   const handleProductHuntLaunch = () => {
-    if (phCooldown > 0) return;
+    const now = Date.now();
+    if (phCooldown > 0 || persistedPhCooldownUntil > now) return;
+    persistedPhCooldownUntil = now + 45000;
     setPhCooldown(45);
     launchStartupProductHunt();
   };
 
   const handleLikeBlindPost = (postId: string) => {
-    if (likedPosts[postId]) return;
+    if (likedPosts[postId] || persistedLikedPosts.has(postId)) return;
+    persistedLikedPosts.add(postId);
     setLikedPosts((prev) => ({ ...prev, [postId]: true }));
     triggerMicroReward({
       needKey: 'fun',
@@ -481,7 +544,7 @@ export const BayPhoneModal: React.FC = () => {
                   (job.activeProjectId && WORK_PROJECT_BY_ID[job.activeProjectId]) ||
                   defaultProj;
                 const projPct = Math.min(100, Math.round(job.projectProgress ?? 0));
-                const shiftsAtLvl = Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted ?? 0);
+                const shiftsAtLvl = job.shiftsAtLevel ?? 0;
                 const reqShifts = nextLevel?.minShiftsForPromo ?? 3;
                 const deliverablesDone = job.deliverablesCompleted ?? 0;
                 const reqDeliverables = nextLevel?.requiredDeliverables ?? 1;
@@ -1112,234 +1175,641 @@ export const BayPhoneModal: React.FC = () => {
           )}
 
           {/* =========================================================
-              2. SCHWAB WEALTH + LIVE SPARKLINE + AI MOMENTUM TRADE
+              2. SCHWAAB WEALTH + LIVE SPARKLINE + AI MOMENTUM TRADE
           ========================================================= */}
           {phoneApp === 'wealth' && (
             <div className="space-y-3.5">
-              {/* Live Stock Sparkline & Net Worth Card */}
-              <div className="rounded-3xl bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-transparent p-4 border border-emerald-500/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                      NVDA / AI Semis · Total Net Worth
+              {/* Sub-Tab Bar: Market · Equity & RSUs · Cashflow */}
+              <div className="grid grid-cols-3 rounded-2xl bg-[var(--mist)] p-1">
+                {(
+                  [
+                    { id: 'market', label: '📈 Market' },
+                    { id: 'equity', label: '💎 Equity & RSUs' },
+                    { id: 'cashflow', label: '💸 Cashflow' },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setWealthSubTab(tab.id)}
+                    className={`rounded-xl py-1.5 text-[11px] font-extrabold transition-all ${
+                      wealthSubTab === tab.id
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-[var(--ink-soft)]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {wealthSubTab === 'market' && (
+                <>
+                  {/* Live Stock Sparkline & Net Worth Card */}
+                  <div className="rounded-3xl bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-transparent p-4 border border-emerald-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                          {MARKET_ASSET_BY_TICKER[selectedTicker]?.name || 'NVDA / AI Semis'} · Total Net Worth
+                        </div>
+                        <div className="text-2xl font-black tracking-tight">
+                          {formatCurrency(netWorth)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-black text-emerald-600 dark:text-emerald-400">
+                          <ArrowUpRight className="size-3.5" />
+                          {SPARKLINE_SERIES[chartRange].gain}
+                        </span>
+                        <div className="mt-1 flex gap-1">
+                          {(['1D', '1W', '1M', 'ALL'] as const).map((tf) => (
+                            <button
+                              key={tf}
+                              onClick={() => setChartRange(tf)}
+                              className={`rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${
+                                chartRange === tf
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-black/5 text-[var(--ink-soft)] dark:bg-white/10'
+                              }`}
+                            >
+                              {tf}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-2xl font-black tracking-tight">
-                      {formatCurrency(netWorth)}
+
+                    {/* Animated SVG Stock Sparkline */}
+                    <div className="mt-2.5 h-16 w-full overflow-hidden rounded-2xl bg-black/5 p-2 dark:bg-black/30">
+                      <svg viewBox="0 0 288 64" className="h-full w-full overflow-visible">
+                        <defs>
+                          <linearGradient id="schwabGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#10B981" stopOpacity="0.45" />
+                            <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+                        <polygon
+                          points={`0,64 ${SPARKLINE_SERIES[chartRange].points} 280,64`}
+                          fill="url(#schwabGrad)"
+                        />
+                        <polyline
+                          fill="none"
+                          stroke="#10B981"
+                          strokeWidth="2.75"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          points={SPARKLINE_SERIES[chartRange].points}
+                        />
+                        <circle cx="280" cy="6" r="4" className="fill-emerald-400 animate-ping" />
+                        <circle cx="280" cy="6" r="3.5" className="fill-emerald-500" />
+                      </svg>
                     </div>
+
+                    {/* Visual Allocation Bar & Bento Stats */}
+                    <div className="mt-3 space-y-1.5">
+                      <div className="flex h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                        <div style={{ width: `${cashPct}%` }} className="bg-emerald-500" />
+                        <div style={{ width: `${rsuPct}%` }} className="bg-purple-500" />
+                        <div style={{ width: `${indexPct}%` }} className="bg-[#007AFF]" />
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5 pt-1 text-center">
+                        <div className="rounded-xl bg-white/65 p-2 dark:bg-black/30">
+                          <div className="text-[9px] font-bold text-[var(--ink-soft)]">Cash</div>
+                          <div className="text-[11px] font-black">{formatCurrency(cash)}</div>
+                        </div>
+                        <div className="rounded-xl bg-white/65 p-2 dark:bg-black/30">
+                          <div className="text-[9px] font-bold text-purple-600">Vested</div>
+                          <div className="text-[11px] font-black text-purple-600">
+                            {formatCurrency(vestedRsu)}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-white/65 p-2 dark:bg-black/30">
+                          <div className="text-[9px] font-bold text-[var(--ink-soft)]">Unvested</div>
+                          <div className="text-[11px] font-black">{formatCurrency(unvestedRsu)}</div>
+                        </div>
+                        <div className="rounded-xl bg-white/65 p-2 dark:bg-black/30">
+                          <div className="text-[9px] font-bold text-[#007AFF]">Equities</div>
+                          <div className="text-[11px] font-black text-[#007AFF]">
+                            {formatCurrency(portfolioValue)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {vestedRsu > 0 && (
+                      <button
+                        onClick={vestRsuToCash}
+                        className="btn-press mt-3 w-full rounded-2xl bg-purple-600 py-2.5 text-xs font-extrabold text-white shadow-sm"
+                      >
+                        💎 Liquidate {formatCurrency(vestedRsu)} Vested RSUs
+                      </button>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-black text-emerald-600 dark:text-emerald-400">
-                      <ArrowUpRight className="size-3.5" />
-                      {SPARKLINE_SERIES[chartRange].gain}
-                    </span>
-                    <div className="mt-1 flex gap-1">
-                      {(['1D', '1W', '1M', 'ALL'] as const).map((tf) => (
+
+                  {/* 1-Tap Index Chips, Portfolio Presets & AI Momentum Trade */}
+                  <div className="rounded-3xl bg-[var(--mist)] p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold">⚡ 1-Tap Index & Presets</span>
+                      <button
+                        disabled={portfolioValue <= 0}
+                        onClick={() => withdrawPortfolio(Math.min(5000, portfolioValue))}
+                        className="btn-press rounded-lg bg-black/10 px-2.5 py-1 text-[10px] font-bold disabled:opacity-35 dark:bg-white/10"
+                      >
+                        Withdraw $5k
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        disabled={cash < 1000}
+                        onClick={() => investInPortfolio(1000)}
+                        className="btn-press rounded-xl bg-[#007AFF] py-2 text-xs font-extrabold text-white disabled:opacity-35"
+                      >
+                        +$1k
+                      </button>
+                      <button
+                        disabled={cash < 5000}
+                        onClick={() => investInPortfolio(5000)}
+                        className="btn-press rounded-xl bg-[#007AFF] py-2 text-xs font-extrabold text-white disabled:opacity-35"
+                      >
+                        +$5k
+                      </button>
+                      <button
+                        disabled={cash < 1000}
+                        onClick={() => investInPortfolio(Math.floor(cash * 0.5))}
+                        className="btn-press rounded-xl bg-indigo-600 py-2 text-xs font-extrabold text-white disabled:opacity-35"
+                      >
+                        50% Max
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(
+                        [
+                          { id: 'boglehead', label: '🌐 Boglehead' },
+                          { id: 'ai_supercycle', label: '🟢 AI Supercycle' },
+                          { id: 'treasury_barbell', label: '🏛️ T-Bill Barbell' },
+                        ] as const
+                      ).map((preset) => (
                         <button
-                          key={tf}
-                          onClick={() => setChartRange(tf)}
-                          className={`rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${chartRange === tf
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-black/5 text-[var(--ink-soft)] dark:bg-white/10'
-                            }`}
+                          key={preset.id}
+                          disabled={cash < 500}
+                          onClick={() => applyPortfolioPreset(preset.id)}
+                          className="btn-press rounded-xl border border-black/10 bg-white/75 py-1.5 text-[9.5px] font-extrabold text-[var(--ink)] disabled:opacity-40 dark:border-white/10 dark:bg-black/30"
                         >
-                          {tf}
+                          {preset.label}
                         </button>
                       ))}
                     </div>
-                  </div>
-                </div>
 
-                {/* Animated SVG Stock Sparkline */}
-                <div className="mt-2.5 h-16 w-full overflow-hidden rounded-2xl bg-black/5 p-2 dark:bg-black/30">
-                  <svg viewBox="0 0 288 64" className="h-full w-full overflow-visible">
-                    <defs>
-                      <linearGradient id="schwabGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10B981" stopOpacity="0.45" />
-                        <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    <polygon
-                      points={`0,64 ${SPARKLINE_SERIES[chartRange].points} 280,64`}
-                      fill="url(#schwabGrad)"
-                    />
-                    <polyline
-                      fill="none"
-                      stroke="#10B981"
-                      strokeWidth="2.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      points={SPARKLINE_SERIES[chartRange].points}
-                    />
-                    <circle cx="280" cy="6" r="4" className="fill-emerald-400 animate-ping" />
-                    <circle cx="280" cy="6" r="3.5" className="fill-emerald-500" />
-                  </svg>
-                </div>
-
-                {/* Visual Allocation Bar & Bento Stats */}
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                    <div style={{ width: `${cashPct}%` }} className="bg-emerald-500" />
-                    <div style={{ width: `${rsuPct}%` }} className="bg-purple-500" />
-                    <div style={{ width: `${indexPct}%` }} className="bg-[#007AFF]" />
-                  </div>
-                  <div className="grid grid-cols-4 gap-1.5 pt-1 text-center">
-                    <div className="rounded-xl bg-white/65 p-2 dark:bg-black/30">
-                      <div className="text-[9px] font-bold text-[var(--ink-soft)]">Cash</div>
-                      <div className="text-[11px] font-black">{formatCurrency(cash)}</div>
-                    </div>
-                    <div className="rounded-xl bg-white/65 p-2 dark:bg-black/30">
-                      <div className="text-[9px] font-bold text-purple-600">Vested</div>
-                      <div className="text-[11px] font-black text-purple-600">
-                        {formatCurrency(vestedRsu)}
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-white/65 p-2 dark:bg-black/30">
-                      <div className="text-[9px] font-bold text-[var(--ink-soft)]">Unvested</div>
-                      <div className="text-[11px] font-black">{formatCurrency(unvestedRsu)}</div>
-                    </div>
-                    <div className="rounded-xl bg-white/65 p-2 dark:bg-black/30">
-                      <div className="text-[9px] font-bold text-[#007AFF]">AI Index</div>
-                      <div className="text-[11px] font-black text-[#007AFF]">
-                        {formatCurrency(portfolioValue)}
-                      </div>
+                    {/* Interactive Pulse Trade & Covered Call Buttons */}
+                    <div className="grid grid-cols-1 gap-1.5">
+                      <button
+                        disabled={tradeCooldown > 0}
+                        onClick={handleAiMomentumTrade}
+                        className="btn-press flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm disabled:opacity-50"
+                      >
+                        <span>📈 Trade AI Earnings Momentum</span>
+                        <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px]">
+                          {tradeCooldown > 0
+                            ? `${tradeCooldown}s`
+                            : 'Lv.' + Math.floor(skills.investing) + ' Alpha'}
+                        </span>
+                      </button>
+                      <button
+                        disabled={portfolioValue < 2500}
+                        onClick={() => executeOptionsStrategy('covered_call')}
+                        className="btn-press flex w-full items-center justify-between rounded-xl bg-indigo-500/15 px-3.5 py-2 text-[10.5px] font-extrabold text-indigo-700 disabled:opacity-40 dark:text-indigo-300"
+                      >
+                        <span>🛡️ Write Covered Calls (1.8% Yield)</span>
+                        <span className="text-[9.5px] font-bold">
+                          {portfolioValue >= 2500
+                            ? `+${formatCurrency(Math.round(portfolioValue * 0.018))}`
+                            : 'Need $2.5k Equity'}
+                        </span>
+                      </button>
                     </div>
                   </div>
-                </div>
 
-                {vestedRsu > 0 && (
-                  <button
-                    onClick={vestRsuToCash}
-                    className="btn-press mt-3 w-full rounded-2xl bg-purple-600 py-2.5 text-xs font-extrabold text-white shadow-sm"
-                  >
-                    💎 Liquidate {formatCurrency(vestedRsu)} Vested RSUs
-                  </button>
-                )}
-              </div>
+                  {/* Individual Tickers Desk */}
+                  <div className="rounded-3xl bg-[var(--mist)] p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold">📊 Direct Ticker Execution</span>
+                      <span className="text-[10px] font-bold text-[var(--ink-soft)]">
+                        Cash: {formatCurrency(cash)}
+                      </span>
+                    </div>
 
-              {/* 1-Tap Index Chips & Interactive AI Momentum Trade */}
-              <div className="rounded-3xl bg-[var(--mist)] p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold">⚡ 1-Tap QQQ / NVDA Allocation</span>
-                  <button
-                    disabled={portfolioValue <= 0}
-                    onClick={() => withdrawPortfolio(Math.min(5000, portfolioValue))}
-                    className="btn-press rounded-lg bg-black/10 px-2.5 py-1 text-[10px] font-bold disabled:opacity-35 dark:bg-white/10"
-                  >
-                    Withdraw $5k
-                  </button>
-                </div>
+                    <div className="space-y-1.5">
+                      {MARKET_ASSETS.map((asset) => {
+                        const pos = finance.holdings[asset.ticker];
+                        const curPrice =
+                          finance.marketPrices[asset.ticker] ?? asset.basePrice;
+                        const prevPrice =
+                          finance.marketPrevClose[asset.ticker] ?? asset.basePrice;
+                        const pctChange =
+                          prevPrice > 0
+                            ? ((curPrice - prevPrice) / prevPrice) * 100
+                            : 0;
+                        const shares = pos?.shares ?? 0;
+                        const holdingValue = Math.round(shares * curPrice);
+                        const isSelected = selectedTicker === asset.ticker;
 
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    disabled={cash < 1000}
-                    onClick={() => investInPortfolio(1000)}
-                    className="btn-press rounded-xl bg-[#007AFF] py-2 text-xs font-extrabold text-white disabled:opacity-35"
-                  >
-                    +$1k
-                  </button>
-                  <button
-                    disabled={cash < 5000}
-                    onClick={() => investInPortfolio(5000)}
-                    className="btn-press rounded-xl bg-[#007AFF] py-2 text-xs font-extrabold text-white disabled:opacity-35"
-                  >
-                    +$5k
-                  </button>
-                  <button
-                    disabled={cash < 1000}
-                    onClick={() => investInPortfolio(Math.floor(cash * 0.5))}
-                    className="btn-press rounded-xl bg-indigo-600 py-2 text-xs font-extrabold text-white disabled:opacity-35"
-                  >
-                    50% Max
-                  </button>
-                </div>
+                        return (
+                          <div
+                            key={asset.ticker}
+                            onClick={() => setSelectedTicker(asset.ticker)}
+                            className={`cursor-pointer rounded-2xl border p-2.5 transition-all ${
+                              isSelected
+                                ? 'border-emerald-500/50 bg-emerald-500/10'
+                                : 'border-black/5 bg-white/75 dark:border-white/10 dark:bg-black/30'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-base">{asset.emoji}</span>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-black">
+                                      {asset.ticker}
+                                    </span>
+                                    <span
+                                      className={`rounded px-1.5 py-0.2 font-mono text-[9px] font-bold ${
+                                        pctChange >= 0
+                                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                          : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                                      }`}
+                                    >
+                                      ${curPrice.toFixed(0)} ({pctChange >= 0 ? '+' : ''}
+                                      {pctChange.toFixed(1)}%)
+                                    </span>
+                                  </div>
+                                  <div className="truncate text-[9.5px] font-semibold text-[var(--ink-soft)]">
+                                    {asset.name} ·{' '}
+                                    {holdingValue > 0
+                                      ? `Held: ${formatCurrency(holdingValue)}`
+                                      : `${(asset.dailyDividendYield * 365 * 100).toFixed(1)}% div`}
+                                  </div>
+                                </div>
+                              </div>
 
-                {/* Interactive Pulse Trade Button */}
-                <button
-                  disabled={tradeCooldown > 0}
-                  onClick={handleAiMomentumTrade}
-                  className="btn-press flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm disabled:opacity-50"
-                >
-                  <span>📈 Trade AI Earnings Momentum</span>
-                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px]">
-                    {tradeCooldown > 0 ? `${tradeCooldown}s` : 'Lv.' + Math.floor(skills.investing) + ' Alpha'}
-                  </span>
-                </button>
-              </div>
-
-              {/* SAFE Note Repayment */}
-              {loanOwed > 0 && (
-                <div className="flex items-center justify-between rounded-2xl bg-amber-500/15 p-3 border border-amber-500/30">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase text-amber-600">SAFE / Student Note</div>
-                    <div className="text-sm font-black">{formatCurrency(loanOwed)}</div>
+                              <div
+                                className="flex shrink-0 items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  disabled={cash < 1000}
+                                  onClick={() => {
+                                    setSelectedTicker(asset.ticker);
+                                    buyStock(asset.ticker, 1000);
+                                  }}
+                                  className="btn-press rounded-lg bg-emerald-600 px-2 py-1 text-[9.5px] font-extrabold text-white disabled:opacity-35"
+                                >
+                                  +$1k
+                                </button>
+                                <button
+                                  disabled={holdingValue < 100}
+                                  onClick={() => {
+                                    setSelectedTicker(asset.ticker);
+                                    sellStock(asset.ticker, 1000, false);
+                                  }}
+                                  className="btn-press rounded-lg bg-black/10 px-2 py-1 text-[9.5px] font-extrabold text-[var(--ink)] disabled:opacity-35 dark:bg-white/10"
+                                >
+                                  -$1k
+                                </button>
+                                <button
+                                  disabled={holdingValue <= 0}
+                                  onClick={() => {
+                                    setSelectedTicker(asset.ticker);
+                                    sellStock(asset.ticker, 1, true);
+                                  }}
+                                  className="btn-press rounded-lg bg-rose-500/15 px-2 py-1 text-[9.5px] font-extrabold text-rose-600 disabled:opacity-35 dark:text-rose-300"
+                                >
+                                  Sell All
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <button
-                    disabled={cash < 1000}
-                    onClick={() => payLoan(Math.min(5000, loanOwed))}
-                    className="btn-press rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-extrabold text-white disabled:opacity-40"
-                  >
-                    Pay {formatCurrency(Math.min(5000, loanOwed))}
-                  </button>
-                </div>
+                </>
               )}
 
-              {/* EV Garage & Apple CarPlay Card */}
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#007AFF]/25 bg-[#007AFF]/8 p-3.5">
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">🏎️</span>
-                  <div>
-                    <div className="text-xs font-extrabold">
-                      Apple CarPlay & Bay Area EV Garage
+              {wealthSubTab === 'equity' && (
+                <>
+                  {/* RSU Vesting & Automation Card */}
+                  <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-500/15 via-indigo-500/10 to-transparent p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                          💎 Equity & RSU Treasury
+                        </div>
+                        <div className="text-lg font-black">
+                          {formatCurrency(vestedRsu)} Vested · {formatCurrency(unvestedRsu)} Unvested
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
-                      {ownedCars.length > 0
-                        ? 'EV Owned · $0 Fares, Fast HOV Autopilot & Scenic Joyrides'
-                        : 'Prius ($4.2k) · Model 3 FSD ($12.5k) · Taycan GT ($18.5k)'}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setActiveModal('garage')}
-                  className="btn-press shrink-0 rounded-xl bg-[#007AFF] px-3.5 py-2 text-xs font-extrabold text-white shadow-xs"
-                >
-                  {ownedCars.length > 0 ? '🚗 Open CarPlay' : '🚗 EV Showroom'}
-                </button>
-              </div>
 
-              {/* F.I.R.E. & Golden Handcuffs Sovereignty Tracker Card */}
-              <div className="rounded-3xl border border-amber-500/35 bg-gradient-to-br from-amber-500/12 via-orange-500/8 to-emerald-500/10 p-3.5 space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                      🔓 F.I.R.E. & Golden Handcuffs Tracker
+                    <div className="grid grid-cols-2 gap-2 text-center">
+                      <div className="rounded-2xl bg-white/70 p-2.5 dark:bg-black/35">
+                        <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">
+                          Realized Alpha
+                        </div>
+                        <div className="mt-0.5 text-xs font-black text-emerald-600">
+                          {formatCurrency(finance.realizedGains)}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-white/70 p-2.5 dark:bg-black/35">
+                        <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">
+                          Dividends Earned
+                        </div>
+                        <div className="mt-0.5 text-xs font-black text-[#007AFF]">
+                          {formatCurrency(finance.dividendsEarnedTotal)}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs font-extrabold">
-                      {job
-                        ? unvestedRsu > 0
-                          ? `Golden Handcuffs: ${formatCurrency(unvestedRsu)} Unvested RSU`
-                          : '0 Unvested RSUs · Ready to Walk Away!'
-                        : '🏖️ Sovereign · Post-W2 / Independent Founder'}
-                    </div>
-                    <div className="text-[10px] font-medium text-[var(--ink-soft)]">
-                      Coast F.I.R.E. Target: $500k ({Math.min(100, Math.round((netWorth / 500000) * 100))}%) · Fat F.I.R.E.: $2.5M
+
+                    <button
+                      disabled={vestedRsu <= 0}
+                      onClick={vestRsuToCash}
+                      className="btn-press w-full rounded-2xl bg-purple-600 py-2.5 text-xs font-extrabold text-white shadow-sm disabled:opacity-40"
+                    >
+                      {vestedRsu > 0
+                        ? `💎 Liquidate ${formatCurrency(vestedRsu)} Vested RSUs`
+                        : 'No Vested RSUs Ready to Liquidate'}
+                    </button>
+
+                    {/* Automation Toggles: DRIP & Auto-Sell RSU */}
+                    <div className="space-y-1.5 pt-1">
+                      <button
+                        onClick={toggleDrip}
+                        className="btn-press flex w-full items-center justify-between rounded-2xl bg-white/75 px-3 py-2 text-left text-xs font-bold dark:bg-black/35"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2
+                            className={`size-4 ${
+                              finance.dripEnabled
+                                ? 'text-emerald-500'
+                                : 'text-[var(--ink-soft)] opacity-45'
+                            }`}
+                          />
+                          <div>
+                            <div className="text-[11px] font-extrabold">
+                              Dividend Reinvestment (DRIP)
+                            </div>
+                            <div className="text-[9.5px] font-medium text-[var(--ink-soft)]">
+                              Auto-compound weekly dividends into QQQM / VOO
+                            </div>
+                          </div>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[9.5px] font-black ${
+                            finance.dripEnabled
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-black/10 text-[var(--ink-soft)] dark:bg-white/10'
+                          }`}
+                        >
+                          {finance.dripEnabled ? 'ON' : 'OFF'}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={toggleAutoSellRsu}
+                        className="btn-press flex w-full items-center justify-between rounded-2xl bg-white/75 px-3 py-2 text-left text-xs font-bold dark:bg-black/35"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2
+                            className={`size-4 ${
+                              finance.autoSellRsu
+                                ? 'text-purple-500'
+                                : 'text-[var(--ink-soft)] opacity-45'
+                            }`}
+                          />
+                          <div>
+                            <div className="text-[11px] font-extrabold">
+                              10b5-1 Auto-Sell Vested RSUs
+                            </div>
+                            <div className="text-[9.5px] font-medium text-[var(--ink-soft)]">
+                              Automatically convert vesting RSU tranches to cash
+                            </div>
+                          </div>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[9.5px] font-black ${
+                            finance.autoSellRsu
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-black/10 text-[var(--ink-soft)] dark:bg-white/10'
+                          }`}
+                        >
+                          {finance.autoSellRsu ? 'ON' : 'OFF'}
+                        </span>
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setActiveModal('guide', 'goals')}
-                    className="btn-press shrink-0 rounded-xl bg-amber-500 px-2.5 py-1.5 text-[10px] font-black text-white shadow-xs"
-                  >
-                    🎯 Goals & Rewards
-                  </button>
-                </div>
-                {job && (
-                  <button
-                    onClick={() => resignJob()}
-                    className="btn-press flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-white/75 py-1.5 text-[10.5px] font-extrabold text-amber-700 hover:bg-amber-500/15 dark:bg-black/35 dark:text-amber-300"
-                  >
-                    <span>🔓 Break the Golden Handcuffs (Resign W-2 Job)</span>
-                  </button>
-                )}
-              </div>
+
+                  {/* SAFE Note Repayment */}
+                  {loanOwed > 0 && (
+                    <div className="flex items-center justify-between rounded-2xl bg-amber-500/15 p-3 border border-amber-500/30">
+                      <div>
+                        <div className="text-[10px] font-bold uppercase text-amber-600">
+                          SAFE / Student Note
+                        </div>
+                        <div className="text-sm font-black">{formatCurrency(loanOwed)}</div>
+                      </div>
+                      <button
+                        disabled={cash < 1000}
+                        onClick={() => payLoan(Math.min(5000, loanOwed))}
+                        className="btn-press rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+                      >
+                        Pay {formatCurrency(Math.min(5000, loanOwed))}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* EV Garage & Apple CarPlay Card */}
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#007AFF]/25 bg-[#007AFF]/8 p-3.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">🏎️</span>
+                      <div>
+                        <div className="text-xs font-extrabold">
+                          Apple CarPlay & Bay Area EV Garage
+                        </div>
+                        <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
+                          {ownedCars.length > 0
+                            ? 'EV Owned · $0 Fares, Fast HOV Autopilot & Scenic Joyrides'
+                            : 'Prius ($4.2k) · Model 3 FSD ($12.5k) · Taycan GT ($18.5k)'}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveModal('garage')}
+                      className="btn-press shrink-0 rounded-xl bg-[#007AFF] px-3.5 py-2 text-xs font-extrabold text-white shadow-xs"
+                    >
+                      {ownedCars.length > 0 ? '🚗 Open CarPlay' : '🚗 EV Showroom'}
+                    </button>
+                  </div>
+
+                  {/* F.I.R.E. & Golden Handcuffs Sovereignty Tracker Card */}
+                  <div className="rounded-3xl border border-amber-500/35 bg-gradient-to-br from-amber-500/12 via-orange-500/8 to-emerald-500/10 p-3.5 space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                          🔓 F.I.R.E. & Golden Handcuffs Tracker
+                        </div>
+                        <div className="text-xs font-extrabold">
+                          {job
+                            ? unvestedRsu > 0
+                              ? `Golden Handcuffs: ${formatCurrency(unvestedRsu)} Unvested RSU`
+                              : '0 Unvested RSUs · Ready to Walk Away!'
+                            : '🏖️ Sovereign · Post-W2 / Independent Founder'}
+                        </div>
+                        <div className="text-[10px] font-medium text-[var(--ink-soft)]">
+                          Coast F.I.R.E. Target: $500k (
+                          {Math.min(100, Math.round((netWorth / 500000) * 100))}%) · Fat F.I.R.E.: $2.5M
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setActiveModal('guide', 'goals')}
+                        className="btn-press shrink-0 rounded-xl bg-amber-500 px-2.5 py-1.5 text-[10px] font-black text-white shadow-xs"
+                      >
+                        🎯 Goals & Rewards
+                      </button>
+                    </div>
+                    {job && (
+                      <button
+                        onClick={() => resignJob()}
+                        className="btn-press flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-white/75 py-1.5 text-[10.5px] font-extrabold text-amber-700 hover:bg-amber-500/15 dark:bg-black/35 dark:text-amber-300"
+                      >
+                        <span>🔓 Break the Golden Handcuffs (Resign W-2 Job)</span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {wealthSubTab === 'cashflow' && (
+                <>
+                  {/* Weekly Cashflow Summary Card */}
+                  <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/12 via-sky-500/8 to-transparent p-4 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                          💸 Weekly Net Cashflow · Day {getDayNumber(time)}
+                        </div>
+                        <div
+                          className={`text-xl font-black ${
+                            cfMetrics.netWeeklyCashFlow >= 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-rose-600 dark:text-rose-400'
+                          }`}
+                        >
+                          {cfMetrics.netWeeklyCashFlow >= 0 ? '+' : ''}
+                          {formatCurrency(cfMetrics.netWeeklyCashFlow)}/wk
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+                        {cfMetrics.passiveCoveragePct}% Rent Covered · {Math.min(100, Math.round((netWorth / 500000) * 100))}% FIRE
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5 text-center">
+                      <div className="rounded-xl bg-white/70 p-2 dark:bg-black/35">
+                        <div className="text-[8.5px] font-bold uppercase text-[var(--ink-soft)]">
+                          W-2 + RSU/wk
+                        </div>
+                        <div className="text-[11px] font-black text-emerald-600">
+                          +{formatCurrency(cfMetrics.weeklySalaryCash + cfMetrics.weeklySalaryRsu)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-white/70 p-2 dark:bg-black/35">
+                        <div className="text-[8.5px] font-bold uppercase text-[var(--ink-soft)]">
+                          Div + MRR/wk
+                        </div>
+                        <div className="text-[11px] font-black text-[#007AFF]">
+                          +{formatCurrency(cfMetrics.weeklyDividendYield + cfMetrics.weeklyStartupRev)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-white/70 p-2 dark:bg-black/35">
+                        <div className="text-[8.5px] font-bold uppercase text-[var(--ink-soft)]">
+                          Rent + Burn/wk
+                        </div>
+                        <div className="text-[11px] font-black text-rose-500">
+                          -{formatCurrency(cfMetrics.weeklyRentBurn + cfMetrics.weeklyCommuteBurn)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ledger Filter & Recent Transactions */}
+                  <div className="rounded-3xl bg-[var(--mist)] p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold">🧾 Financial Ledger</span>
+                      <div className="flex gap-1">
+                        {(
+                          [
+                            { id: 'all', label: 'All' },
+                            { id: 'inflow', label: 'Inflow' },
+                            { id: 'outflow', label: 'Outflow' },
+                            { id: 'trade', label: 'Trades' },
+                          ] as const
+                        ).map((f) => (
+                          <button
+                            key={f.id}
+                            onClick={() => setLedgerFilter(f.id)}
+                            className={`rounded-lg px-2 py-0.5 text-[9.5px] font-extrabold ${
+                              ledgerFilter === f.id
+                                ? 'bg-[#007AFF] text-white'
+                                : 'bg-black/5 text-[var(--ink-soft)] dark:bg-white/10'
+                            }`}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="max-h-56 space-y-1.5 overflow-y-auto pr-0.5">
+                      {finance.ledger
+                        .filter((entry) => {
+                          if (ledgerFilter === 'inflow') return entry.amount > 0;
+                          if (ledgerFilter === 'outflow') return entry.amount < 0;
+                          if (ledgerFilter === 'trade') return entry.category === 'trade';
+                          return true;
+                        })
+                        .slice(0, 18)
+                        .map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between rounded-xl bg-white/75 px-3 py-2 text-xs dark:bg-black/30"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span>{entry.emoji}</span>
+                              <div className="min-w-0">
+                                <div className="truncate text-[10.5px] font-extrabold">
+                                  {entry.label}
+                                </div>
+                                <div className="text-[9px] font-semibold text-[var(--ink-soft)]">
+                                  Day {entry.day} · {entry.category.toUpperCase()}
+                                </div>
+                              </div>
+                            </div>
+                            <span
+                              className={`shrink-0 font-mono text-[11px] font-black ${
+                                entry.amount >= 0
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-rose-600 dark:text-rose-400'
+                              }`}
+                            >
+                              {entry.amount >= 0 ? '+' : ''}
+                              {formatCurrency(entry.amount)}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -2132,29 +2602,39 @@ export const BayPhoneModal: React.FC = () => {
                           </div>
 
                           <div className="grid grid-cols-3 gap-1.5">
-                            {unlockedInteractions.map((act) => (
-                              <button
-                                key={act.id}
-                                onClick={() => interactWithNpc(activeDmNpc.id, act.id)}
-                                className="btn-press flex flex-col items-center justify-center rounded-xl border border-black/5 bg-white/80 px-2 py-1.5 text-center dark:border-white/10 dark:bg-black/35"
-                              >
-                                <span className="text-[10.5px] font-extrabold">
-                                  {act.emoji} {act.shortLabel}
-                                </span>
-                                <span
-                                  className="text-[8.5px] font-bold"
-                                  style={{ color: act.accent }}
+                            {unlockedInteractions.map((act) => {
+                              const lacksEnergy = needs.energy < act.energyCost;
+                              const lacksCash = Boolean(act.cashCost && cash < act.cashCost);
+                              const insufficient = lacksEnergy || lacksCash;
+                              return (
+                                <button
+                                  key={act.id}
+                                  disabled={insufficient}
+                                  onClick={() => interactWithNpc(activeDmNpc.id, act.id)}
+                                  className="btn-press flex flex-col items-center justify-center rounded-xl border border-black/5 bg-white/80 px-2 py-1.5 text-center disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-black/35"
                                 >
-                                  +{act.baseScoreDelta} Bond
-                                  {act.cashCost ? ` · $${act.cashCost}` : ''}
-                                </span>
-                              </button>
-                            ))}
+                                  <span className="text-[10.5px] font-extrabold">
+                                    {act.emoji} {act.shortLabel}
+                                  </span>
+                                  <span
+                                    className="text-[8.5px] font-bold"
+                                    style={{ color: act.accent }}
+                                  >
+                                    {lacksEnergy
+                                      ? `Need ${act.energyCost}⚡`
+                                      : lacksCash
+                                        ? `Need $${act.cashCost}`
+                                        : `+${act.baseScoreDelta} Bond${act.cashCost ? ` · $${act.cashCost}` : ''}`}
+                                  </span>
+                                </button>
+                              );
+                            })}
                             {lockedInteractions.slice(0, 3).map((act) => (
                               <button
                                 key={act.id}
+                                disabled
                                 onClick={() => interactWithNpc(activeDmNpc.id, act.id)}
-                                className="btn-press flex flex-col items-center justify-center rounded-xl bg-black/5 px-2 py-1.5 text-center opacity-55 dark:bg-white/5"
+                                className="btn-press flex flex-col items-center justify-center rounded-xl bg-black/5 px-2 py-1.5 text-center opacity-55 disabled:cursor-not-allowed dark:bg-white/5"
                               >
                                 <span className="text-[10px] font-bold text-[var(--ink-soft)]">
                                   🔒 {act.shortLabel}
@@ -2305,30 +2785,48 @@ export const BayPhoneModal: React.FC = () => {
 
                             {/* 1-Tap iMessage Action Pills + Open Thread */}
                             <div className="grid grid-cols-5 gap-1.5">
-                              <button
-                                onClick={() => interactWithNpc(npc.id, 'coffeeChat')}
-                                className="btn-press rounded-xl bg-[#007AFF]/15 py-1.5 text-[10px] font-extrabold text-[#007AFF]"
-                              >
-                                ☕ Coffee
-                              </button>
-                              <button
-                                onClick={() => interactWithNpc(npc.id, 'whiteboard')}
-                                className="btn-press rounded-xl bg-indigo-500/15 py-1.5 text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400"
-                              >
-                                🧠 Arch
-                              </button>
-                              <button
-                                onClick={() => interactWithNpc(npc.id, 'pitch')}
-                                className="btn-press rounded-xl bg-orange-500/15 py-1.5 text-[10px] font-extrabold text-orange-600 dark:text-orange-400"
-                              >
-                                🦄 Pitch
-                              </button>
-                              <button
-                                onClick={() => interactWithNpc(npc.id, 'flirt')}
-                                className="btn-press rounded-xl bg-rose-500/15 py-1.5 text-[10px] font-extrabold text-rose-600 dark:text-rose-400"
-                              >
-                                ❤️ Vibe
-                              </button>
+                              {(
+                                [
+                                  {
+                                    id: 'coffeeChat',
+                                    label: '☕ Coffee',
+                                    cls: 'bg-[#007AFF]/15 text-[#007AFF]',
+                                  },
+                                  {
+                                    id: 'whiteboard',
+                                    label: '🧠 Arch',
+                                    cls: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
+                                  },
+                                  {
+                                    id: 'pitch',
+                                    label: '🦄 Pitch',
+                                    cls: 'bg-orange-500/15 text-orange-600 dark:text-orange-400',
+                                  },
+                                  {
+                                    id: 'flirt',
+                                    label: '❤️ Vibe',
+                                    cls: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+                                  },
+                                ] as const
+                              ).map((btn) => {
+                                const actDef = NPC_INTERACTIONS.find((a) => a.id === btn.id);
+                                const disabled = Boolean(
+                                  actDef &&
+                                    (score < actDef.minScore ||
+                                      needs.energy < actDef.energyCost ||
+                                      (actDef.cashCost && cash < actDef.cashCost))
+                                );
+                                return (
+                                  <button
+                                    key={btn.id}
+                                    disabled={disabled}
+                                    onClick={() => interactWithNpc(npc.id, btn.id)}
+                                    className={`btn-press rounded-xl py-1.5 text-[10px] font-extrabold disabled:cursor-not-allowed disabled:opacity-40 ${btn.cls}`}
+                                  >
+                                    {btn.label}
+                                  </button>
+                                );
+                              })}
                               <button
                                 onClick={() => setSelectedDmNpcId(npc.id)}
                                 className="btn-press rounded-xl bg-[#007AFF] py-1.5 text-[10px] font-extrabold text-white shadow-xs"

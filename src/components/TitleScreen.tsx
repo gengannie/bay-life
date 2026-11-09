@@ -108,7 +108,7 @@ const QUICK_ARCHETYPES: QuickArchetype[] = [
       origin: 'h1bhustler',
     },
     rewardPatch: {
-      cashDelta: 11000,
+      cashDelta: 11500,
       skill: 'coding',
       skillDelta: 1.2,
       toastText: '1-Click Launch: Goggle L4 SWE in Mission Studio ($18k + RSUs)',
@@ -220,7 +220,7 @@ export const TitleScreen: React.FC = () => {
       toastText: arch.rewardPatch.toastText,
       emoji: arch.emoji,
     });
-    applyJob(arch.careerId);
+    applyJob(arch.careerId, arch.id === 'goggle_l4' ? 1 : 0);
     // Also checkpoint the newly launched archetype
     setTimeout(() => {
       useAuthSaveStore.getState().autoCheckpointCurrentRun(`Quick Start: ${arch.title}`);
@@ -315,7 +315,7 @@ export const TitleScreen: React.FC = () => {
         <div className="mb-2.5 flex items-center justify-between px-1">
           <div className="inline-flex items-center gap-1.5 text-xs font-extrabold tracking-wider text-slate-700 uppercase dark:text-slate-200">
             <Zap className="size-3.5 fill-amber-400 text-amber-500" />
-            <span>⚡ Quick Start · Pick a Life Goal & Jump Straight In</span>
+            <span>Quick Start · Pick a Life Goal & Jump Straight In</span>
           </div>
           <span className="text-[11px] font-semibold text-[var(--ink-soft)]">
             Switch goals anytime in-game (Shortcut: Q)
@@ -345,9 +345,9 @@ export const TitleScreen: React.FC = () => {
                 <div className="mt-3 flex items-center gap-3">
                   <Portrait appearance={arch.profile.appearance} size={48} ringColor={arch.accent} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-lg">{arch.emoji}</span>
-                      <h3 className="text-base font-extrabold leading-snug">{arch.title}</h3>
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0 text-base">{arch.emoji}</span>
+                      <h3 className="text-[15px] font-extrabold leading-tight">{arch.title}</h3>
                     </div>
                     <p className="mt-0.5 text-[11px] font-medium leading-snug text-[var(--ink-soft)]">
                       {arch.subtitle}

@@ -223,6 +223,7 @@ export const IsometricScene: React.FC = () => {
   const time = useGameStore((s) => s.time);
   const workShift = useGameStore((s) => s.workShift);
   const weather = useGameStore((s) => s.weather);
+  const nightMode = useGameStore((s) => s.nightMode);
   const pgePowerOn = useGameStore((s) => s.pgePowerOn);
   const relationships = useGameStore((s) => s.relationships);
   const moveToTile = useGameStore((s) => s.moveToTile);
@@ -348,13 +349,13 @@ export const IsometricScene: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [droneAvailable]);
 
-  // Clear local selection popovers when location, apartment, or loaded Sim changes
+  // Clear local selection popovers when location, apartment, floor, or loaded Sim changes
   useEffect(() => {
     setSelectedObject(null);
     setSelectedStation(null);
     setSelectedNpc(null);
     setPopoverAnchor(null);
-  }, [homeId, locationId, sim.name]);
+  }, [homeId, locationId, campusFloorIndex, sim.name]);
 
   const state = useGameStore.getState();
   const moodInfo = calculateOverallMood(state);
@@ -518,8 +519,12 @@ export const IsometricScene: React.FC = () => {
   ]);
 
   const hour = getHourOfDay(time);
-  const isNight = hour < 6 || hour >= 19.5;
-  const isSunset = (hour >= 5.5 && hour < 7) || (hour >= 17.5 && hour < 19.5);
+  const isNight =
+    nightMode === 'dark' || (nightMode === 'auto' && (hour < 6 || hour >= 19.5));
+  const isSunset =
+    nightMode !== 'dark' &&
+    nightMode !== 'light' &&
+    ((hour >= 5.5 && hour < 7) || (hour >= 17.5 && hour < 19.5));
 
   const activeQueued = queue[0];
   const activeActionDef = activeQueued ? ACTIONS[activeQueued.actionId] : null;
@@ -555,29 +560,48 @@ export const IsometricScene: React.FC = () => {
   }, [needs]);
 
   // NPCs present at this venue (none inside your private apartment)
-  const npcsHere = isHome
-    ? []
-    : NPCS.filter(
+  const npcsHere = useMemo(() => {
+    if (isHome) return [];
+    const atVenue = NPCS.filter(
       (n) =>
         n.favoriteSpot === locationId ||
         NPCS.indexOf(n) % 3 === Math.floor(time / 240) % 3
     );
+    const floorCount = venueDef?.floors?.length || 1;
+    if (floorCount <= 1 || atVenue.length <= 1) return atVenue;
+    const onFloor = atVenue.filter(
+      (n, idx) => (idx + Math.floor(time / 240)) % floorCount === campusFloorIndex
+    );
+    return onFloor.length > 0 ? onFloor : [atVenue[campusFloorIndex % atVenue.length]];
+  }, [isHome, locationId, time, venueDef, campusFloorIndex]);
 
   // Compute collision-free tile coordinates for NPCs so they never overlap objects, stations, or the Sim
   const npcPositions = useMemo(() => {
     const occupied = new Set<string>();
+    const stationFrontBuffer = new Set<string>();
     occupied.add(`${pos.x},${pos.y}`);
     if (isHome) {
       objects.forEach((o) => occupied.add(`${o.x},${o.y}`));
     } else {
-      currentStations.forEach((st) => occupied.add(`${st.x},${st.y}`));
+      currentStations.forEach((st) => {
+        occupied.add(`${st.x},${st.y}`);
+        // Avoid placing NPCs immediately down-screen of a station where their floating name pill would cover the station
+        stationFrontBuffer.add(`${st.x + 1},${st.y + 1}`);
+        stationFrontBuffer.add(`${st.x + 1},${st.y}`);
+        stationFrontBuffer.add(`${st.x},${st.y + 1}`);
+      });
     }
 
-    const candidateTiles: Array<{ x: number; y: number }> = [];
+    const preferredCandidates: Array<{ x: number; y: number }> = [];
+    const fallbackCandidates: Array<{ x: number; y: number }> = [];
     for (let y = 0; y < gridSize; y++) {
       for (let x = 0; x < gridSize; x++) {
-        if (!occupied.has(`${x},${y}`)) {
-          candidateTiles.push({ x, y });
+        const key = `${x},${y}`;
+        if (!occupied.has(key)) {
+          fallbackCandidates.push({ x, y });
+          if (!stationFrontBuffer.has(key)) {
+            preferredCandidates.push({ x, y });
+          }
         }
       }
     }
@@ -585,19 +609,21 @@ export const IsometricScene: React.FC = () => {
     return npcsHere.map((npc, idx) => {
       const preferredX = isHome ? gridSize - 1 : (idx * 2 + 1) % Math.max(2, gridSize - 1);
       const preferredY = isHome ? 2 : (idx * 2 + 2) % Math.max(2, gridSize - 1);
-      if (!occupied.has(`${preferredX},${preferredY}`)) {
-        occupied.add(`${preferredX},${preferredY}`);
+      const prefKey = `${preferredX},${preferredY}`;
+      if (!occupied.has(prefKey) && !stationFrontBuffer.has(prefKey)) {
+        occupied.add(prefKey);
         return { npc, x: preferredX, y: preferredY };
       }
-      const fallback =
-        candidateTiles.find((t) => !occupied.has(`${t.x},${t.y}`)) || {
+      const best =
+        preferredCandidates.find((t) => !occupied.has(`${t.x},${t.y}`)) ||
+        fallbackCandidates.find((t) => !occupied.has(`${t.x},${t.y}`)) || {
           x: preferredX,
           y: preferredY,
         };
-      occupied.add(`${fallback.x},${fallback.y}`);
-      return { npc, x: fallback.x, y: fallback.y };
+      occupied.add(`${best.x},${best.y}`);
+      return { npc, x: best.x, y: best.y };
     });
-  }, [npcsHere, isHome, objects, venueDef, currentStations, gridSize, pos.x, pos.y]);
+  }, [npcsHere, isHome, objects, currentStations, gridSize, pos.x, pos.y]);
 
   const handleGoHome = () => {
     const mode =
@@ -718,30 +744,12 @@ export const IsometricScene: React.FC = () => {
     const oldY = selectedObject.y;
     const oldUid = selectedObject.uid;
 
-    if (cash + resaleValue < upgradeTargetDef.price) {
-      buyFurniture(upgradeTargetDef.id);
-      return;
-    }
-
-    sellFurniture(oldUid);
-    buyFurniture(upgradeTargetDef.id);
-
-    // Keep upgraded item right in place at the original tile coordinates
-    const updatedObjects = useGameStore.getState().objects;
-    const newest = updatedObjects[updatedObjects.length - 1];
-    if (newest && newest.objectId === upgradeTargetDef.id) {
-      const repositioned: PlacedObject = { ...newest, x: oldX, y: oldY };
-      useGameStore.setState({
-        objects: [
-          ...updatedObjects.slice(0, updatedObjects.length - 1),
-          repositioned,
-        ],
-      });
-      setSelectedObject(repositioned);
+    const ok = useFurnishStore.getState().upgradePlacedFurniture(oldUid);
+    if (ok) {
+      const updated = useGameStore.getState().objects.find((o) => o.uid === oldUid) || null;
+      setSelectedObject(updated);
       const pt = isoToScreen(oldX + 0.5, oldY + 0.5);
-      triggerSparkle(pt.sx, pt.sy - 24, upgradeTargetDef.emoji, `Upgraded!`);
-    } else {
-      setSelectedObject(null);
+      triggerSparkle(pt.sx, pt.sy - 24, upgradeTargetDef.emoji, 'Upgraded!');
     }
   };
 
@@ -1422,7 +1430,7 @@ export const IsometricScene: React.FC = () => {
           {/* Right Wall Sign / Location Header (translated to sign center before skewY!) */}
           <g>
             <polygon
-              points={`${backCorner.sx + 28},${backCorner.sy + 14 - 96} ${backCorner.sx + 168},${backCorner.sy + 84 - 96} ${backCorner.sx + 168},${backCorner.sy + 84 - 62} ${backCorner.sx + 28},${backCorner.sy + 14 - 62}`}
+              points={`${backCorner.sx + 16},${backCorner.sy + 8 - 96} ${backCorner.sx + 196},${backCorner.sy + 98 - 96} ${backCorner.sx + 196},${backCorner.sy + 98 - 62} ${backCorner.sx + 16},${backCorner.sy + 8 - 62}`}
               fill={
                 isHome && homeDef.tier >= 5
                   ? '#451A03'
@@ -1435,12 +1443,12 @@ export const IsometricScene: React.FC = () => {
               stroke={isHome && homeDef.tier >= 4 ? '#F59E0B' : 'rgba(255,255,255,0.28)'}
               strokeWidth="1.5"
             />
-            <g transform={`translate(${backCorner.sx + 98}, ${backCorner.sy - 30}) skewY(26.5)`}>
+            <g transform={`translate(${backCorner.sx + 106}, ${backCorner.sy - 26}) skewY(26.5)`}>
               <text
                 x="0"
                 y="3.5"
                 fill={isHome && homeDef.tier >= 4 ? '#FDE68A' : '#F8FAFC'}
-                fontSize="9.5"
+                fontSize="8.8"
                 fontWeight="800"
                 textAnchor="middle"
               >
