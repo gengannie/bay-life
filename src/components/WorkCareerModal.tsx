@@ -136,14 +136,15 @@ export const WorkCareerModal: React.FC = () => {
     (s) => (s as typeof s & CareerStoreExtensions).trainTechNodeSkill
   );
 
-  if (!job && activeTab !== 'tree') {
+  if (!job && activeTab !== 'tree' && activeTab !== 'interview') {
+    const curUnlockedNodes = unlockedTechNodes ?? ['node_git_monorepo'];
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 backdrop-blur-md"
         onClick={() => setActiveModal(null)}
       >
         <div
-          className="apple-glass-heavy relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-[36px] p-6"
+          className="apple-glass-heavy relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-y-auto rounded-[36px] p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between gap-3 border-b border-black/5 pb-4 dark:border-white/10">
@@ -160,10 +161,16 @@ export const WorkCareerModal: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setActiveTab('interview')}
+                className="btn-press rounded-xl bg-[#007AFF]/15 px-3 py-1.5 text-xs font-extrabold text-[#007AFF] hover:bg-[#007AFF]/25"
+              >
+                🌉 Career Track Prerequisites
+              </button>
+              <button
                 onClick={() => setActiveTab('tree')}
                 className="btn-press rounded-xl bg-amber-500/20 px-3 py-1.5 text-xs font-extrabold text-amber-700 hover:bg-amber-500/30 dark:text-amber-300"
               >
-                🌳 Skill Tech Tree ({(unlockedTechNodes ?? ['node_git_monorepo']).length}/{SKILL_TREE_NODES.length})
+                🌳 Skill Tech Tree ({curUnlockedNodes.length}/{SKILL_TREE_NODES.length})
               </button>
               <button
                 onClick={() => setActiveModal(null)}
@@ -179,6 +186,12 @@ export const WorkCareerModal: React.FC = () => {
               You have officially resigned from corporate W-2 life! You have zero Hybrid RTO mandates and 100% control over your schedule.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => setActiveTab('interview')}
+                className="btn-press rounded-xl bg-[#007AFF] px-3.5 py-2 font-extrabold text-white"
+              >
+                🌉 View Career Tracks & Prerequisites
+              </button>
               <button
                 onClick={() => setActiveTab('tree')}
                 className="btn-press rounded-xl bg-amber-500 px-3.5 py-2 font-extrabold text-white"
@@ -197,41 +210,68 @@ export const WorkCareerModal: React.FC = () => {
               >
                 🦄 Open Startup Studio
               </button>
-              <button
-                onClick={() => setActiveModal('phone', 'wealth')}
-                className="btn-press rounded-xl bg-[#007AFF] px-3.5 py-2 font-extrabold text-white"
-              >
-                💎 Open Schwaab Wealth
-              </button>
             </div>
           </div>
 
-          <h3 className="mb-2 text-xs font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
-            Want to Re-Enter Big Tech? Interview for a W-2 Track Below:
-          </h3>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
+              Re-Enter a W-2 Career Track (Requires Tech Tree & Skill Prerequisites):
+            </h3>
+            <button
+              onClick={() => setActiveTab('interview')}
+              className="text-[11px] font-extrabold text-[#007AFF] underline"
+            >
+              See Full Prerequisite Checklist →
+            </button>
+          </div>
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {CAREERS.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--mist)] p-3.5"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-2xl">{c.emoji}</span>
-                  <div>
-                    <div className="text-xs font-extrabold">{c.company}</div>
-                    <div className="text-[10px] text-[var(--ink-soft)]">
-                      {c.name} · Starts at {formatCurrency(c.levels[0].baseSalary + c.levels[0].rsuAnnual)}/yr
+            {CAREERS.map((c) => {
+              const reqNodes = c.entryRequirements?.requiredTechNodes ?? [];
+              const reqSkills = c.entryRequirements?.requiredSkills ?? [];
+              const nodesOk = reqNodes.every((nid) => curUnlockedNodes.includes(nid));
+              const skillsOk = reqSkills.every((r) => Math.floor(skills[r.skill] ?? 0) >= r.level);
+              const metCount =
+                reqNodes.filter((nid) => curUnlockedNodes.includes(nid)).length +
+                reqSkills.filter((r) => Math.floor(skills[r.skill] ?? 0) >= r.level).length;
+              const totalCount = reqNodes.length + reqSkills.length;
+              const ready = nodesOk && skillsOk && (c.entryRequirements?.minDeliverables ?? 0) === 0;
+
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-black/5 bg-[var(--mist)] p-3.5 dark:border-white/10"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-2xl">{c.emoji}</span>
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-extrabold">{c.company}</div>
+                      <div className="text-[10px] text-[var(--ink-soft)]">
+                        {c.name} · {formatCurrency(c.levels[0].baseSalary + c.levels[0].rsuAnnual)}/yr
+                      </div>
+                      <div
+                        className={`mt-0.5 text-[10px] font-extrabold ${
+                          ready
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-amber-600 dark:text-amber-400'
+                        }`}
+                      >
+                        {ready
+                          ? `✓ All ${totalCount} Prerequisites Met`
+                          : `🔒 ${metCount}/${totalCount} Tech Tree & Skill Prereqs Met`}
+                      </div>
                     </div>
                   </div>
+                  <button
+                    onClick={() => (ready ? applyJob(c.id) : setActiveTab('interview'))}
+                    className={`btn-press shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-extrabold text-white ${
+                      ready ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#007AFF]'
+                    }`}
+                  >
+                    {ready ? '🎯 Sit Onsite' : '🔒 Prereqs'}
+                  </button>
                 </div>
-                <button
-                  onClick={() => applyJob(c.id)}
-                  className="btn-press rounded-xl bg-[#007AFF] px-3 py-1.5 text-[11px] font-extrabold text-white"
-                >
-                  Interview
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

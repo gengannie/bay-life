@@ -2785,8 +2785,175 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        // During gameplay, route into the Interactive 3-Round Onsite Interview Loop Arena!
-        get().openInterviewLoop(careerId);
+        if (s.workShift || s.travel) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: '🔒 Finish your active shift or commute before sitting for a multi-round onsite interview loop!',
+            emoji: '🔒',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
+        const unlockedNodes = s.unlockedTechNodes ?? ['node_git_monorepo'];
+        const entryReq = career.entryRequirements;
+
+        if (entryReq) {
+          const missingTechNodes = entryReq.requiredTechNodes.filter(
+            (nid) => !unlockedNodes.includes(nid)
+          );
+          const missingSkills = entryReq.requiredSkills.filter(
+            (req) => Math.floor(s.skills[req.skill] ?? 0) < req.level
+          );
+          const minDeliv = entryReq.minDeliverables ?? 0;
+          const curDeliv = s.job?.deliverablesCompleted ?? 0;
+          const missingDeliv = curDeliv < minDeliv;
+
+          if (missingTechNodes.length > 0 || missingSkills.length > 0 || missingDeliv) {
+            sfx.play('error');
+            const reasons: string[] = [];
+            if (missingTechNodes.length > 0) {
+              const nodeNames = missingTechNodes
+                .map((nid) => {
+                  const n = SKILL_TREE_NODE_BY_ID[nid];
+                  return n ? `${n.codeName} (${n.title})` : nid;
+                })
+                .join(' + ');
+              reasons.push(`Tech Tree: ${nodeNames}`);
+            }
+            if (missingSkills.length > 0) {
+              const skNames = missingSkills
+                .map((req) => {
+                  const meta = SKILLS_META.find((m) => m.key === req.skill);
+                  return `${meta?.label || req.skill} Lv.${req.level} (at Lv.${Math.floor(s.skills[req.skill] ?? 0)})`;
+                })
+                .join(', ');
+              reasons.push(`Skills: ${skNames}`);
+            }
+            if (missingDeliv) {
+              reasons.push(`R&D Deliverables: ${curDeliv}/${minDeliv} shipped`);
+            }
+
+            const notice = {
+              id: uid(),
+              text: `🔒 ${career.company} Prerequisites Not Met (${entryReq.selectivityLabel}) — Missing: ${reasons.join(' · ')}.`,
+              emoji: career.emoji,
+              tone: 'bad' as const,
+              time: s.time,
+            };
+            set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+            return;
+          }
+
+          if (s.needs.energy < entryReq.interviewEnergyCost) {
+            sfx.play('error');
+            const notice = {
+              id: uid(),
+              text: `☕ Too tired for ${career.company}’s ${entryReq.interviewLoopTitle} (needs ${entryReq.interviewEnergyCost}⚡ Energy, you have ${Math.round(s.needs.energy)}⚡). Recharge first!`,
+              emoji: '☕',
+              tone: 'bad' as const,
+              time: s.time,
+            };
+            set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+            return;
+          }
+        }
+
+        // All prerequisites met! Determine highest entry level qualified for (up to Level 2 / index 1)
+        let qualifiedIndex = 0;
+        for (let i = 0; i < Math.min(2, career.levels.length); i++) {
+          const req = career.levels[i].requiredSkill;
+          const sec = career.levels[i].secondarySkill;
+          const reqNode = career.levels[i].requiredTechNode;
+          const hasPrimary = Math.floor(s.skills[req.skill]) >= req.level;
+          const hasSecondary = !sec || Math.floor(s.skills[sec.skill]) >= sec.level;
+          const hasNode = !reqNode || unlockedNodes.includes(reqNode);
+          if (hasPrimary && hasSecondary && hasNode) {
+            qualifiedIndex = i;
+          }
+        }
+
+        const lvl = career.levels[qualifiedIndex];
+        let goalIndex = s.goalIndex;
+        const signOnBonus =
+          entryReq?.difficultyTier === 'Ultra-Selective'
+            ? 6000
+            : entryReq?.difficultyTier === 'Selective'
+              ? 3000
+              : 1500;
+        let cash = s.cash + signOnBonus;
+        let karma = s.karma + 6;
+        if (goalIndex === 0) {
+          goalIndex = 1;
+          cash += GOALS[0].rewardCash;
+          karma += GOALS[0].rewardKarma;
+        }
+
+        const energyCost = entryReq?.interviewEnergyCost ?? 15;
+        const primarySkill =
+          entryReq?.requiredSkills[0]?.skill || career.levels[0].requiredSkill.skill;
+        const nextPrimary = clamp((s.skills[primarySkill] ?? 0) + 0.35, 0, 10);
+
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `${career.company} Sign-On Bonus (${lvl.code})`,
+          emoji: career.emoji,
+          amount: signOnBonus,
+          category: 'salary',
+        });
+
+        sfx.play('levelup');
+        const notice = {
+          id: uid(),
+          text: `🎉 PASSED ${career.company.toUpperCase()} ONSITE LOOP! Signed as ${lvl.code} ${lvl.title} (${formatCurrency(lvl.baseSalary + lvl.rsuAnnual)}/yr TC + ${formatCurrency(signOnBonus)} Sign-On Bonus + 6⚡ Karma)!`,
+          emoji: '🎉',
+          tone: 'good' as const,
+          time: s.time,
+        };
+
+        set({
+          needs: {
+            ...s.needs,
+            energy: clamp(s.needs.energy - energyCost, 0, 100),
+          },
+          skills: {
+            ...s.skills,
+            [primarySkill]: nextPrimary,
+          },
+          finance: fin,
+          job: {
+            careerId,
+            levelIndex: qualifiedIndex,
+            performance: 42,
+            shiftsCompleted: 0,
+            shiftsAtLevel: 0,
+            deliverablesCompleted: s.job?.deliverablesCompleted ?? 0,
+            activeProjectId: getNextCareerProject(careerId, undefined, s.job?.completedProjects),
+            projectProgress: 0,
+            completedProjects: s.job?.completedProjects ?? [],
+            officeDaysThisWeek: s.job?.officeDaysThisWeek ?? 0,
+            wfhDaysThisWeek: s.job?.wfhDaysThisWeek ?? 0,
+            wfaDaysRemaining: s.job?.wfaDaysRemaining ?? 4,
+            weeklyAttendance: s.job?.weeklyAttendance ?? ['none', 'none', 'none', 'none', 'none'],
+            rtoCompliant: true,
+            autoWork: s.job?.autoWork ?? false,
+            preferredCommute: hasPersonalCar(s) ? 'tesla' : s.job?.preferredCommute ?? 'gbus',
+          },
+          goalIndex,
+          cash,
+          karma,
+          stats: {
+            ...s.stats,
+            earnedToday: s.stats.earnedToday + signOnBonus,
+            earnedTotal: s.stats.earnedTotal + signOnBonus,
+            leetCodeSolved: s.stats.leetCodeSolved + 2,
+          },
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
       },
 
       vestRsuToCash: () => {
