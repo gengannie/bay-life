@@ -1112,19 +1112,6 @@ export const WorldMapModal: React.FC = () => {
               )}
             </svg>
 
-            {/* Midpoint Distance & Duration Floating Pill along Active Route */}
-            {!isAlreadyHere && (
-              <div
-                style={{
-                  left: `${(currentCoords.x + selectedCoords.x) / 2}%`,
-                  top: `${(currentCoords.y + selectedCoords.y) / 2}%`,
-                  transform: `translate(-50%, -50%) scale(${pinScale})`,
-                }}
-                className="pointer-events-none absolute z-25 whitespace-nowrap rounded-full border border-white/80 bg-slate-900/92 px-2.5 py-0.5 text-[9.5px] font-extrabold text-white shadow-md"
-              >
-                {activeCommuteEst.miles} mi · {activeCommuteEst.durationMinutes}m ({activeCommuteEst.zoneLabel})
-              </div>
-            )}
 
             {/* RESIDENCE PINS ON THE MAP CANVAS (Only Your Current Home by Default; All 5 Homes When House-Hunting via Bluefin) */}
             {pinLayerFilter !== 'venues' &&
@@ -1156,21 +1143,6 @@ export const WorldMapModal: React.FC = () => {
                               : 'z-10 opacity-35'
                       }`}
                   >
-                    {/* Top Status Badge */}
-                    {isHomeHere ? (
-                      <div className="mb-1 flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white uppercase shadow-lg ring-2 ring-white">
-                        <span>📍 YOU ARE HERE (HOME)</span>
-                      </div>
-                    ) : isCurrentHome ? (
-                      <div className="mb-0.5 flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black tracking-wide text-white uppercase shadow-md ring-1 ring-white">
-                        <span>🏠 YOUR HOME · T{h.tier}</span>
-                      </div>
-                    ) : isSelected ? (
-                      <div className="mb-0.5 flex items-center gap-1 whitespace-nowrap rounded-full bg-[#0284C7] px-2 py-0.5 text-[9px] font-black tracking-wide text-white uppercase shadow-md ring-1 ring-white">
-                        <span>🐟 BLUEFIN LISTING · T{h.tier}</span>
-                      </div>
-                    ) : null}
-
                     {/* Pin Marker Button */}
                     <button
                       onClick={(e) => {
@@ -1178,59 +1150,72 @@ export const WorldMapModal: React.FC = () => {
                         if (mapDragRef.current.moved) return;
                         setSelectedTarget({ kind: 'home', home: h });
                       }}
-                      className={`btn-press relative flex items-center justify-center rounded-full transition-all ${isHomeHere
-                          ? 'bg-emerald-500 p-1 text-white shadow-xl ring-4 ring-emerald-300'
+                      className={`btn-press relative flex items-center justify-center transition-all ${isHomeHere
+                          ? 'size-11 rounded-full bg-emerald-500 text-white shadow-xl ring-4 ring-emerald-300'
                           : isSelected
-                            ? 'scale-110 bg-[#0284C7] px-2.5 py-1.5 text-white shadow-lg ring-4 ring-sky-400/50'
+                            ? 'size-10 rounded-2xl bg-[#007AFF] text-white shadow-lg ring-4 ring-[#007AFF]/40 scale-110'
                             : isCurrentHome
-                              ? 'bg-emerald-600 px-2.5 py-1 text-white shadow-md ring-2 ring-white'
-                              : 'bg-sky-50/95 px-2 py-1 text-sky-950 shadow-md ring-2 ring-[#0284C7]/80 hover:scale-105 dark:bg-slate-900/95 dark:text-sky-200'
+                              ? 'size-9 rounded-2xl bg-emerald-600 text-white shadow-md ring-2 ring-white hover:scale-105'
+                              : 'size-9 rounded-2xl bg-sky-50/95 text-sky-950 shadow-sm ring-1 ring-sky-300/80 hover:scale-105 hover:shadow-md dark:bg-slate-900/95 dark:text-sky-200 dark:ring-sky-500/30'
                         }`}
+                      title={`${h.name}${isHomeHere ? " · You're here" : isCurrentHome ? ' · Your Residence' : ''}`}
                     >
+                      {/* Apple Maps Pulse Ring for Current Location */}
                       {isHomeHere && (
-                        <span className="pointer-events-none absolute -inset-1.5 animate-ping rounded-full bg-emerald-400/50" />
+                        <span className="pointer-events-none absolute -inset-2 animate-ping rounded-full bg-emerald-400/40" />
                       )}
+
+                      {/* Content: Sim Portrait if Home Here, else Residence Emoji */}
                       {isHomeHere ? (
-                        <div className="relative flex items-center gap-1 pr-1">
-                          <Portrait
-                            appearance={sim.appearance}
-                            size={30}
-                            ringColor="#FFFFFF"
-                          />
-                          <span className="text-sm">{h.emoji}</span>
+                        <div className="relative flex items-center justify-center">
+                          <Portrait appearance={sim.appearance} size={28} ringColor="#FFFFFF" />
+                          <span className="absolute -bottom-1 -right-1 text-xs">{h.emoji}</span>
                         </div>
                       ) : (
-                        <span className="text-sm">{h.emoji}</span>
+                        <span className="text-base select-none">{h.emoji}</span>
+                      )}
+
+                      {/* Current Residence Marker Badge */}
+                      {isCurrentHome && !isHomeHere && (
+                        <span
+                          className="pointer-events-none absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[8px] font-black text-white shadow-xs ring-1.5 ring-white"
+                          title="Your Primary Home"
+                        >
+                          HOME
+                        </span>
                       )}
                     </button>
 
-                    {/* Label Pill Underneath */}
+                    {/* Apple Frosted Label Pill Underneath */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         if (mapDragRef.current.moved) return;
                         setSelectedTarget({ kind: 'home', home: h });
                       }}
-                      className={`mt-1 flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${isHomeHere
-                          ? 'bg-emerald-700 text-white ring-1 ring-emerald-300'
+                      className={`mt-1 flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-bold shadow-xs backdrop-blur-md transition-all ${isHomeHere
+                          ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-white/60'
                           : isSelected
-                            ? 'bg-[#0284C7] text-white ring-1 ring-white/80'
+                            ? 'bg-[#007AFF] text-white shadow-sm ring-1 ring-white/80'
                             : isCurrentHome
-                              ? 'bg-emerald-700 text-white ring-1 ring-white/80'
-                              : 'bg-sky-50/95 text-sky-950 ring-1 ring-[#0284C7]/60 dark:bg-slate-900/95 dark:text-sky-100'
+                              ? 'bg-emerald-700 text-white ring-1 ring-emerald-300/60'
+                              : 'bg-white/92 text-slate-800 ring-1 ring-black/8 hover:bg-white dark:bg-slate-900/90 dark:text-slate-100 dark:ring-white/10'
                         }`}
                     >
-                      <span>{isCurrentHome ? `🏠 ${h.shortName}` : `🐟 ${h.shortName}`}</span>
+                      {isHomeHere && (
+                        <span className="size-1.5 rounded-full bg-emerald-200 animate-pulse" />
+                      )}
+                      <span>{h.shortName}</span>
                       <span
-                        className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-black ${isHomeHere || isSelected || isCurrentHome
+                        className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-semibold ${isHomeHere || isSelected || isCurrentHome
                             ? 'bg-white/25 text-white'
-                            : 'bg-[#0284C7]/15 text-[#0284C7] dark:text-sky-300'
+                            : 'bg-sky-500/10 text-sky-700 dark:bg-sky-400/20 dark:text-sky-300'
                           }`}
                       >
                         {isCurrentHome
                           ? `T${h.tier}`
                           : isOwned
-                            ? '🔑 OWNED'
+                            ? 'Owned'
                             : `T${h.tier} · $${(h.weeklyRent / 1000).toFixed(1)}k`}
                       </span>
                     </button>

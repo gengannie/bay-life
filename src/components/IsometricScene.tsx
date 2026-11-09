@@ -365,8 +365,13 @@ export const IsometricScene: React.FC = () => {
   const isFurnishMode = isHome && view === 'buy';
   const homeDef = HOMES.find((h) => h.id === homeId) || HOMES[1];
   const venueDef = !isHome ? LOCATION_BY_ID[locationId] : null;
-  const gridSize = isHome ? homeDef.gridSize : 7;
-  const floorStyle = isHome ? homeDef.floorStyle : venueDef?.floorStyle || 'concrete';
+  const activeCampusFloor =
+    !isHome && venueDef?.floors ? venueDef.floors[campusFloorIndex] || venueDef.floors[0] : null;
+  const gridSize = isHome ? homeDef.gridSize : (venueDef?.gridSize || 7);
+  const floorStyle = isHome
+    ? homeDef.floorStyle
+    : activeCampusFloor?.floorStyle || venueDef?.floorStyle || 'concrete';
+  const currentStations = !isHome ? (activeCampusFloor?.stations || venueDef?.stations || []) : [];
 
   // Clear live action popovers when entering Furnish Mode
   useEffect(() => {
@@ -564,8 +569,8 @@ export const IsometricScene: React.FC = () => {
     occupied.add(`${pos.x},${pos.y}`);
     if (isHome) {
       objects.forEach((o) => occupied.add(`${o.x},${o.y}`));
-    } else if (venueDef) {
-      venueDef.stations.forEach((st) => occupied.add(`${st.x},${st.y}`));
+    } else {
+      currentStations.forEach((st) => occupied.add(`${st.x},${st.y}`));
     }
 
     const candidateTiles: Array<{ x: number; y: number }> = [];
@@ -592,7 +597,7 @@ export const IsometricScene: React.FC = () => {
       occupied.add(`${fallback.x},${fallback.y}`);
       return { npc, x: fallback.x, y: fallback.y };
     });
-  }, [npcsHere, isHome, objects, venueDef, gridSize, pos.x, pos.y]);
+  }, [npcsHere, isHome, objects, venueDef, currentStations, gridSize, pos.x, pos.y]);
 
   const handleGoHome = () => {
     const mode =
