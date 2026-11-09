@@ -1981,11 +1981,12 @@ export const IsometricScene: React.FC = () => {
             })
           )}
 
-          {/* Designer Central Area Rug & Luxury Floor Accents for Tier 2–5 Homes */}
-          {isHome &&
-            homeDef.architecture?.rugColor &&
+          {/* Designer Central Area Rug & Floor Accents for Homes & Campus Floors */}
+          {((isHome && homeDef.architecture?.rugColor) || (!isHome && activeCampusFloor?.rugColor)) &&
             (() => {
-              const pad = homeDef.tier >= 4 ? 1.35 : 1.55;
+              const rugFill = isHome ? homeDef.architecture?.rugColor : activeCampusFloor?.rugColor;
+              const rugStroke = isHome ? (homeDef.architecture?.rugAccent || '#F59E0B') : (activeCampusFloor?.rugAccent || activeCampusFloor?.accentColor || '#38BDF8');
+              const pad = isHome && homeDef.tier >= 4 ? 1.35 : 1.75;
               const rTop = isoToScreen(pad, pad);
               const rRight = isoToScreen(gridSize - pad, pad);
               const rBottom = isoToScreen(gridSize - pad, gridSize - pad);
@@ -1999,17 +2000,17 @@ export const IsometricScene: React.FC = () => {
                 <g pointerEvents="none">
                   <polygon
                     points={`${rTop.sx},${rTop.sy} ${rRight.sx},${rRight.sy} ${rBottom.sx},${rBottom.sy} ${rLeft.sx},${rLeft.sy}`}
-                    fill={homeDef.architecture.rugColor}
+                    fill={rugFill}
                     opacity="0.82"
-                    stroke={homeDef.architecture.rugAccent || '#F59E0B'}
+                    stroke={rugStroke}
                     strokeWidth="2"
                   />
                   <polygon
                     points={`${iTop.sx},${iTop.sy} ${iRight.sx},${iRight.sy} ${iBottom.sx},${iBottom.sy} ${iLeft.sx},${iLeft.sy}`}
                     fill="none"
-                    stroke={homeDef.architecture.rugAccent || '#F59E0B'}
+                    stroke={rugStroke}
                     strokeWidth="1.2"
-                    strokeDasharray={homeDef.tier >= 5 ? 'none' : '4 2'}
+                    strokeDasharray={isHome && homeDef.tier >= 5 ? 'none' : '4 2'}
                     opacity="0.9"
                   />
                 </g>
@@ -2551,7 +2552,7 @@ export const IsometricScene: React.FC = () => {
 
         {/* Venue Interactive Stations */}
         {!isHome &&
-          venueDef?.stations.map((st) => {
+          currentStations.map((st) => {
             const center = isoToScreen(st.x + 0.5, st.y + 0.5);
             const isSelected = selectedStation?.id === st.id;
             const isHovered = hoveredStationId === st.id;
@@ -2952,14 +2953,15 @@ export const IsometricScene: React.FC = () => {
 
           {/* Hovered / Selected Venue Station Label */}
           {!isHome &&
-            venueDef?.stations.map((st) => {
+            currentStations.map((st) => {
               const isSelected = selectedStation?.id === st.id;
               const isHovered = hoveredStationId === st.id;
               const isInUse = activeQueued?.targetStationId === st.id;
               if (!isSelected && !isHovered && !isInUse) return null;
 
               const center = isoToScreen(st.x + 0.5, st.y + 0.5);
-              const stPillW = Math.max(102, st.label.length * 6.0 + 24);
+              const displayLabel = st.badge ? `${st.badge} · ${st.label}` : st.label;
+              const stPillW = Math.max(102, displayLabel.length * 6.2 + 24);
               return (
                 <g
                   key={`st-label-${st.id}`}
@@ -2983,7 +2985,7 @@ export const IsometricScene: React.FC = () => {
                     fontWeight="800"
                     textAnchor="middle"
                   >
-                    {st.label}
+                    {displayLabel}
                   </text>
                 </g>
               );
@@ -3220,6 +3222,44 @@ export const IsometricScene: React.FC = () => {
         </div>
       )}
 
+      {/* Campus Multi-Floor Elevator & Wing Switcher Pill */}
+      {!isHome && venueDef?.floors && venueDef.floors.length > 1 && (
+        <div
+          className="apple-pill absolute right-4 bottom-20 z-20 flex items-center gap-1.5 rounded-full p-1.5 text-xs text-[var(--ink)] shadow-md border border-white/25 dark:border-white/10"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-1 px-2 text-[11px] font-extrabold text-[var(--ink-soft)]">
+            <span className="text-sm">🛗</span>
+            <span className="hidden sm:inline font-mono tracking-wider">FLOORS</span>
+          </div>
+
+          <div className="flex items-center gap-1 rounded-full bg-black/5 p-0.5 dark:bg-white/5">
+            {venueDef.floors.map((fl, idx) => {
+              const isActive = (campusFloorIndex ?? 0) === idx;
+              return (
+                <button
+                  key={fl.id}
+                  onClick={() => setCampusFloor(idx)}
+                  className={`btn-press flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold transition-all ${
+                    isActive
+                      ? 'bg-[#007AFF] text-white shadow-sm ring-2 ring-[#007AFF]/30'
+                      : 'text-[var(--ink-soft)] hover:bg-black/5 hover:text-[var(--ink)] dark:hover:bg-white/10'
+                  }`}
+                  title={`${fl.name} — ${fl.subtitle}`}
+                >
+                  <span>{fl.emoji}</span>
+                  <span className="font-mono">{fl.code}</span>
+                  <span className="hidden md:inline text-[11px] font-semibold opacity-90 truncate max-w-[120px]">
+                    {fl.name.split('·')[1]?.trim() || fl.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Backup Battery Active Pill */}
       {isHome && backupActive && (
         <div className="pointer-events-none absolute top-20 left-1/2 z-10 -translate-x-1/2">
@@ -3258,7 +3298,7 @@ export const IsometricScene: React.FC = () => {
                       </span>
                     ) : (
                       <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold text-sky-600 dark:text-sky-300">
-                        Venue Station
+                        {selectedStation?.badge || 'Campus Station'}
                       </span>
                     )}
                   </div>
@@ -3267,7 +3307,7 @@ export const IsometricScene: React.FC = () => {
                       <span>{'★'.repeat(selectedFurnitureDef.quality)} Quality Rating</span>
                     ) : (
                       <span>
-                        {venueDef?.emoji} {venueDef?.name}
+                        {selectedStation?.subtitle || (activeCampusFloor ? `${activeCampusFloor.emoji} ${activeCampusFloor.name}` : `${venueDef?.emoji} ${venueDef?.name}`)}
                       </span>
                     )}
                   </div>
@@ -3310,6 +3350,47 @@ export const IsometricScene: React.FC = () => {
                   Open OS →
                 </span>
               </button>
+            )}
+
+            {/* Quick Desk CTAs when a Campus Desk Station is selected */}
+            {selectedStation?.kind === 'desk' && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedStation(null);
+                    setActiveModal('computer');
+                  }}
+                  className="btn-press flex items-center justify-between gap-2 rounded-2xl bg-gradient-to-r from-[#007AFF] to-indigo-600 px-3.5 py-2.5 text-left text-white shadow-md hover:opacity-95"
+                  title="Open Cursor IDE & Terminal"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Monitor className="size-4 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-extrabold truncate">🖥️ Workstation IDE</div>
+                      <div className="text-[10px] font-semibold text-white/80 truncate">Cursor & Terminal</div>
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-bold bg-white/20 rounded-full px-2 py-0.5">Open →</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSelectedStation(null);
+                    setActiveModal('career');
+                  }}
+                  className="btn-press flex items-center justify-between gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 px-3.5 py-2.5 text-left text-white shadow-md hover:opacity-95"
+                  title="Open Career Ladder & R&D Charters"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Briefcase className="size-4 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-extrabold truncate">🏢 Career & Charters</div>
+                      <div className="text-[10px] font-semibold text-white/80 truncate">Promo & Shift Hub</div>
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-bold bg-white/20 rounded-full px-2 py-0.5">View →</span>
+                </button>
+              </div>
             )}
 
             {/* Action Buttons with Full Unclipped Labels & Clear Stat Impact Badges */}
@@ -3411,6 +3492,21 @@ export const IsometricScene: React.FC = () => {
                       {act.startupProgress && (
                         <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-300">
                           🚀 +{act.startupProgress}% MVP
+                        </span>
+                      )}
+                      {act.workPerformanceDelta && (
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-300">
+                          📈 +{act.workPerformanceDelta}% Rating
+                        </span>
+                      )}
+                      {act.projectProgressDelta && (
+                        <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-bold text-sky-600 dark:text-sky-300">
+                          🚀 +{act.projectProgressDelta}% Charter
+                        </span>
+                      )}
+                      {act.rsuBonus && (
+                        <span className="rounded-full bg-purple-500/15 px-2 py-0.5 text-[11px] font-bold text-purple-600 dark:text-purple-300">
+                          💎 +${act.rsuBonus.toLocaleString()} RSUs
                         </span>
                       )}
                     </div>

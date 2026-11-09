@@ -133,6 +133,30 @@ const SPRINT_TEMPLATES: Omit<SprintTarget, 'id'>[] = [
     reward: { cashDelta: 420, performanceDelta: 3, skill: 'aiResearch', skillDelta: 0.14 },
     popText: '+$420 · +3% Promo',
   },
+  {
+    emoji: '🖥️',
+    title: 'Lock In at Desk',
+    badge: '+8% Promo',
+    accent: 'border-sky-500/40 bg-sky-500/12 text-sky-700 dark:text-sky-300',
+    reward: { performanceDelta: 8, cashDelta: 180, skill: 'coding', skillDelta: 0.12 },
+    popText: '+8% Promo · Standing Desk Flow',
+  },
+  {
+    emoji: '🍣',
+    title: 'Cafeteria Omakase',
+    badge: '+25% Hunger',
+    accent: 'border-emerald-500/40 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
+    reward: { needKey: 'hunger', needDelta: 25, performanceDelta: 3 },
+    popText: '+25% Hunger · Campus Feast',
+  },
+  {
+    emoji: '🚨',
+    title: 'SEV-1 War Room',
+    badge: '+$500 Spot',
+    accent: 'border-red-500/40 bg-red-500/12 text-red-700 dark:text-red-300',
+    reward: { cashDelta: 500, performanceDelta: 9, skill: 'coding', skillDelta: 0.15 },
+    popText: '+$500 · SEV-1 Resolved',
+  },
 ];
 
 const COMPACT_TONE_LABELS: Record<WorkToneId, string> = {
@@ -388,7 +412,10 @@ export const AppleHUD: React.FC = () => {
     } else {
       const venue = LOCATION_BY_ID[locationId];
       if (venue) {
-        for (const st of venue.stations) {
+        const curFloorStations = venue.floors
+          ? venue.floors[useGameStore.getState().campusFloorIndex || 0]?.stations || venue.stations
+          : venue.stations;
+        for (const st of curFloorStations) {
           for (const actId of st.actionIds) {
             const act = ACTIONS[actId];
             if (!act) continue;
@@ -396,21 +423,22 @@ export const AppleHUD: React.FC = () => {
             if (
               act.category === 'hustle' ||
               act.category === 'skill' ||
-              act.category === 'social'
+              act.category === 'social' ||
+              act.category === 'work'
             ) {
               return {
-                shortBadge: `${act.emoji} Venue Action`,
+                shortBadge: `${act.emoji} ${st.badge || 'Campus Action'}`,
                 fullLabel: `${act.emoji} ${act.label}`,
-                subHint: `⏱ ${act.durationMinutes}m at ${venue.shortName} · Shortcut: A`,
+                subHint: `⏱ ${act.durationMinutes}m at ${st.label} · Shortcut: A`,
               };
             }
           }
         }
-        const firstSt = venue.stations[0];
+        const firstSt = curFloorStations[0] || venue.stations[0];
         const firstAct = firstSt?.actionIds[0] ? ACTIONS[firstSt.actionIds[0]] : null;
         if (firstAct) {
           return {
-            shortBadge: `${firstAct.emoji} Venue Action`,
+            shortBadge: `${firstAct.emoji} ${firstSt?.badge || 'Campus Action'}`,
             fullLabel: `${firstAct.emoji} ${firstAct.label}`,
             subHint: `⏱ ${firstAct.durationMinutes}m at ${venue.shortName} · Shortcut: A`,
           };
@@ -465,12 +493,20 @@ export const AppleHUD: React.FC = () => {
     } else {
       const venue = LOCATION_BY_ID[s.locationId];
       if (venue) {
-        for (const st of venue.stations) {
+        const curFloorStations = venue.floors
+          ? venue.floors[s.campusFloorIndex || 0]?.stations || venue.stations
+          : venue.stations;
+        for (const st of curFloorStations) {
           for (const actId of st.actionIds) {
             const actDef = ACTIONS[actId];
             if (!actDef) continue;
             if (actDef.cost && s.cash < actDef.cost) continue;
-            if (actDef.category === 'hustle' || actDef.category === 'skill' || actDef.category === 'social') {
+            if (
+              actDef.category === 'hustle' ||
+              actDef.category === 'skill' ||
+              actDef.category === 'social' ||
+              actDef.category === 'work'
+            ) {
               enqueueAction(actId, {
                 stationId: st.id,
                 pos: { x: st.x, y: st.y },
@@ -480,7 +516,7 @@ export const AppleHUD: React.FC = () => {
           }
         }
         // Fallback to first station action
-        const firstSt = venue.stations[0];
+        const firstSt = curFloorStations[0] || venue.stations[0];
         if (firstSt && firstSt.actionIds[0]) {
           enqueueAction(firstSt.actionIds[0], {
             stationId: firstSt.id,
@@ -591,6 +627,19 @@ export const AppleHUD: React.FC = () => {
       } else if (key === 'a') {
         e.preventDefault();
         handleSmartNext();
+      } else if (key === '[' || key === ']') {
+        const venue = s.locationId !== 'home' ? LOCATION_BY_ID[s.locationId] : null;
+        if (venue?.floors && venue.floors.length > 1) {
+          e.preventDefault();
+          const curFloor = s.campusFloorIndex || 0;
+          const nextFloor =
+            key === '['
+              ? Math.max(0, curFloor - 1)
+              : Math.min(venue.floors.length - 1, curFloor + 1);
+          if (nextFloor !== curFloor) {
+            useGameStore.getState().setCampusFloor(nextFloor);
+          }
+        }
       }
     };
 

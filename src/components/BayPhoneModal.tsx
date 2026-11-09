@@ -190,6 +190,8 @@ export const BayPhoneModal: React.FC = () => {
   const submitPromoPacket = useGameStore(
     (s) => (s as typeof s & { submitPromoPacket?: () => void }).submitPromoPacket
   );
+  const lastToast = useGameStore((s) => s.lastToast);
+  const dismissToast = useGameStore((s) => s.dismissToast);
   const locationId = useGameStore((s) => s.locationId);
   const toggleAutoWork = useGameStore((s) => s.toggleAutoWork);
   const vestRsuToCash = useGameStore((s) => s.vestRsuToCash);
@@ -218,6 +220,7 @@ export const BayPhoneModal: React.FC = () => {
   const claimRelationshipMilestone = useGameStore((s) => s.claimRelationshipMilestone);
   const inviteNpcHangout = useGameStore((s) => s.inviteNpcHangout);
   const inventory = useGameStore((s) => s.inventory);
+  const unlockedPerks = useGameStore((s) => s.unlockedPerks || []);
   const triggerMicroReward = useGameStore((s) => s.triggerMicroReward);
   const resignJob = useGameStore((s) => s.resignJob);
 
@@ -478,11 +481,38 @@ export const BayPhoneModal: React.FC = () => {
                   (job.activeProjectId && WORK_PROJECT_BY_ID[job.activeProjectId]) ||
                   defaultProj;
                 const projPct = Math.min(100, Math.round(job.projectProgress ?? 0));
-                const shiftsAtLvl = job.shiftsAtLevel ?? job.shiftsCompleted ?? 0;
+                const shiftsAtLvl = Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted ?? 0);
                 const reqShifts = nextLevel?.minShiftsForPromo ?? 3;
                 const deliverablesDone = job.deliverablesCompleted ?? 0;
                 const reqDeliverables = nextLevel?.requiredDeliverables ?? 1;
+                const reqPerf = unlockedPerks.includes('perk_exec_halo') ? 82 : 92;
                 const isAtCampus = locationId === currentCareer.locationId;
+
+                const phonePerfPass = Math.round(job.performance) >= reqPerf;
+                const phoneTenurePass = shiftsAtLvl >= reqShifts;
+                const phonePrimaryPass =
+                  nextLevel
+                    ? Math.floor((skills[nextLevel.requiredSkill.skill] ?? 0) + 0.001) >=
+                      nextLevel.requiredSkill.level
+                    : true;
+                const phoneSecPass =
+                  !nextLevel?.secondarySkill ||
+                  Math.floor((skills[nextLevel.secondarySkill.skill] ?? 0) + 0.001) >=
+                    nextLevel.secondarySkill.level;
+                const phoneNodePass =
+                  !nextLevel?.requiredTechNode ||
+                  unlockedTechNodes.includes(nextLevel.requiredTechNode);
+                const phoneDelivPass = deliverablesDone >= reqDeliverables;
+                const phoneRtoPass = job.rtoCompliant !== false;
+                const allPhoneGatesReady =
+                  Boolean(nextLevel) &&
+                  phonePerfPass &&
+                  phoneTenurePass &&
+                  phonePrimaryPass &&
+                  phoneSecPass &&
+                  phoneNodePass &&
+                  phoneDelivPass &&
+                  phoneRtoPass;
 
                 return (
                   <>
@@ -554,13 +584,13 @@ export const BayPhoneModal: React.FC = () => {
                             {nextLevel ? `→ ${nextLevel.code} (${nextLevel.title})` : '· Max Level'}
                           </span>
                           <span className="text-[#007AFF]">
-                            {Math.round(job.performance)}% / 92%
+                            {Math.round(job.performance)}% / {reqPerf}%
                           </span>
                         </div>
                         <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-[#007AFF] to-indigo-500 transition-all duration-300"
-                            style={{ width: `${job.performance}%` }}
+                            style={{ width: `${Math.min(100, (job.performance / reqPerf) * 100)}%` }}
                           />
                         </div>
 
@@ -571,19 +601,19 @@ export const BayPhoneModal: React.FC = () => {
                                 <span>📊 Calibration</span>
                                 <span
                                   className={
-                                    Math.round(job.performance) >= 92
+                                    phonePerfPass
                                       ? 'text-emerald-600 dark:text-emerald-400'
                                       : 'text-amber-600 dark:text-amber-400'
                                   }
                                 >
-                                  {Math.round(job.performance)}%/92%
+                                  {Math.round(job.performance)}%/{reqPerf}%
                                 </span>
                               </div>
                               <div className="flex items-center justify-between rounded-lg bg-black/5 px-2 py-1 dark:bg-white/5">
                                 <span>⏳ Tenure</span>
                                 <span
                                   className={
-                                    shiftsAtLvl >= reqShifts
+                                    phoneTenurePass
                                       ? 'text-emerald-600 dark:text-emerald-400'
                                       : 'text-amber-600 dark:text-amber-400'
                                   }
@@ -602,13 +632,12 @@ export const BayPhoneModal: React.FC = () => {
                                 </span>
                                 <span
                                   className={
-                                    Math.floor(skills[nextLevel.requiredSkill.skill]) >=
-                                      nextLevel.requiredSkill.level
+                                    phonePrimaryPass
                                       ? 'text-emerald-600 dark:text-emerald-400'
                                       : 'text-amber-600 dark:text-amber-400'
                                   }
                                 >
-                                  Lv.{Math.floor(skills[nextLevel.requiredSkill.skill])}/
+                                  Lv.{Math.floor((skills[nextLevel.requiredSkill.skill] ?? 0) + 0.001)}/
                                   {nextLevel.requiredSkill.level}
                                 </span>
                               </div>
@@ -616,7 +645,7 @@ export const BayPhoneModal: React.FC = () => {
                                 <span>📦 Shipped</span>
                                 <span
                                   className={
-                                    deliverablesDone >= reqDeliverables
+                                    phoneDelivPass
                                       ? 'text-emerald-600 dark:text-emerald-400'
                                       : 'text-purple-600 dark:text-purple-400'
                                   }
@@ -644,13 +673,12 @@ export const BayPhoneModal: React.FC = () => {
                                 </span>
                                 <span
                                   className={
-                                    Math.floor(skills[nextLevel.secondarySkill.skill]) >=
-                                      nextLevel.secondarySkill.level
+                                    phoneSecPass
                                       ? 'text-emerald-600 dark:text-emerald-400'
                                       : 'text-amber-600 dark:text-amber-400'
                                   }
                                 >
-                                  Lv.{Math.floor(skills[nextLevel.secondarySkill.skill])}/
+                                  Lv.{Math.floor((skills[nextLevel.secondarySkill.skill] ?? 0) + 0.001)}/
                                   {nextLevel.secondarySkill.level}
                                 </span>
                               </div>
@@ -680,12 +708,61 @@ export const BayPhoneModal: React.FC = () => {
                               );
                             })()}
 
+                            {/* Gate 7: Hybrid RTO Standing */}
+                            <div className="flex items-center justify-between rounded-lg bg-black/5 px-2 py-1 dark:bg-white/5">
+                              <span>🏢 Hybrid RTO Standing</span>
+                              <span
+                                className={
+                                  phoneRtoPass
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-rose-600 dark:text-rose-400'
+                                }
+                              >
+                                {phoneRtoPass ? 'Compliant ✓' : '3/3 Office Days Needed'}
+                              </span>
+                            </div>
+
+                            {/* Blocked Advisory Callout */}
+                            {!allPhoneGatesReady && (
+                              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-2 text-[10px] font-bold text-amber-900 dark:text-amber-200">
+                                ⚠️ Missing Gates: {!phonePerfPass && `Perf (${Math.round(job.performance)}%/${reqPerf}%) · `}{!phoneTenurePass && `Tenure (${shiftsAtLvl}/${reqShifts}) · `}{!phonePrimaryPass && 'Primary Skill · '}{!phoneSecPass && 'Secondary Skill · '}{!phoneNodePass && 'Tech Spec · '}{!phoneDelivPass && 'Deliverables · '}{!phoneRtoPass && 'Hybrid RTO'}
+                              </div>
+                            )}
+
                             <button
                               onClick={() => submitPromoPacket?.()}
-                              className="btn-press mt-1 w-full rounded-xl bg-gradient-to-r from-[#007AFF] to-indigo-600 py-1.5 text-[11px] font-black text-white shadow-xs"
+                              className={`btn-press mt-1 w-full rounded-xl py-2 text-[11px] font-black text-white shadow-xs transition-all ${
+                                allPhoneGatesReady
+                                  ? 'bg-gradient-to-r from-emerald-500 via-[#007AFF] to-purple-600'
+                                  : 'bg-[#007AFF] hover:bg-blue-600'
+                              }`}
                             >
                               📋 Submit Promo Packet ({nextLevel.code})
                             </button>
+
+                            {/* Immediate Feedback Notice */}
+                            {lastToast && (
+                              <div
+                                className={`flex items-center justify-between gap-1.5 rounded-xl border p-2 text-[10px] font-black ${
+                                  lastToast.tone === 'bad'
+                                    ? 'border-rose-500/40 bg-rose-500/15 text-rose-800 dark:text-rose-200'
+                                    : lastToast.tone === 'good'
+                                      ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+                                      : 'border-sky-500/40 bg-sky-500/15 text-sky-800 dark:text-sky-200'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span>{lastToast.emoji}</span>
+                                  <span className="leading-tight">{lastToast.text}</span>
+                                </div>
+                                <button
+                                  onClick={dismissToast}
+                                  className="btn-press shrink-0 rounded bg-black/10 px-1.5 py-0.5 text-[9px]"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="mt-1.5 rounded-xl bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
@@ -1284,6 +1361,30 @@ export const BayPhoneModal: React.FC = () => {
                   </button>
                 </div>
 
+                {/* Difficulty Mode Selector */}
+                <div className="mt-2.5 rounded-2xl bg-black/5 p-1 dark:bg-white/5">
+                  <div className="flex items-center gap-1">
+                    {(['easy', 'realistic', 'hardcore'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setStartupDifficulty(mode)}
+                        className={`flex-1 rounded-xl py-1 text-[10px] font-extrabold transition-all ${
+                          startupDifficulty === mode
+                            ? 'bg-orange-500 text-white shadow-sm'
+                            : 'text-[var(--ink-soft)] hover:text-black dark:hover:text-white'
+                        }`}
+                      >
+                        {mode === 'easy' ? '🌱 Casual' : mode === 'realistic' ? '⚡ Realistic SV' : '🔥 Hardcore'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-1 px-1 text-center text-[9px] font-medium text-[var(--ink-soft)]">
+                    {startupDifficulty === 'easy' && 'Zero cloud burn · Lenient VCs · No dev churn'}
+                    {startupDifficulty === 'realistic' && `${dailyBurn > 0 ? `-$${dailyBurn}/d AWS GPU burn` : 'Modest cloud burn'} · 1.2% dev churn if idle · Traction gates`}
+                    {startupDifficulty === 'hardcore' && `${dailyBurn > 0 ? `-$${dailyBurn}/d AWS GPU burn` : 'High GPU burn'} · 2.5% dev churn · Ruthless partner diligence`}
+                  </div>
+                </div>
+
                 {/* Product Readiness Circular Gauge + Identity */}
                 <div className="mt-3 flex items-center gap-4">
                   <div className="relative grid size-20 shrink-0 place-items-center">
@@ -1340,10 +1441,42 @@ export const BayPhoneModal: React.FC = () => {
                   <div className="rounded-2xl bg-white/70 p-2.5 dark:bg-black/35">
                     <div className="text-[9px] font-bold uppercase text-[var(--ink-soft)]">Active Devs</div>
                     <div className="mt-0.5 text-xs font-black">
-                      {startup.users.toLocaleString()}
+                      {displayDevs.toLocaleString()}
                     </div>
                   </div>
                 </div>
+
+                {/* Stage Milestones & Diligence Card */}
+                {stageReq && stageReq.nextStage ? (
+                  <div className="mt-3 rounded-2xl bg-white/60 p-3 text-left dark:bg-black/30 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] font-black">
+                      <span className="text-[var(--ink-soft)]">Next Round Target</span>
+                      <span className="text-orange-600 dark:text-orange-400">{stageReq.stageTitle}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                      <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${startup.productProgress >= stageReq.minMvp ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-black/5 dark:bg-white/5 text-[var(--ink-soft)]'}`}>
+                        <span>{startup.productProgress >= stageReq.minMvp ? '✓' : '○'}</span>
+                        <span>MVP: {Math.round(startup.productProgress)}%/{stageReq.minMvp}%</span>
+                      </div>
+                      <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${displayDevs >= stageReq.minUsers ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-black/5 dark:bg-white/5 text-[var(--ink-soft)]'}`}>
+                        <span>{displayDevs >= stageReq.minUsers ? '✓' : '○'}</span>
+                        <span>Devs: {displayDevs.toLocaleString()}/{stageReq.minUsers.toLocaleString()}</span>
+                      </div>
+                      <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${startup.mrr >= stageReq.minMrr ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-black/5 dark:bg-white/5 text-[var(--ink-soft)]'}`}>
+                        <span>{startup.mrr >= stageReq.minMrr ? '✓' : '○'}</span>
+                        <span>MRR: {formatCurrency(startup.mrr)}/{formatCurrency(stageReq.minMrr)}</span>
+                      </div>
+                      <div className={`flex items-center gap-1 rounded-lg px-2 py-1 ${Math.floor(skills.hustle || 0) >= stageReq.minHustle ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold' : 'bg-black/5 dark:bg-white/5 text-[var(--ink-soft)]'}`}>
+                        <span>{Math.floor(skills.hustle || 0) >= stageReq.minHustle ? '✓' : '○'}</span>
+                        <span>Hustle: Lv.{Math.floor(skills.hustle || 0)}/{stageReq.minHustle}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-2xl bg-amber-500/15 p-2.5 text-center text-xs font-black text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                    🏆 Generational Decacorn ($10B Market Cap) · Publicly Traded
+                  </div>
+                )}
 
                 {/* Interactive Launch & VC Pitch Buttons */}
                 <div className="mt-3.5 space-y-2">
@@ -1354,25 +1487,31 @@ export const BayPhoneModal: React.FC = () => {
                   >
                     <span>🚀 Drop Launch on ProductHunt</span>
                     <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px]">
-                      {phCooldown > 0 ? `${phCooldown}s` : '+14% MVP · +$480'}
+                      {phCooldown > 0 ? `${phCooldown}s` : '+140 Devs · +$300 MRR'}
                     </span>
                   </button>
 
-                  <button
-                    disabled={startup.productProgress < 50}
-                    onClick={pitchStartupVC}
-                    className={`btn-press flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-extrabold text-white shadow-sm ${startup.productProgress >= 50
-                        ? 'bg-emerald-600 animate-pulse'
-                        : 'bg-orange-500/70 opacity-75 cursor-not-allowed'
+                  {stageReq && stageReq.nextStage ? (
+                    <button
+                      onClick={pitchStartupVC}
+                      className={`btn-press flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-extrabold text-white shadow-sm ${
+                        canPitchVC
+                          ? 'bg-emerald-600 animate-pulse hover:bg-emerald-500'
+                          : 'bg-orange-500/80 hover:bg-orange-500'
                       }`}
-                  >
-                    <Sparkles className="size-4 shrink-0" />
-                    <span>
-                      {startup.productProgress >= 50
-                        ? '🦄 Term Sheet Ready · Pitch Sand Hill VCs!'
-                        : `Build MVP to 50% at Desk first (${Math.round(startup.productProgress)}/50%)`}
-                    </span>
-                  </button>
+                    >
+                      <Sparkles className="size-4 shrink-0" />
+                      <span>
+                        {canPitchVC
+                          ? `🦄 Term Sheet Ready · Pitch ${stageReq.stageTitle}!`
+                          : `Pitch Sand Hill VCs for ${stageReq.stageTitle}`}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="rounded-2xl bg-emerald-600/20 py-2.5 text-center text-xs font-extrabold text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                      🏆 All Venture Rounds Closed · NASDAQ Bell Rung!
+                    </div>
+                  )}
                 </div>
               </div>
 

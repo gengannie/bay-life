@@ -3097,15 +3097,25 @@ export const WorkCareerModal: React.FC = () => {
                               )}
                               <span>1. Calibration Performance</span>
                             </span>
-                            <span
-                              className={
-                                gatePerfPass
-                                  ? 'font-black text-emerald-600 dark:text-emerald-400'
-                                  : 'font-black text-[#007AFF]'
-                              }
-                            >
-                              {Math.round(effectiveJob.performance)}% / {reqPerfGate}%
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={
+                                  gatePerfPass
+                                    ? 'font-black text-emerald-600 dark:text-emerald-400'
+                                    : 'font-black text-[#007AFF]'
+                                }
+                              >
+                                {Math.round(effectiveJob.performance)}% / {reqPerfGate}%
+                              </span>
+                              {!gatePerfPass && (
+                                <button
+                                  onClick={() => setActiveTab('explore')}
+                                  className="btn-press rounded-lg bg-[#007AFF]/15 px-2 py-0.5 text-[10px] font-black text-[#007AFF] hover:bg-[#007AFF]/25"
+                                >
+                                  🔬 Boost R&D →
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                             <div
@@ -3126,15 +3136,25 @@ export const WorkCareerModal: React.FC = () => {
                               )}
                               <span>2. Level Tenure (Shifts at {currentLevel.code})</span>
                             </span>
-                            <span
-                              className={
-                                gateTenurePass
-                                  ? 'font-black text-emerald-600 dark:text-emerald-400'
-                                  : 'font-black text-amber-600 dark:text-amber-400'
-                              }
-                            >
-                              {shiftsAtLevel} / {reqShifts} shifts
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={
+                                  gateTenurePass
+                                    ? 'font-black text-emerald-600 dark:text-emerald-400'
+                                    : 'font-black text-amber-600 dark:text-amber-400'
+                                }
+                              >
+                                {shiftsAtLevel} / {reqShifts} shifts
+                              </span>
+                              {!gateTenurePass && (
+                                <button
+                                  onClick={() => setActiveTab('hybrid')}
+                                  className="btn-press rounded-lg bg-amber-500/20 px-2 py-0.5 text-[10px] font-black text-amber-700 hover:bg-amber-500/30 dark:text-amber-300"
+                                >
+                                  🏢 Dispatch Shift →
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -3151,15 +3171,32 @@ export const WorkCareerModal: React.FC = () => {
                                 3. Primary Bar ({primarySkillMeta?.emoji} {primarySkillMeta?.label})
                               </span>
                             </span>
-                            <span
-                              className={
-                                gatePrimaryPass
-                                  ? 'font-black text-emerald-600 dark:text-emerald-400'
-                                  : 'font-black text-amber-600 dark:text-amber-400'
-                              }
-                            >
-                              Lv.{primarySkillCur} / Lv.{primarySkillReq}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={
+                                  gatePrimaryPass
+                                    ? 'font-black text-emerald-600 dark:text-emerald-400'
+                                    : 'font-black text-amber-600 dark:text-amber-400'
+                                }
+                              >
+                                Lv.{primarySkillCur} / Lv.{primarySkillReq}
+                              </span>
+                              {!gatePrimaryPass && (() => {
+                                const trainNode =
+                                  unlockedNodes.map((nid) => SKILL_TREE_NODE_BY_ID[nid]).find((n) => n?.requiredSkills.some((r) => r.skill === primarySkillKey)) ||
+                                  SKILL_TREE_NODES.find((n) => n.requiredSkills.some((r) => r.skill === primarySkillKey));
+                                if (!trainNode) return null;
+                                return (
+                                  <button
+                                    onClick={() => trainTechNodeSkill?.(trainNode.id, primarySkillKey)}
+                                    className="btn-press rounded-lg bg-sky-500/20 px-2 py-0.5 text-[10px] font-black text-sky-700 hover:bg-sky-500/30 dark:text-sky-300"
+                                    title={`Study ${primarySkillMeta?.label || primarySkillKey} (-16⚡ Energy)`}
+                                  >
+                                    🔬 Train (-16⚡)
+                                  </button>
+                                );
+                              })()}
+                            </div>
                           </div>
                         </div>
 
@@ -3179,17 +3216,34 @@ export const WorkCareerModal: React.FC = () => {
                                   : '(Scope Alignment)'}
                               </span>
                             </span>
-                            <span
-                              className={
-                                gateSecondaryPass
-                                  ? 'font-black text-emerald-600 dark:text-emerald-400'
-                                  : 'font-black text-amber-600 dark:text-amber-400'
-                              }
-                            >
-                              {secondarySkillMeta
-                                ? `Lv.${secondarySkillCur} / Lv.${secondarySkillReq}`
-                                : 'Passed ✓'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={
+                                  gateSecondaryPass
+                                    ? 'font-black text-emerald-600 dark:text-emerald-400'
+                                    : 'font-black text-amber-600 dark:text-amber-400'
+                                }
+                              >
+                                {secondarySkillMeta
+                                  ? `Lv.${secondarySkillCur} / Lv.${secondarySkillReq}`
+                                  : 'Passed ✓'}
+                              </span>
+                              {!gateSecondaryPass && secondarySkillKey && (() => {
+                                const trainNode =
+                                  unlockedNodes.map((nid) => SKILL_TREE_NODE_BY_ID[nid]).find((n) => n?.requiredSkills.some((r) => r.skill === secondarySkillKey)) ||
+                                  SKILL_TREE_NODES.find((n) => n.requiredSkills.some((r) => r.skill === secondarySkillKey));
+                                if (!trainNode) return null;
+                                return (
+                                  <button
+                                    onClick={() => trainTechNodeSkill?.(trainNode.id, secondarySkillKey)}
+                                    className="btn-press rounded-lg bg-sky-500/20 px-2 py-0.5 text-[10px] font-black text-sky-700 hover:bg-sky-500/30 dark:text-sky-300"
+                                    title={`Study ${secondarySkillMeta?.label || secondarySkillKey} (-16⚡ Energy)`}
+                                  >
+                                    🔬 Train (-16⚡)
+                                  </button>
+                                );
+                              })()}
+                            </div>
                           </div>
                         </div>
 
@@ -3238,15 +3292,25 @@ export const WorkCareerModal: React.FC = () => {
                               )}
                               <span>6. Shipped Deliverables (Work Exploration)</span>
                             </span>
-                            <span
-                              className={
-                                gateDeliverablesPass
-                                  ? 'font-black text-emerald-600 dark:text-emerald-400'
-                                  : 'font-black text-purple-600 dark:text-purple-400'
-                              }
-                            >
-                              {deliverablesDone} / {reqDeliverables} deliverables
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={
+                                  gateDeliverablesPass
+                                    ? 'font-black text-emerald-600 dark:text-emerald-400'
+                                    : 'font-black text-purple-600 dark:text-purple-400'
+                                }
+                              >
+                                {deliverablesDone} / {reqDeliverables} deliverables
+                              </span>
+                              {!gateDeliverablesPass && (
+                                <button
+                                  onClick={() => setActiveTab('explore')}
+                                  className="btn-press rounded-lg bg-purple-500/20 px-2 py-0.5 text-[10px] font-black text-purple-700 hover:bg-purple-500/30 dark:text-purple-300"
+                                >
+                                  🚀 Ship Charter →
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -3261,15 +3325,25 @@ export const WorkCareerModal: React.FC = () => {
                               )}
                               <span>7. Hybrid RTO Standing</span>
                             </span>
-                            <span
-                              className={
-                                gateRtoPass
-                                  ? 'font-black text-emerald-600 dark:text-emerald-400'
-                                  : 'font-black text-rose-600 dark:text-rose-400'
-                              }
-                            >
-                              {rtoCompliant ? '🟢 Compliant' : '⚠️ Needs 3/3 Office Days'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={
+                                  gateRtoPass
+                                    ? 'font-black text-emerald-600 dark:text-emerald-400'
+                                    : 'font-black text-rose-600 dark:text-rose-400'
+                                }
+                              >
+                                {rtoCompliant ? '🟢 Compliant' : '⚠️ Needs 3/3 Office Days'}
+                              </span>
+                              {!gateRtoPass && (
+                                <button
+                                  onClick={() => setActiveTab('hybrid')}
+                                  className="btn-press rounded-lg bg-rose-500/20 px-2 py-0.5 text-[10px] font-black text-rose-700 hover:bg-rose-500/30 dark:text-rose-300"
+                                >
+                                  🏢 Badge In →
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -3282,19 +3356,62 @@ export const WorkCareerModal: React.FC = () => {
                     )}
                   </div>
 
+                  {/* Promo Packet Blocked Guidance Banner (when gates are not yet met) */}
+                  {nextLevel && !allPromoGatesReady && (
+                    <div className="mt-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200 animate-target-pop">
+                      <div className="flex items-center gap-2 font-black text-amber-800 dark:text-amber-200">
+                        <AlertCircle className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <span>Promo Packet Blocked — {7 - gatesPassedCount} Committee Gate{7 - gatesPassedCount > 1 ? 's' : ''} Remaining:</span>
+                      </div>
+                      <ul className="mt-2 space-y-1 text-[11px] font-bold text-amber-800/90 dark:text-amber-200/90">
+                        {!gatePerfPass && <li>• Calibration Perf: Need {reqPerfGate}% (currently {Math.round(effectiveJob.performance)}%)</li>}
+                        {!gateTenurePass && <li>• Level Tenure: Need {reqShifts} shifts at {currentLevel.code} (currently {shiftsAtLevel})</li>}
+                        {!gatePrimaryPass && <li>• Primary Skill: Need {primarySkillMeta?.label || primarySkillKey} Lv.{primarySkillReq} (currently Lv.{primarySkillCur})</li>}
+                        {!gateSecondaryPass && secondarySkillKey && <li>• Secondary Skill: Need {secondarySkillMeta?.label || secondarySkillKey} Lv.{secondarySkillReq} (currently Lv.{secondarySkillCur})</li>}
+                        {!gateTechNodePass && <li>• Tech Tree: Unlock {reqTechNodeDef ? `${reqTechNodeDef.emoji} ${reqTechNodeDef.title}` : 'Required Spec Node'}</li>}
+                        {!gateDeliverablesPass && <li>• Deliverables: Ship {reqDeliverables} charter deliverables (currently {deliverablesDone})</li>}
+                        {!gateRtoPass && <li>• Hybrid RTO: Need 3/3 campus office days (currently {effectiveJob.officeDaysThisWeek ?? 0}/3)</li>}
+                      </ul>
+                    </div>
+                  )}
+
                   {/* Submit Promo Packet Button */}
                   {nextLevel && (
                     <button
                       onClick={() => submitPromoPacket?.()}
                       className={`btn-press mt-4 w-full rounded-2xl py-3 text-xs font-black tracking-wide text-white shadow-md transition-all ${
                         allPromoGatesReady
-                          ? 'bg-gradient-to-r from-emerald-500 via-[#007AFF] to-purple-600 hover:opacity-95'
+                          ? 'bg-gradient-to-r from-emerald-500 via-[#007AFF] to-purple-600 hover:opacity-95 ring-2 ring-emerald-400/40'
                           : 'bg-[#007AFF] hover:bg-blue-600'
                       }`}
                     >
                       📋 Submit Promo Packet to Committee ({nextLevel.code} ·{' '}
                       {formatCurrency(nextLevel.baseSalary + nextLevel.rsuAnnual)}/yr)
                     </button>
+                  )}
+
+                  {/* Immediate Feedback Card in Dossier */}
+                  {lastToast && (
+                    <div
+                      className={`mt-3 flex items-center justify-between gap-2.5 rounded-2xl border p-3 text-xs font-black shadow-xs ${
+                        lastToast.tone === 'bad'
+                          ? 'border-rose-500/50 bg-rose-500/15 text-rose-800 dark:text-rose-200'
+                          : lastToast.tone === 'good'
+                            ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+                            : 'border-sky-500/50 bg-sky-500/15 text-sky-800 dark:text-sky-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base shrink-0">{lastToast.emoji}</span>
+                        <span className="leading-tight">{lastToast.text}</span>
+                      </div>
+                      <button
+                        onClick={dismissToast}
+                        className="btn-press shrink-0 rounded-lg bg-black/10 px-2 py-0.5 text-[10px] font-bold hover:bg-black/20 dark:bg-white/10"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   )}
                 </div>
 

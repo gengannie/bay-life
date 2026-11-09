@@ -7,6 +7,8 @@ import {
   HOME_BY_ID,
   LOCATION_BY_ID,
   calculateCommuteDetails,
+  getStartupDailyBurnRate,
+  getStartupNextStageRequirements,
 } from '../data/worldData';
 import {
   formatCurrency,
