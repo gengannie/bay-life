@@ -828,16 +828,28 @@ export const BayPhoneModal: React.FC = () => {
 
               {/* Selective Onsite Interview Loops & Career Track Switching */}
               <div className="space-y-2.5">
-                <div className="flex items-center justify-between px-1">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 px-1">
                   <div className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
-                    Switch Track · Onsite Interview Loops
+                    🌉 Career Track Prerequisites & Onsite Loops
                   </div>
-                  <button
-                    onClick={() => setActiveModal('career', 'tree')}
-                    className="btn-press rounded-lg bg-[#007AFF]/15 px-2.5 py-1 text-[10px] font-extrabold text-[#007AFF]"
-                  >
-                    🌳 Skill Tech Tree & Hub ↗
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setActiveModal('career', 'interview')}
+                      className="btn-press rounded-lg bg-[#007AFF]/15 px-2 py-1 text-[9.5px] font-extrabold text-[#007AFF]"
+                    >
+                      🌉 Full Switcher ↗
+                    </button>
+                    <button
+                      onClick={() => setActiveModal('career', 'tree')}
+                      className="btn-press rounded-lg bg-amber-500/15 px-2 py-1 text-[9.5px] font-extrabold text-amber-700 dark:text-amber-300"
+                    >
+                      🌳 Tech Tree ↗
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[#007AFF]/20 bg-[#007AFF]/5 px-2.5 py-2 text-[10px] font-semibold leading-relaxed text-[var(--ink-soft)]">
+                  To switch tracks, unlock the company&apos;s <strong className="text-[var(--ink)]">Skill Tech Tree nodes</strong> (with ⚡ Karma), train <strong className="text-[var(--ink)]">Core Skill levels</strong>, and ship required <strong className="text-[var(--ink)]">R&amp;D Deliverables</strong>, then spend Energy to pass the onsite loop.
                 </div>
 
                 <div className="grid grid-cols-1 gap-2.5">
@@ -852,12 +864,19 @@ export const BayPhoneModal: React.FC = () => {
                     const minDeliv = entryReq?.minDeliverables ?? 0;
                     const curDeliv = job?.deliverablesCompleted ?? 0;
 
-                    const allNodesMet = reqNodes.every((nid) => unlockedTechNodes.includes(nid));
-                    const allSkillsMet = reqSkills.every(
+                    const metNodesCount = reqNodes.filter((nid) =>
+                      unlockedTechNodes.includes(nid)
+                    ).length;
+                    const metSkillsCount = reqSkills.filter(
                       (req) => Math.floor(skills[req.skill] ?? 0) >= req.level
-                    );
+                    ).length;
                     const delivMet = curDeliv >= minDeliv;
-                    const canPassGate = allNodesMet && allSkillsMet && delivMet;
+
+                    const totalPrereqs =
+                      reqNodes.length + reqSkills.length + (minDeliv > 0 ? 1 : 0);
+                    const metPrereqs =
+                      metNodesCount + metSkillsCount + (minDeliv > 0 ? (delivMet ? 1 : 0) : 0);
+                    const canPassGate = metPrereqs === totalPrereqs;
 
                     return (
                       <div
@@ -883,8 +902,20 @@ export const BayPhoneModal: React.FC = () => {
                                 </div>
                               </div>
                             </div>
-                            <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-[9px] font-extrabold dark:bg-white/10">
-                              {entry.code}–{top.code}
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-extrabold ${
+                                isCurrent
+                                  ? 'bg-[#007AFF] text-white'
+                                  : canPassGate
+                                    ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                              }`}
+                            >
+                              {isCurrent
+                                ? '✓ Active'
+                                : canPassGate
+                                  ? `✅ ${metPrereqs}/${totalPrereqs} Ready`
+                                  : `🔒 ${metPrereqs}/${totalPrereqs} Prereqs`}
                             </span>
                           </div>
 
@@ -893,7 +924,7 @@ export const BayPhoneModal: React.FC = () => {
                             <div className="flex flex-wrap items-center justify-between gap-1 rounded-xl bg-black/5 px-2.5 py-1 text-[10px] font-extrabold dark:bg-white/5">
                               <span>{entryReq.selectivityLabel}</span>
                               <span className="text-[9px] font-bold text-[var(--ink-soft)]">
-                                -{entryReq.interviewEnergyCost} ⚡ Energy
+                                -{entryReq.interviewEnergyCost} ⚡ Onsite
                               </span>
                             </div>
                           )}
@@ -902,22 +933,24 @@ export const BayPhoneModal: React.FC = () => {
                           {entryReq && (
                             <div className="space-y-1">
                               <div className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)]">
-                                Required Custom Tech Tree & Core Skills:
+                                Prerequisites ({metPrereqs}/{totalPrereqs} Met):
                               </div>
                               <div className="flex flex-wrap gap-1">
                                 {reqNodes.map((nid) => {
                                   const nodeDef = SKILL_TREE_NODE_BY_ID[nid];
                                   const hasNode = unlockedTechNodes.includes(nid);
                                   return (
-                                    <span
+                                    <button
                                       key={nid}
-                                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${hasNode
+                                      onClick={() => setActiveModal('career', 'tree')}
+                                      className={`btn-press inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${hasNode
                                           ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                           : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
                                         }`}
+                                      title="Open Skill Tech Tree"
                                     >
-                                      {hasNode ? '✓' : '🔒'} {nodeDef?.emoji} {nodeDef?.title || nid}
-                                    </span>
+                                      {hasNode ? '✓' : '🔒'} {nodeDef?.codeName}: {nodeDef?.title || nid}
+                                    </button>
                                   );
                                 })}
 
@@ -933,20 +966,21 @@ export const BayPhoneModal: React.FC = () => {
                                           : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                                         }`}
                                     >
-                                      {met ? '✓' : '🔒'} {skMeta?.emoji} {req.skill} Lv.{req.level} (at Lv.{curLvl})
+                                      {met ? '✓' : '🔒'} {skMeta?.emoji} {skMeta?.label || req.skill} Lv.{curLvl}/{req.level}
                                     </span>
                                   );
                                 })}
 
                                 {minDeliv > 0 && (
-                                  <span
-                                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${delivMet
+                                  <button
+                                    onClick={() => setActiveModal('career', 'explore')}
+                                    className={`btn-press inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${delivMet
                                         ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                         : 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
                                       }`}
                                   >
-                                    {delivMet ? '✓' : '🔒'} 📦 {curDeliv}/{minDeliv} Deliverable
-                                  </span>
+                                    {delivMet ? '✓' : '🔒'} 🚀 {curDeliv}/{minDeliv} Shipped Deliverable
+                                  </button>
                                 )}
                               </div>
                             </div>
@@ -954,29 +988,33 @@ export const BayPhoneModal: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-1.5 pt-0.5">
-                          <button
-                            disabled={isCurrent}
-                            onClick={() => applyJob(c.id)}
-                            className={`btn-press flex-1 rounded-xl py-1.5 text-[11px] font-extrabold ${isCurrent
-                                ? 'bg-emerald-500/20 text-emerald-600'
-                                : canPassGate
-                                  ? 'bg-emerald-600 text-white'
-                                  : 'bg-[#007AFF] text-white'
-                              }`}
-                          >
-                            {isCurrent
-                              ? '✓ Current Track'
-                              : canPassGate
-                                ? `🎯 Sit Onsite Loop (-${entryReq?.interviewEnergyCost ?? 15} ⚡)`
-                                : '🔒 Attempt Onsite Loop'}
-                          </button>
-                          {!isCurrent && !canPassGate && (
+                          {isCurrent ? (
+                            <span className="flex-1 rounded-xl bg-emerald-500/20 py-1.5 text-center text-[11px] font-extrabold text-emerald-600">
+                              ✓ Current Career Track
+                            </span>
+                          ) : canPassGate ? (
                             <button
-                              onClick={() => setActiveModal('career')}
-                              className="btn-press rounded-xl bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-extrabold text-purple-600 dark:text-purple-300"
+                              onClick={() => applyJob(c.id)}
+                              className="btn-press flex-1 rounded-xl bg-emerald-600 py-1.5 text-[11px] font-extrabold text-white"
                             >
-                              🌳 Tech Tree
+                              🎯 Pass Onsite &amp; Switch (-{entryReq?.interviewEnergyCost ?? 15} ⚡)
                             </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setActiveModal('career', 'interview')}
+                                className="btn-press flex-1 rounded-xl bg-amber-500/20 py-1.5 text-[10px] font-extrabold text-amber-700 dark:text-amber-300"
+                              >
+                                🌉 View Prereq Checklist ({metPrereqs}/{totalPrereqs})
+                              </button>
+                              <button
+                                onClick={() => applyJob(c.id)}
+                                className="btn-press rounded-xl bg-black/8 px-2.5 py-1.5 text-[10px] font-extrabold text-[var(--ink-soft)] dark:bg-white/10"
+                                title="Check missing prerequisites"
+                              >
+                                🔒
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
