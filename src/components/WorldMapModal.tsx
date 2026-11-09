@@ -1132,7 +1132,7 @@ export const WorldMapModal: React.FC = () => {
                       top: `${h.mapCoords.y}%`,
                       transform: `translate(-50%, -50%) scale(${pinScale})`,
                     }}
-                    className={`absolute flex flex-col items-center transition-opacity ${isHomeHere
+                    className={`absolute flex flex-col items-center transition-all ${isHomeHere
                         ? 'z-40'
                         : isSelected
                           ? 'z-35'
@@ -1243,7 +1243,7 @@ export const WorldMapModal: React.FC = () => {
                       top: `${coords.y}%`,
                       transform: `translate(-50%, -50%) scale(${pinScale})`,
                     }}
-                    className={`absolute flex flex-col items-center transition-opacity ${isHere
+                    className={`absolute flex flex-col items-center transition-all ${isHere
                         ? 'z-40'
                         : isSelected
                           ? 'z-35'
@@ -1254,24 +1254,6 @@ export const WorldMapModal: React.FC = () => {
                               : 'z-10 opacity-35'
                       }`}
                   >
-                    {/* Floating "🏢 YOUR HQ" Badge */}
-                    {isCompanyHq && job && (
-                      <div className="mb-0.5 flex items-center gap-1 whitespace-nowrap rounded-full bg-indigo-600 px-2 py-0.5 text-[9px] font-black tracking-wide text-white uppercase shadow-md ring-1 ring-white">
-                        <span>🏢 YOUR HQ ({job.officeDaysThisWeek || 0}/3 Office)</span>
-                      </div>
-                    )}
-
-                    {/* Floating "📍 YOU ARE HERE" or "🎯 DESTINATION" Badge */}
-                    {isHere ? (
-                      <div className="mb-1 flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white uppercase shadow-lg ring-2 ring-white">
-                        <span>📍 YOU ARE HERE</span>
-                      </div>
-                    ) : isSelected ? (
-                      <div className="mb-1 flex items-center gap-1 whitespace-nowrap rounded-full bg-[#007AFF] px-2 py-0.5 text-[9px] font-black tracking-wide text-white uppercase shadow-md ring-2 ring-white">
-                        <span>🎯 DESTINATION</span>
-                      </div>
-                    ) : null}
-
                     {/* Pin Marker Button */}
                     <button
                       onClick={(e) => {
@@ -1279,49 +1261,62 @@ export const WorldMapModal: React.FC = () => {
                         if (mapDragRef.current.moved) return;
                         setSelectedTarget({ kind: 'venue', loc });
                       }}
-                      className={`btn-press relative flex items-center justify-center rounded-full transition-all ${isHere
-                          ? 'bg-emerald-500 p-1 text-white shadow-xl ring-4 ring-emerald-300'
+                      className={`btn-press relative flex items-center justify-center transition-all ${isHere
+                          ? 'size-11 rounded-full bg-emerald-500 text-white shadow-xl ring-4 ring-emerald-300'
                           : isSelected
-                            ? 'scale-110 bg-[#007AFF] px-2.5 py-1.5 text-white shadow-lg ring-4 ring-[#007AFF]/40'
-                            : 'bg-white/95 px-2.5 py-1 text-slate-900 shadow-md ring-1 ring-slate-300 hover:scale-105 dark:bg-slate-900/95 dark:text-white dark:ring-slate-700'
+                            ? 'size-10 rounded-2xl bg-[#007AFF] text-white shadow-lg ring-4 ring-[#007AFF]/40 scale-110'
+                            : 'size-9 rounded-2xl bg-white/95 text-slate-800 shadow-sm ring-1 ring-black/10 hover:scale-105 hover:shadow-md dark:bg-slate-900/95 dark:text-white dark:ring-white/15'
                         }`}
+                      title={`${loc.name}${isHere ? " · You're here" : ''}${isCompanyHq ? ' · Your HQ' : ''}`}
                     >
+                      {/* Apple Maps Pulse Ring for Current Location */}
                       {isHere && (
-                        <span className="pointer-events-none absolute -inset-1.5 animate-ping rounded-full bg-emerald-400/50" />
+                        <span className="pointer-events-none absolute -inset-2 animate-ping rounded-full bg-emerald-400/40" />
                       )}
+
+                      {/* Content: Sim Portrait if Here, else Venue Emoji */}
                       {isHere ? (
-                        <div className="relative flex items-center gap-1 pr-1">
-                          <Portrait
-                            appearance={sim.appearance}
-                            size={30}
-                            ringColor="#FFFFFF"
-                          />
-                          <span className="text-sm">{loc.emoji}</span>
+                        <div className="relative flex items-center justify-center">
+                          <Portrait appearance={sim.appearance} size={28} ringColor="#FFFFFF" />
+                          <span className="absolute -bottom-1 -right-1 text-xs">{loc.emoji}</span>
                         </div>
                       ) : (
-                        <span className="text-sm">{loc.emoji}</span>
+                        <span className="text-base select-none">{loc.emoji}</span>
+                      )}
+
+                      {/* HQ Micro-Chip (Apple-style top-right badge) */}
+                      {isCompanyHq && (
+                        <span
+                          className="pointer-events-none absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[8.5px] font-black tracking-wider text-white shadow-xs ring-1.5 ring-white"
+                          title="Your Company HQ"
+                        >
+                          HQ
+                        </span>
                       )}
                     </button>
 
-                    {/* Always-Visible Label Pill + NPC Presence Count Underneath Every Pin */}
+                    {/* Apple Frosted Label Pill Underneath */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         if (mapDragRef.current.moved) return;
                         setSelectedTarget({ kind: 'venue', loc });
                       }}
-                      className={`mt-1 flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9.5px] font-extrabold shadow-md transition-all ${isHere
-                          ? 'bg-emerald-700 text-white ring-1 ring-emerald-300'
+                      className={`mt-1 flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-bold shadow-xs backdrop-blur-md transition-all ${isHere
+                          ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-white/60'
                           : isSelected
-                            ? 'bg-[#007AFF] text-white ring-1 ring-white/80'
-                            : 'bg-white/95 text-slate-900 ring-1 ring-slate-200 hover:bg-white dark:bg-slate-900/95 dark:text-slate-100 dark:ring-slate-700'
+                            ? 'bg-[#007AFF] text-white shadow-sm ring-1 ring-white/80'
+                            : 'bg-white/92 text-slate-800 ring-1 ring-black/8 hover:bg-white dark:bg-slate-900/90 dark:text-slate-100 dark:ring-white/10'
                         }`}
                     >
+                      {isHere && (
+                        <span className="size-1.5 rounded-full bg-emerald-200 animate-pulse" />
+                      )}
                       <span>{loc.shortName}</span>
                       <span
-                        className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-black ${isHere || isSelected
+                        className={`rounded-full px-1.5 py-0.2 text-[8.5px] font-semibold ${isHere || isSelected
                             ? 'bg-white/25 text-white'
-                            : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
+                            : 'bg-purple-500/10 text-purple-700 dark:bg-purple-400/20 dark:text-purple-300'
                           }`}
                       >
                         👥 {npcsAtLoc.length}

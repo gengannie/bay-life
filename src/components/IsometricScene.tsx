@@ -1672,6 +1672,96 @@ export const IsometricScene: React.FC = () => {
                 </g>
               );
             })()}
+
+          {/* Work Campus Interactive Right-Wall Feature */}
+          {!isHome &&
+            activeCampusFloor?.wallFeature &&
+            (() => {
+              const wf = activeCampusFloor.wallFeature;
+              return (
+                <g
+                  className="cursor-pointer"
+                  onMouseEnter={() => setRightWallHovered(true)}
+                  onMouseLeave={() => setRightWallHovered(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (dragRef.current.moved) return;
+                    triggerMicroReward({
+                      needKey: wf.needKey,
+                      needDelta: wf.delta,
+                      karmaDelta: 1,
+                      toastText: `${wf.title} (+${wf.delta}% ${wf.needKey})`,
+                      emoji: wf.emoji,
+                    });
+                    triggerSparkle(
+                      backCorner.sx + 106,
+                      backCorner.sy + 12,
+                      wf.emoji,
+                      `⚡ +${wf.delta}% ${wf.needKey === 'energy' ? 'Focus' : wf.needKey === 'hunger' ? 'Nourishment' : 'Morale'}`,
+                      wf.title,
+                      wf.sub
+                    );
+                  }}
+                >
+                  <polygon
+                    points={`${backCorner.sx + 40},${backCorner.sy - 26} ${backCorner.sx + 174},${backCorner.sy + 41} ${backCorner.sx + 174},${backCorner.sy + 85} ${backCorner.sx + 40},${backCorner.sy + 18}`}
+                    fill="#0F172A"
+                    stroke={rightWallHovered ? '#38BDF8' : activeCampusFloor.accentColor || '#007AFF'}
+                    strokeWidth="2"
+                  />
+                  <line
+                    x1={backCorner.sx + 54}
+                    y1={backCorner.sy - 2}
+                    x2={backCorner.sx + 160}
+                    y2={backCorner.sy + 51}
+                    stroke={activeCampusFloor.accentColor || '#38BDF8'}
+                    strokeWidth="2.5"
+                  />
+                  <line
+                    x1={backCorner.sx + 54}
+                    y1={backCorner.sy + 10}
+                    x2={backCorner.sx + 140}
+                    y2={backCorner.sy + 53}
+                    stroke="#10B981"
+                    strokeWidth="2"
+                  />
+                  <text
+                    x={backCorner.sx + 106}
+                    y={backCorner.sy + 42}
+                    fill="#F8FAFC"
+                    fontSize="16"
+                    textAnchor="middle"
+                  >
+                    {wf.emoji}
+                  </text>
+
+                  {rightWallHovered && (
+                    <g transform={`translate(${backCorner.sx + 108}, ${backCorner.sy - 8})`}>
+                      <rect
+                        x="-96"
+                        y="-14"
+                        width="192"
+                        height="24"
+                        rx="12"
+                        fill="rgba(15,23,42,0.95)"
+                        stroke="#38BDF8"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        x="0"
+                        y="2"
+                        fill="#FFFFFF"
+                        fontSize="9.5"
+                        fontWeight="800"
+                        textAnchor="middle"
+                      >
+                        {wf.emoji} {wf.badge}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })()}
         </g>
 
         {/* Floating Waymo / Prime Air Delivery Drone Outside Balcony (Enlarged & Readable) */}
