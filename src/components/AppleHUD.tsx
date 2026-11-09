@@ -1439,13 +1439,10 @@ export const AppleHUD: React.FC = () => {
             className="btn-press flex items-center gap-2.5 rounded-2xl pr-1 text-left"
             title="Open Sim Inspector (Shortcut: I)"
           >
-            <Portrait appearance={sim.appearance} size={46} ringColor={moodInfo.color} />
+            <Portrait appearance={sim.appearance} size={44} ringColor={moodInfo.color} />
             <div className="hidden sm:block">
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-extrabold text-[var(--ink)]">
-                  {sim.name.split(' ')[0]}
-                </span>
-                <span className="keycap-hint">I</span>
+              <div className="text-xs font-extrabold text-[var(--ink)]">
+                {sim.name.split(' ')[0]}
               </div>
               <span
                 className="mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white"
@@ -1458,11 +1455,11 @@ export const AppleHUD: React.FC = () => {
 
           <div className="h-9 w-px bg-black/10 dark:bg-white/15" />
 
-          {/* 6 Enlarged Circular SVG Progress Rings + Visible Percentage (1-Tap Auto-Fix) */}
-          <div className="flex items-center gap-2">
+          {/* 6 Apple Watch Activity Rings (Show percentage only when < 50% or on hover) */}
+          <div className="flex items-center gap-1.5">
             {NEEDS_META.map((n) => {
               const v = Math.round(needs[n.key]);
-              const radius = 17;
+              const radius = 16;
               const circumference = 2 * Math.PI * radius;
               const offset = circumference * (1 - Math.max(0, Math.min(100, v)) / 100);
               const ringColor = v < 30 ? '#FF3B30' : v < 50 ? '#FF9500' : n.color;
@@ -1472,33 +1469,33 @@ export const AppleHUD: React.FC = () => {
                   key={n.key}
                   onClick={() => autoFixNeed(n.key)}
                   aria-label={`${n.label} ${v}% — Tap to Auto-Fix`}
-                  className="btn-press group relative flex flex-col items-center gap-0.5 rounded-2xl px-1 py-0.5 hover:bg-black/5 dark:hover:bg-white/10"
+                  className="btn-press group relative flex flex-col items-center rounded-2xl p-1 hover:bg-black/5 dark:hover:bg-white/10"
                 >
-                  <div className="relative grid size-10 place-items-center">
-                    <svg className="size-10 -rotate-90" viewBox="0 0 42 42">
+                  <div className="relative grid size-9 place-items-center">
+                    <svg className="size-9 -rotate-90" viewBox="0 0 40 40">
                       <circle
-                        cx="21"
-                        cy="21"
+                        cx="20"
+                        cy="20"
                         r={radius}
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="3.6"
+                        strokeWidth="3.5"
                         className="text-black/10 dark:text-white/15"
                       />
                       <circle
-                        cx="21"
-                        cy="21"
+                        cx="20"
+                        cy="20"
                         r={radius}
                         fill="none"
                         stroke={ringColor}
-                        strokeWidth="3.6"
+                        strokeWidth="3.5"
                         strokeDasharray={circumference}
                         strokeDashoffset={offset}
                         strokeLinecap="round"
                         className="transition-all duration-300"
                       />
                     </svg>
-                    <span className="pointer-events-none absolute text-base leading-none">
+                    <span className="pointer-events-none absolute text-sm leading-none">
                       {n.emoji}
                     </span>
                     {v < 30 && (
@@ -1506,13 +1503,15 @@ export const AppleHUD: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Always-Visible Mini Label & Percentage */}
-                  <span
-                    className="font-mono text-[9px] leading-none font-extrabold"
-                    style={{ color: ringColor }}
-                  >
-                    {v}%
-                  </span>
+                  {/* Show percentage inline only when attention is needed (< 50%) */}
+                  {v < 50 && (
+                    <span
+                      className="mt-0.5 font-mono text-[9px] leading-none font-extrabold"
+                      style={{ color: ringColor }}
+                    >
+                      {v}%
+                    </span>
+                  )}
 
                   {/* Crisp Hover Tooltip: Tap to Auto-Fix */}
                   <div className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-xl bg-black/90 px-3 py-1.5 text-center text-[11px] font-bold text-white opacity-0 shadow-lg backdrop-blur-md transition-all group-hover:visible group-hover:opacity-100">
@@ -1530,8 +1529,8 @@ export const AppleHUD: React.FC = () => {
         </div>
 
         {/* Right: Primary Navigation Dock + "✨ Smart Next" Apple Intelligence Button */}
-        <div className="apple-glass-heavy pointer-events-auto flex items-center gap-1.5 rounded-3xl p-1.5">
-          {/* "✨ Smart Next" Apple Intelligence 1-Tap Button (Zero Cut-Off Text) */}
+        <div className="apple-glass-heavy pointer-events-auto flex items-center gap-1 rounded-3xl p-1.5">
+          {/* "✨ Smart Next" Apple Intelligence 1-Tap Button */}
           <button
             onClick={handleSmartNext}
             title={`Apple Intelligence Smart Next (Shortcut: A) — ${smartRecommendation.fullLabel}`}
@@ -1539,11 +1538,8 @@ export const AppleHUD: React.FC = () => {
           >
             <Sparkles className="size-4 shrink-0" />
             <div className="text-left leading-tight">
-              <div className="flex items-center gap-1 text-[10px] font-extrabold whitespace-nowrap">
-                <span>✨ Smart Next</span>
-                <span className="rounded bg-white/25 px-1 font-mono text-[8px] font-bold text-white">
-                  A
-                </span>
+              <div className="text-[10px] font-extrabold whitespace-nowrap">
+                Smart Next
               </div>
               <div className="text-[9px] font-semibold whitespace-nowrap text-white/95">
                 {smartRecommendation.shortBadge}
@@ -1567,11 +1563,11 @@ export const AppleHUD: React.FC = () => {
                   hasPersonalCar({ ownedCars }) ? 'tesla' : job?.preferredCommute || 'caltrain'
                 )
               }
-              title="Travel back to your apartment"
-              className="btn-press flex flex-col items-center gap-0.5 rounded-2xl bg-emerald-500/15 px-3 py-1.5 text-[10px] font-extrabold text-emerald-600 hover:bg-emerald-500/25 dark:text-emerald-400"
+              title="Travel back to your apartment (Shortcut: H)"
+              className="btn-press flex flex-col items-center gap-0.5 rounded-2xl bg-emerald-500/15 px-2.5 py-1.5 text-[10px] font-extrabold text-emerald-600 hover:bg-emerald-500/25 dark:text-emerald-400"
             >
               <Home className="size-4" />
-              <span>Go Home</span>
+              <span>Home</span>
             </button>
           ) : (
             <button
@@ -1602,10 +1598,7 @@ export const AppleHUD: React.FC = () => {
             title="Bay Area Map (Shortcut: M)"
           >
             <Map className="size-4" />
-            <div className="flex items-center gap-1">
-              <span>Map</span>
-              <span className="keycap-hint">M</span>
-            </div>
+            <span>Map</span>
           </button>
 
           {/* Furnish & Computer Icons ONLY visible when at Home */}
@@ -1617,10 +1610,7 @@ export const AppleHUD: React.FC = () => {
                 title="Furnish Apartment (Shortcut: B)"
               >
                 <ShoppingBag className="size-4" />
-                <div className="flex items-center gap-1">
-                  <span>Furnish</span>
-                  <span className="keycap-hint">B</span>
-                </div>
+                <span>Furnish</span>
               </button>
 
               {(() => {
@@ -1635,7 +1625,7 @@ export const AppleHUD: React.FC = () => {
                         ? 'bg-[#007AFF] text-white'
                         : hasPC
                         ? 'text-[var(--ink)] hover:bg-[var(--mist)]'
-                        : 'bg-sky-500/12 text-sky-600 hover:bg-sky-500/20 dark:text-sky-300'
+                        : 'text-sky-600 hover:bg-[var(--mist)] dark:text-sky-400'
                     }`}
                     title={
                       hasPC
@@ -1644,10 +1634,7 @@ export const AppleHUD: React.FC = () => {
                     }
                   >
                     <Monitor className="size-4" />
-                    <div className="flex items-center gap-1">
-                      <span>{hasPC ? 'PC / IDE' : '+Install PC'}</span>
-                      <span className="keycap-hint">C</span>
-                    </div>
+                    <span>{hasPC ? 'Mac' : '+Mac'}</span>
                   </button>
                 );
               })()}
@@ -1662,24 +1649,15 @@ export const AppleHUD: React.FC = () => {
                 ? 'bg-[#007AFF] text-white'
                 : 'text-[var(--ink)] hover:bg-[var(--mist)]'
             }`}
-            title="Open Backpack & Everyday Carry Inventory — Use snacks, tech gear & stored furniture anywhere (Shortcut: K)"
+            title="Open Backpack & Everyday Carry Inventory (Shortcut: K)"
           >
-            <span
-              className={`-mt-1 rounded-full px-1.5 py-0.2 font-mono text-[8px] font-extrabold ${
-                activeModal === 'backpack'
-                  ? 'bg-white/25 text-white'
-                  : 'bg-[#007AFF]/15 text-[#007AFF]'
-              }`}
-            >
-              {totalPackCount}🎒
-            </span>
-            <div className="flex items-center gap-1">
-              <Backpack
-                className={`size-3.5 ${activeModal === 'backpack' ? 'text-white' : 'text-[#007AFF]'}`}
-              />
-              <span>Pack</span>
-              <span className="keycap-hint">K</span>
-            </div>
+            {totalPackCount > 0 && (
+              <span className="absolute -top-0.5 right-1 rounded-full bg-[#007AFF] px-1 text-[8px] font-extrabold text-white">
+                {totalPackCount}
+              </span>
+            )}
+            <Backpack className="size-4" />
+            <span>Pack</span>
           </button>
 
           {/* Apple CarPlay & EV Garage (Shortcut: G) */}
@@ -1688,36 +1666,16 @@ export const AppleHUD: React.FC = () => {
             className={`btn-press relative flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[10px] font-bold ${
               activeModal === 'garage'
                 ? 'bg-[#007AFF] text-white'
-                : activeVehicle
-                ? 'text-[var(--ink)] hover:bg-[var(--mist)]'
-                : 'bg-emerald-500/12 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300'
+                : 'text-[var(--ink)] hover:bg-[var(--mist)]'
             }`}
             title={
               activeVehicle
                 ? `Apple CarPlay & EV Garage (${activeVehicle.shortName}) — 1-Tap Drives & Joyrides (Shortcut: G)`
-                : 'Open EV Garage — Buy Prius ($4.2k), Tesla FSD ($12.5k) or Taycan ($18.5k) for $0 Fares & Fast HOV Drives (Shortcut: G)'
+                : 'Open EV Garage — Buy Prius ($4.2k), Tesla FSD ($12.5k) or Taycan ($18.5k) (Shortcut: G)'
             }
           >
-            <span
-              className={`-mt-1 rounded-full px-1.5 py-0.2 font-mono text-[8px] font-extrabold ${
-                activeModal === 'garage'
-                  ? 'bg-white/25 text-white'
-                  : activeVehicle
-                  ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                  : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
-              }`}
-            >
-              {activeVehicle ? '$0 HOV' : '+EV'}
-            </span>
-            <div className="flex items-center gap-1">
-              <Car
-                className={`size-3.5 ${
-                  activeModal === 'garage' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'
-                }`}
-              />
-              <span>{activeVehicle ? 'CarPlay' : 'Car'}</span>
-              <span className="keycap-hint">G</span>
-            </div>
+            <Car className="size-4" />
+            <span>{activeVehicle ? 'CarPlay' : 'Garage'}</span>
           </button>
 
           <button
@@ -1727,40 +1685,22 @@ export const AppleHUD: React.FC = () => {
                 ? 'bg-[#007AFF] text-white'
                 : 'text-[var(--ink)] hover:bg-[var(--mist)]'
             }`}
-            title="Open Work & Career Hub — Hybrid Policy, R&D Exploration & Promo Packet (Shortcut: W)"
+            title="Open Work & Career Hub (Shortcut: W)"
           >
-            <span
-              className={`-mt-1 rounded-full px-1.5 py-0.2 font-mono text-[8px] font-extrabold ${
-                workShift
-                  ? 'bg-emerald-500 text-white'
-                  : activeModal === 'career'
-                  ? 'bg-white/25 text-white'
-                  : 'bg-[#007AFF]/15 text-[#007AFF]'
-              }`}
-            >
-              {workShift
-                ? 'Working'
-                : job
-                  ? `${job.officeDaysThisWeek || 0}/3🏢`
-                  : '🔓 Free'}
-            </span>
-            <div className="flex items-center gap-1">
-              <Briefcase className={`size-3.5 ${activeModal === 'career' ? 'text-white' : 'text-[#007AFF]'}`} />
-              <span>Work</span>
-              <span className="keycap-hint">W</span>
-            </div>
+            {workShift && (
+              <span className="absolute top-1 right-1.5 size-2 rounded-full bg-emerald-500" />
+            )}
+            <Briefcase className="size-4" />
+            <span>Work</span>
           </button>
 
           <button
             onClick={() => setActiveModal(activeModal === 'phone' ? null : 'phone', 'levels')}
-            className="btn-press relative flex flex-col items-center gap-0.5 rounded-2xl bg-[#007AFF]/12 px-3 py-1.5 text-[10px] font-bold text-[#007AFF]"
+            className="btn-press relative flex flex-col items-center gap-0.5 rounded-2xl bg-[#007AFF]/12 px-2.5 py-1.5 text-[10px] font-bold text-[#007AFF]"
             title="Open BayOS Phone (Shortcut: P)"
           >
             <Smartphone className="size-4" />
-            <div className="flex items-center gap-1">
-              <span>BayOS</span>
-              <span className="keycap-hint">P</span>
-            </div>
+            <span>BayOS</span>
           </button>
         </div>
       </div>
