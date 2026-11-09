@@ -50,6 +50,7 @@ import {
   CheckCircle2,
   Flame,
   ArrowUpRight,
+  Globe,
 } from 'lucide-react';
 
 interface BlitzProblem {
@@ -2179,9 +2180,23 @@ export const BayPhoneModal: React.FC = () => {
                           >
                             <Heart className="size-3" /> {post.likes + (liked ? 1 : 0)}
                           </button>
-                          <span className="text-[10px] font-semibold text-[var(--ink-soft)]">
-                            💬 {post.comments}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {post.link && (
+                              <a
+                                href={post.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-press inline-flex items-center gap-1 rounded-full bg-[#007AFF] px-2.5 py-1 text-[10px] font-extrabold text-white shadow-2xs hover:bg-[#0066CC]"
+                              >
+                                <Globe className="size-2.5" />
+                                <span>{post.linkLabel || 'Visit Site'}</span>
+                                <ArrowUpRight className="size-2.5" />
+                              </a>
+                            )}
+                            <span className="text-[10px] font-semibold text-[var(--ink-soft)]">
+                              💬 {post.comments}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );

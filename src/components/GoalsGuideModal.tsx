@@ -24,6 +24,8 @@ import {
   LockOpen,
   X,
   ArrowRight,
+  Globe,
+  ArrowUpRight,
 } from 'lucide-react';
 
 interface PlaybookCardDef {
@@ -881,6 +883,38 @@ export const GoalsGuideModal: React.FC = () => {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Creator Spotlight & Personal Site Card */}
+              <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-3xl border border-[#007AFF]/25 bg-gradient-to-r from-[#007AFF]/10 via-[#38BDF8]/10 to-transparent p-4 transition-all">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#007AFF] text-white shadow-sm">
+                    <Globe className="size-5" />
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#007AFF]">
+                        Creator Spotlight
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-extrabold text-[var(--ink)]">
+                      Crafted by Annie
+                    </h4>
+                    <p className="text-[11px] text-[var(--ink-soft)]">
+                      Software engineer · heavy AI adopter · hobby vibe-coder building games & side projects
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href="https://gengannie.github.io/personal_site/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="apple-pill btn-press inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#007AFF] px-3.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-[#0066CC]"
+                >
+                  <span>Visit Personal Site</span>
+                  <ArrowUpRight className="size-3.5" />
+                </a>
               </div>
             </div>
           )}

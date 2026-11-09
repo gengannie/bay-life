@@ -22,6 +22,8 @@ import {
   ArrowRight,
   Cloud,
   FolderOpen,
+  Globe,
+  ArrowUpRight,
 } from 'lucide-react';
 
 interface QuickArchetype {
@@ -239,6 +241,18 @@ export const TitleScreen: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <a
+            href="https://gengannie.github.io/personal_site/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="apple-pill btn-press inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-extrabold text-[var(--ink)] shadow-sm hover:border-[#007AFF]/50 hover:text-[#007AFF] transition-colors"
+            title="Visit Annie's Personal Site & Portfolio"
+          >
+            <Globe className="size-3.5 text-[#007AFF]" />
+            <span>Annie's Site</span>
+            <ArrowUpRight className="size-3 text-[var(--ink-soft)]" />
+          </a>
+
           <button
             onClick={() => setShowAccountModal(true)}
             className="apple-pill btn-press inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-extrabold text-[var(--ink)] shadow-sm hover:border-[#007AFF]/50"
@@ -412,6 +426,35 @@ export const TitleScreen: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Footer / Creator Portfolio Credit */}
+      <div className="relative z-10 mx-auto mt-4 mb-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-[var(--ink-soft)]">
+        <span>
+          Bay Life · Crafted by <strong className="font-bold text-[var(--ink)]">Annie</strong>
+        </span>
+        <span>•</span>
+        <a
+          href="https://gengannie.github.io/personal_site/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 font-bold text-[#007AFF] hover:underline"
+          title="Visit Annie's Portfolio & Side Projects"
+        >
+          <Globe className="size-3" />
+          <span>Personal Site & Portfolio</span>
+          <ArrowUpRight className="size-3" />
+        </a>
+        <span>•</span>
+        <a
+          href="https://github.com/gengannie"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 hover:text-[var(--ink)] hover:underline"
+        >
+          <span>GitHub</span>
+          <ArrowUpRight className="size-3 opacity-60" />
+        </a>
       </div>
 
       {showAccountModal && (

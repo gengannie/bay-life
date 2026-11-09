@@ -4958,7 +4958,30 @@ export const GOALS: Array<{
   },
 ];
 
-export const BLIND_POSTS = [
+export interface BlindPost {
+  id: string;
+  company: string;
+  author: string;
+  title: string;
+  body: string;
+  likes: number;
+  comments: number;
+  link?: string;
+  linkLabel?: string;
+}
+
+export const BLIND_POSTS: BlindPost[] = [
+  {
+    id: 'bp_annie',
+    company: 'Bay Life Creator',
+    author: 'Annie · @gengannie',
+    title: '✨ Welcome to Bay Life! Discover more side projects & work',
+    body: 'Built Bay Life as an interactive simulation of Bay Area tech life. Curious what else I build? Explore my side projects, games, and portfolio at gengannie.github.io/personal_site!',
+    likes: 1024,
+    comments: 92,
+    link: 'https://gengannie.github.io/personal_site/',
+    linkLabel: "Annie's Site",
+  },
   {
     id: 'bp1',
     company: 'Goggle',

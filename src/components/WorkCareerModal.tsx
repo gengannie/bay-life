@@ -65,7 +65,7 @@ interface CareerStoreExtensions {
   trainTechNodeSkill?: (nodeId: TechNodeId, preferredSkill?: SkillKey) => void;
 }
 
-type CareerModalTab = 'hybrid' | 'explore' | 'tree' | 'ladder';
+type CareerModalTab = 'hybrid' | 'explore' | 'tree' | 'interview' | 'ladder';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 

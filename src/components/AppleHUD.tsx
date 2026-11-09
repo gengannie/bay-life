@@ -55,6 +55,8 @@ import {
   Save,
   Target,
   ArrowRight,
+  Globe,
+  ArrowUpRight,
 } from 'lucide-react';
 
 interface SprintTarget {
@@ -735,6 +737,19 @@ export const AppleHUD: React.FC = () => {
               </>
             )}
           </button>
+
+          {/* Annie's Personal Site & Portfolio */}
+          <a
+            href="https://gengannie.github.io/personal_site/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-press inline-flex items-center gap-1 rounded-full bg-[#007AFF]/10 px-2.5 py-1 text-[11px] font-bold text-[#007AFF] hover:bg-[#007AFF]/20 transition-colors"
+            title="Discover more projects on Annie's personal site & portfolio"
+          >
+            <Globe className="size-3" />
+            <span className="hidden sm:inline">Annie's Site</span>
+            <ArrowUpRight className="size-2.5 opacity-70" />
+          </a>
 
           <button
             onClick={() => setScreen('title')}

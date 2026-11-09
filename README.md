@@ -2,6 +2,8 @@
 
 **Live your Silicon Valley software engineer story.**
 
+Created by **[Annie](https://gengannie.github.io/personal_site/)** · [Personal Site & Portfolio](https://gengannie.github.io/personal_site/) · [GitHub](https://github.com/gengannie)
+
 **Bay Life** is a browser-based, Sims-style life simulation game set in the San Francisco Bay Area, inspired by the game mechanics of [Lagos Life](https://lagoslife.app/) and crafted following **Apple Human Interface Guidelines** (macOS Sequoia / iOS 18 / visionOS frosted glass materials, SF Pro typography, Dynamic Island notifications, and fluid spatial UI).
 
 ---

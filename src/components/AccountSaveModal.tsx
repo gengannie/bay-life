@@ -35,6 +35,8 @@ import {
   Volume2,
   VolumeX,
   X,
+  Globe,
+  ArrowUpRight,
 } from 'lucide-react';
 
 export const GoogleLogoSvg: React.FC<{ className?: string }> = ({ className = 'size-4' }) => (
@@ -751,6 +753,24 @@ export const AccountSaveModal: React.FC<AccountSaveModalProps> = ({ onClose }) =
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Footer Creator Link */}
+          <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-2.5 text-[11px] text-[var(--ink-soft)] dark:border-white/10">
+            <span>
+              Bay Life · Crafted by <strong className="font-bold text-[var(--ink)]">Annie</strong>
+            </span>
+            <a
+              href="https://gengannie.github.io/personal_site/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-bold text-[#007AFF] hover:underline"
+              title="Visit Annie's Portfolio & Side Projects"
+            >
+              <Globe className="size-3" />
+              <span>Personal Site & Portfolio</span>
+              <ArrowUpRight className="size-2.5" />
+            </a>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import {
   BASE_NEEDS,
   calculateCommuteDetails,
   CAREER_BY_ID,
+  CAREERS,
   COMMUTE_MODES,
   DOORDASH_MENU,
   FURNITURE_BY_ID,
@@ -1183,6 +1184,13 @@ interface GameActions {
   setWorkTone: (tone: WorkToneId) => void;
   toggleAutoWork: () => void;
   applyJob: (careerId: string) => void;
+  openInterviewLoop: (careerId: string) => void;
+  completeInterviewLoop: (
+    careerId: string,
+    mode: 'official' | 'mock',
+    scorePct: number,
+    roundsPassed: number
+  ) => void;
   vestRsuToCash: () => void;
   investInPortfolio: (amount: number) => void;
   withdrawPortfolio: (amount: number) => void;
@@ -2578,89 +2586,83 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ job: { ...s.job, autoWork: !s.job.autoWork } });
       },
 
-      applyJob: (careerId) => {
+      openInterviewLoop: (careerId) => {
+        const s = get();
+        const career = CAREER_BY_ID[careerId] || CAREERS[0];
+        sfx.play('open');
+        const notice = {
+          id: uid(),
+          text: `🎯 Entered ${career.company} Onsite Interview Arena (${career.entryRequirements?.interviewLoopTitle || '3-Round Technical Loop'})!`,
+          emoji: career.emoji,
+          tone: 'info' as const,
+          time: s.time,
+        };
+        set({
+          activeModal: 'career',
+          careerTab: 'interview',
+          interviewTargetCareerId: career.id,
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      completeInterviewLoop: (careerId, mode, scorePct, roundsPassed) => {
         const s = get();
         const career = CAREER_BY_ID[careerId];
         if (!career) return;
 
-        if (s.workShift || s.travel) {
-          sfx.play('error');
+        const entryReq = career.entryRequirements;
+        const primarySkill =
+          entryReq?.requiredSkills[0]?.skill || career.levels[0].requiredSkill.skill;
+        const secondarySkill =
+          entryReq?.requiredSkills[1]?.skill ||
+          career.levels[0].secondarySkill?.skill ||
+          'systemDesign';
+        const skMeta = SKILLS_META.find((m) => m.key === primarySkill);
+
+        // If Mock Practice Loop OR scorePct < 65, award generous Interview Prep Skill XP + Karma
+        if (mode === 'mock' || scorePct < 65) {
+          const skillGain = +(0.25 + roundsPassed * 0.12).toFixed(2);
+          const secGain = +(0.12 + roundsPassed * 0.06).toFixed(2);
+          const karmaGain = 4 + roundsPassed * 2;
+          const nextPrimary = clamp((s.skills[primarySkill] ?? 0) + skillGain, 0, 10);
+          const nextSecondary = clamp((s.skills[secondarySkill] ?? 0) + secGain, 0, 10);
+
+          sfx.play('cash');
           const notice = {
             id: uid(),
-            text: '🔒 Finish your active shift or transit before sitting for a multi-round onsite interview loop!',
-            emoji: '🔒',
-            tone: 'bad' as const,
+            text:
+              mode === 'mock'
+                ? `🧪 Mock Onsite Loop Complete (${roundsPassed}/3 Rounds LGTM at ${career.company}): +${skillGain} ${skMeta?.label || primarySkill}, +${secGain} ${secondarySkill} & +${karmaGain} ⚡ Karma toward your Offer Gates!`
+                : `📋 ${career.company} Hiring Committee Feedback (${scorePct}% Signal · Needed 65%+): Earned +${skillGain} ${skMeta?.label || primarySkill} & +${karmaGain} ⚡ Karma from the whiteboard rounds!`,
+            emoji: mode === 'mock' ? '🧪' : '📋',
+            tone: 'good' as const,
             time: s.time,
           };
-          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+
+          set({
+            needs: {
+              ...s.needs,
+              energy: clamp(s.needs.energy - 10, 0, 100),
+            },
+            skills: {
+              ...s.skills,
+              [primarySkill]: nextPrimary,
+              [secondarySkill]: nextSecondary,
+            },
+            karma: s.karma + karmaGain,
+            stats: {
+              ...s.stats,
+              leetCodeSolved: s.stats.leetCodeSolved + Math.max(1, roundsPassed),
+            },
+            notices: [notice, ...s.notices.slice(0, 29)],
+            lastToast: notice,
+          });
           return;
         }
 
+        // Official Onsite Loop Passed!
         const unlockedNodes = s.unlockedTechNodes ?? ['node_git_monorepo'];
-        const entryReq = career.entryRequirements;
-
-        if (entryReq) {
-          const missingTechNodes = entryReq.requiredTechNodes.filter(
-            (nid) => !unlockedNodes.includes(nid)
-          );
-          const missingSkills = entryReq.requiredSkills.filter(
-            (req) => Math.floor(s.skills[req.skill] ?? 0) < req.level
-          );
-          const minDeliv = entryReq.minDeliverables ?? 0;
-          const curDeliv = s.job?.deliverablesCompleted ?? 0;
-          const missingDeliv = curDeliv < minDeliv;
-
-          if (missingTechNodes.length > 0 || missingSkills.length > 0 || missingDeliv) {
-            sfx.play('error');
-            const reasons: string[] = [];
-            if (missingTechNodes.length > 0) {
-              const nodeNames = missingTechNodes
-                .map((nid) => {
-                  const n = SKILL_TREE_NODE_BY_ID[nid];
-                  return n ? `${n.emoji} ${n.title}` : nid;
-                })
-                .join(' + ');
-              reasons.push(`Tech Tree: ${nodeNames}`);
-            }
-            if (missingSkills.length > 0) {
-              const skNames = missingSkills
-                .map((req) => {
-                  const meta = SKILLS_META.find((m) => m.key === req.skill);
-                  return `${meta?.label || req.skill} Lv.${req.level} (at Lv.${Math.floor(s.skills[req.skill] ?? 0)})`;
-                })
-                .join(', ');
-              reasons.push(`Skills: ${skNames}`);
-            }
-            if (missingDeliv) {
-              reasons.push(`Shipped Deliverables: ${curDeliv}/${minDeliv}`);
-            }
-
-            const notice = {
-              id: uid(),
-              text: `🔒 ${career.company} Onsite Loop Gate (${entryReq.selectivityLabel}): Missing ${reasons.join(' · ')}. Unlock custom skills in the Skill Tech Tree!`,
-              emoji: career.emoji,
-              tone: 'bad' as const,
-              time: s.time,
-            };
-            set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
-            return;
-          }
-
-          if (s.needs.energy < entryReq.interviewEnergyCost) {
-            sfx.play('error');
-            const notice = {
-              id: uid(),
-              text: `Too tired for ${career.company}’s ${entryReq.interviewLoopTitle} (needs ${entryReq.interviewEnergyCost} Energy). Recharge first!`,
-              emoji: '☕',
-              tone: 'bad' as const,
-              time: s.time,
-            };
-            set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
-            return;
-          }
-        }
-
-        // Determine highest level player qualifies for (up to levelIndex 1 on direct entry — Senior L5+ requires promo packet!)
         let qualifiedIndex = 0;
         for (let i = 0; i < Math.min(2, career.levels.length); i++) {
           const req = career.levels[i].requiredSkill;
@@ -2676,14 +2678,17 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const lvl = career.levels[qualifiedIndex];
         let goalIndex = s.goalIndex;
-        const signOnBonus =
+        const baseSignOn =
           entryReq?.difficultyTier === 'Ultra-Selective'
             ? 6000
             : entryReq?.difficultyTier === 'Selective'
               ? 3000
-              : 0;
-        let cash = s.cash + signOnBonus;
-        let karma = s.karma + (signOnBonus > 0 ? 6 : 0);
+              : 1500;
+        const barRaiserBonus = roundsPassed === 3 ? 2500 : 0;
+        const totalSignOn = baseSignOn + barRaiserBonus;
+
+        let cash = s.cash + totalSignOn;
+        let karma = s.karma + (roundsPassed === 3 ? 10 : 6);
         if (goalIndex === 0) {
           goalIndex = 1;
           cash += GOALS[0].rewardCash;
@@ -2691,11 +2696,12 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         const energyCost = entryReq?.interviewEnergyCost ?? 15;
+        const nextPrimary = clamp((s.skills[primarySkill] ?? 0) + 0.35, 0, 10);
 
         sfx.play('levelup');
         const notice = {
           id: uid(),
-          text: `PASSED ${career.company.toUpperCase()} ONSITE LOOP! Signed as ${lvl.code} ${lvl.title} (${formatCurrency(lvl.baseSalary + lvl.rsuAnnual)}/yr TC${signOnBonus > 0 ? ` + ${formatCurrency(signOnBonus)} sign-on bonus` : ''})!`,
+          text: `🎉 OFFER SIGNED AT ${career.company.toUpperCase()} (${scorePct}% Committee Signal · ${roundsPassed}/3 LGTM)! Joined as ${lvl.code} ${lvl.title} (${formatCurrency(lvl.baseSalary + lvl.rsuAnnual)}/yr TC) + ${formatCurrency(totalSignOn)} Sign-On Bonus!`,
           emoji: '🎉',
           tone: 'good' as const,
           time: s.time,
@@ -2706,10 +2712,14 @@ export const useGameStore = create<GameState & GameActions>()(
             ...s.needs,
             energy: clamp(s.needs.energy - energyCost, 0, 100),
           },
+          skills: {
+            ...s.skills,
+            [primarySkill]: nextPrimary,
+          },
           job: {
             careerId,
             levelIndex: qualifiedIndex,
-            performance: 35,
+            performance: roundsPassed === 3 ? 48 : 38,
             shiftsCompleted: 0,
             shiftsAtLevel: 0,
             deliverablesCompleted: s.job?.deliverablesCompleted ?? 0,
@@ -2727,9 +2737,56 @@ export const useGameStore = create<GameState & GameActions>()(
           goalIndex,
           cash,
           karma,
+          stats: {
+            ...s.stats,
+            earnedToday: s.stats.earnedToday + totalSignOn,
+            earnedTotal: s.stats.earnedTotal + totalSignOn,
+            leetCodeSolved: s.stats.leetCodeSolved + 3,
+          },
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
         });
+      },
+
+      applyJob: (careerId) => {
+        const s = get();
+        const career = CAREER_BY_ID[careerId];
+        if (!career) return;
+
+        // If called during Quick-Start Archetype initialization on Day 1 07:30, assign starter career cleanly
+        const isStarterInit =
+          s.time === 450 && s.stats.daysLived <= 1 && (s.job?.shiftsCompleted ?? 0) === 0 && !s.activeModal;
+        if (isStarterInit) {
+          const starterNodes = new Set<TechNodeId>([
+            ...(s.unlockedTechNodes ?? ['node_git_monorepo']),
+            ...(career.entryRequirements?.requiredTechNodes ?? []),
+          ]);
+          set({
+            unlockedTechNodes: Array.from(starterNodes),
+            job: {
+              careerId,
+              levelIndex: 0,
+              performance: 40,
+              shiftsCompleted: 0,
+              shiftsAtLevel: 0,
+              deliverablesCompleted: career.entryRequirements?.minDeliverables ?? 0,
+              activeProjectId: getNextCareerProject(careerId, undefined, []),
+              projectProgress: 0,
+              completedProjects: [],
+              officeDaysThisWeek: 0,
+              wfhDaysThisWeek: 0,
+              wfaDaysRemaining: 4,
+              weeklyAttendance: ['none', 'none', 'none', 'none', 'none'],
+              rtoCompliant: true,
+              autoWork: false,
+              preferredCommute: hasPersonalCar(s) ? 'tesla' : 'gbus',
+            },
+          });
+          return;
+        }
+
+        // During gameplay, route into the Interactive 3-Round Onsite Interview Loop Arena!
+        get().openInterviewLoop(careerId);
       },
 
       vestRsuToCash: () => {
