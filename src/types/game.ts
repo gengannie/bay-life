@@ -241,6 +241,47 @@ export interface CareerEntryRequirements {
   minDeliverables?: number;
 }
 
+export type InterviewRating = 'strong_hire' | 'hire' | 'lean_hire' | 'lean_no_hire' | 'no_hire';
+
+export interface InterviewChoiceDef {
+  id: string;
+  label: string;
+  approachTag: string; // e.g. "⚡ Staff / Triton Architecture", "📚 Standard Algorithm", "⚠️ Premature Optimization"
+  codeSnippet?: string;
+  signalDelta: number; // e.g. +38, +24, -15
+  rating: InterviewRating;
+  requiredSkill?: { skill: SkillKey; minLevel: number; bonusSignal: number };
+  requiredTechNode?: { nodeId: TechNodeId; bonusSignal: number; bonusLabel: string };
+  interviewerReaction: string;
+  explanation: string;
+}
+
+export interface InterviewRoundDef {
+  roundNumber: 1 | 2 | 3;
+  title: string;
+  focusArea: string; // e.g. "Algorithm & Complexity", "Systems Architecture", "Bar Raiser & Culture"
+  interviewer: {
+    name: string;
+    role: string;
+    emoji: string;
+    vibe: string;
+  };
+  promptContext: string;
+  problemStatement: string;
+  hint?: string;
+  choices: InterviewChoiceDef[];
+}
+
+export interface CompanyInterviewLoopDef {
+  careerId: string;
+  company: string;
+  emoji: string;
+  accent: string;
+  loopTitle: string;
+  difficultyTier: 'Standard' | 'Selective' | 'Ultra-Selective';
+  rounds: InterviewRoundDef[];
+}
+
 export interface CareerLevel {
   level: number;
   code: string; // e.g., "L3", "L4", "L5", "L6", "L7", "L8"
@@ -723,16 +764,27 @@ export interface InteractiveEvent {
   choices: DilemmaChoice[];
 }
 
+export type StartupDifficulty = 'easy' | 'realistic' | 'hardcore';
+
 export interface StartupState {
   name: string;
   tagline: string;
-  stage: 'Ideation' | 'Weekend Prototype' | 'YC Batch' | 'Seed Funded' | 'Series A Unicorn';
+  stage:
+    | 'Ideation'
+    | 'Weekend Prototype'
+    | 'YC Batch'
+    | 'Seed Funded'
+    | 'Series A Unicorn'
+    | 'Decacorn IPO';
   productProgress: number; // 0 to 100
   users: number;
-  mrr: number; // monthly recurring revenue (paid out weekly/4)
+  mrr: number; // monthly recurring revenue
   valuation: number;
   ycAccepted: boolean;
   fundedAmount: number;
+  difficultyMode?: StartupDifficulty;
+  lastActivityDay?: number;
+  rejections?: number;
 }
 
 export interface NoticeItem {

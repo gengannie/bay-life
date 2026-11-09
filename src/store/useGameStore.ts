@@ -11,6 +11,8 @@ import {
   COMMUTE_MODES,
   DOORDASH_MENU,
   FURNITURE_BY_ID,
+  getStartupDailyBurnRate,
+  getStartupNextStageRequirements,
   GOALS,
   HOMES,
   HOME_BY_ID,
@@ -64,6 +66,7 @@ import {
   SaveGameData,
   SimProfile,
   SkillKey,
+  StartupDifficulty,
   StockHolding,
   TechNodeId,
   VehicleDef,
@@ -567,13 +570,13 @@ export function evaluateAspirationProgress(
       case 'unicorn_2': {
         met =
           state.startup.ycAccepted ||
-          ['YC Batch', 'Seed Funded', 'Series A Unicorn'].includes(state.startup.stage);
+          ['YC Batch', 'Seed Funded', 'Series A Unicorn', 'Decacorn IPO'].includes(state.startup.stage);
         pct = met ? 100 : clamp(Math.round((state.startup.productProgress / 50) * 100), 0, 95);
         progressText = met ? 'YC S26 Batch Accepted!' : `${Math.round(state.startup.productProgress)}/50% MVP to Pitch YC`;
         break;
       }
       case 'unicorn_3': {
-        met = ['Seed Funded', 'Series A Unicorn'].includes(state.startup.stage);
+        met = ['Seed Funded', 'Series A Unicorn', 'Decacorn IPO'].includes(state.startup.stage);
         pct = met
           ? 100
           : state.startup.stage === 'YC Batch'
@@ -583,7 +586,7 @@ export function evaluateAspirationProgress(
         break;
       }
       case 'unicorn_4': {
-        met = state.startup.stage === 'Series A Unicorn';
+        met = ['Series A Unicorn', 'Decacorn IPO'].includes(state.startup.stage);
         pct = met
           ? 100
           : state.startup.stage === 'Seed Funded'
@@ -1066,6 +1069,7 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
 
     homeId: homeDef.id,
     locationId: 'home',
+    campusFloorIndex: 0,
     objects: homeDef.starterObjects.map((o) => ({
       uid: uid(),
       objectId: o.objectId,
@@ -1108,6 +1112,9 @@ export function createFreshState(profile: SimProfile, chosenHomeId?: string): Ga
       valuation: profile.origin === 'ycdropout' ? 2500000 : 500000,
       ycAccepted: false,
       fundedAmount: 0,
+      difficultyMode: 'realistic',
+      lastActivityDay: 1,
+      rejections: 0,
     },
 
     relationships: buildInitialRelationships(),
@@ -1166,6 +1173,7 @@ interface GameActions {
   resetToFreshGame: () => void;
   tick: (deltaGameMinutes: number) => void;
   moveToTile: (x: number, y: number) => void;
+  setCampusFloor: (floorIndex: number) => void;
   enqueueAction: (
     actionId: string,
     opts?: { objectUid?: string; stationId?: string; pos?: { x: number; y: number }; auto?: boolean }
@@ -1223,6 +1231,8 @@ interface GameActions {
   orderDoorDash: (itemId: string) => void;
   pitchStartupVC: () => void;
   renameStartup: (name: string, tagline: string) => void;
+  setStartupDifficulty: (mode: StartupDifficulty) => void;
+  launchStartupProductHunt: () => void;
   claimPerk: (perkId: string) => void;
   resolveEventChoice: (choiceIndex: number) => void;
   dismissToast: () => void;
@@ -1552,7 +1562,8 @@ export const useGameStore = create<GameState & GameActions>()(
           raw.locationId === 'home' || (raw.locationId && LOCATION_BY_ID[raw.locationId])
             ? raw.locationId
             : 'home';
-        const gridSize = validLocationId === 'home' ? homeDef.gridSize : 7;
+        const locDef = validLocationId !== 'home' ? LOCATION_BY_ID[validLocationId] : null;
+        const gridSize = validLocationId === 'home' ? homeDef.gridSize : locDef?.gridSize || 7;
 
         const validObjects = Array.isArray(raw.objects)
           ? raw.objects
@@ -1590,6 +1601,7 @@ export const useGameStore = create<GameState & GameActions>()(
           simTab: 'needs',
           homeId: validHomeId,
           locationId: validLocationId,
+          campusFloorIndex: typeof raw.campusFloorIndex === 'number' ? raw.campusFloorIndex : 0,
           objects: validObjects,
           pos: validPos,
           targetPos: null,
@@ -1646,6 +1658,35 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ targetPos: { x, y }, facing });
       },
 
+      setCampusFloor: (floorIdx: number) => {
+        const s = get();
+        if (s.locationId === 'home') return;
+        const loc = LOCATION_BY_ID[s.locationId];
+        if (!loc?.floors || !loc.floors[floorIdx]) return;
+        if (s.campusFloorIndex === floorIdx) return;
+
+        sfx.play('tap');
+        const targetFloor = loc.floors[floorIdx];
+        const centerPos = {
+          x: Math.floor((loc.gridSize || 9) / 2),
+          y: Math.floor((loc.gridSize || 9) / 2),
+        };
+        const notice = {
+          id: uid(),
+          text: `${targetFloor.emoji} Arrived at ${targetFloor.name}`,
+          emoji: targetFloor.emoji,
+          tone: 'info' as const,
+          time: s.time,
+        };
+        set({
+          campusFloorIndex: floorIdx,
+          pos: centerPos,
+          targetPos: null,
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
       enqueueAction: (actionId, opts) => {
         const s = get();
         const def = ACTIONS[actionId];
@@ -1693,13 +1734,29 @@ export const useGameStore = create<GameState & GameActions>()(
         if (!opts?.auto) sfx.play('tap');
 
         let targetPos = opts?.pos;
+        let nextFloorIndex = s.campusFloorIndex || 0;
         if (!targetPos && opts?.objectUid) {
           const foundObj = s.objects.find((o) => o.uid === opts.objectUid);
           if (foundObj) targetPos = { x: foundObj.x, y: foundObj.y };
         }
         if (!targetPos && opts?.stationId && s.locationId !== 'home') {
           const loc = LOCATION_BY_ID[s.locationId];
-          const st = loc?.stations.find((stItem) => stItem.id === opts.stationId);
+          const activeFloorStations = loc?.floors?.[s.campusFloorIndex || 0]?.stations;
+          let st = activeFloorStations?.find((stItem) => stItem.id === opts.stationId);
+          if (!st && loc?.floors) {
+            // Find which floor this station belongs to and switch floor
+            for (let fIdx = 0; fIdx < loc.floors.length; fIdx++) {
+              const cand = loc.floors[fIdx].stations.find((stItem) => stItem.id === opts.stationId);
+              if (cand) {
+                st = cand;
+                nextFloorIndex = fIdx;
+                break;
+              }
+            }
+          }
+          if (!st) {
+            st = loc?.stations.find((stItem) => stItem.id === opts.stationId);
+          }
           if (st) targetPos = { x: st.x, y: st.y };
         }
 
@@ -1731,6 +1788,7 @@ export const useGameStore = create<GameState & GameActions>()(
         set({
           queue: [...existingQueue.slice(0, 4), newItem],
           targetPos: existingQueue.length === 0 && targetPos ? targetPos : s.targetPos,
+          ...(nextFloorIndex !== (s.campusFloorIndex || 0) ? { campusFloorIndex: nextFloorIndex } : {}),
         });
       },
 
@@ -1892,6 +1950,7 @@ export const useGameStore = create<GameState & GameActions>()(
         set({
           time: s.travel.arriveAt,
           locationId: dest,
+          campusFloorIndex: 0,
           travel: null,
           pos: { x: 3, y: 3 },
           targetPos: null,
@@ -2218,8 +2277,14 @@ export const useGameStore = create<GameState & GameActions>()(
         let karma = s.karma;
         let notice;
 
+        let nextShiftsCompleted = s.job.shiftsCompleted ?? 0;
+        let nextShiftsAtLevel = Math.max(s.job.shiftsAtLevel ?? 0, nextShiftsCompleted);
+        const isOnCampus = s.locationId === career.locationId;
+
         if (nextProgress >= 100) {
           nextDeliverables += 1;
+          nextShiftsCompleted += 1;
+          nextShiftsAtLevel += 1;
           if (!nextCompleted.includes(proj.id)) {
             nextCompleted.push(proj.id);
           }
@@ -2273,6 +2338,9 @@ export const useGameStore = create<GameState & GameActions>()(
             performance: nextPerf,
             deliverablesCompleted: nextDeliverables,
             completedProjects: nextCompleted,
+            shiftsCompleted: nextShiftsCompleted,
+            shiftsAtLevel: nextShiftsAtLevel,
+            rtoCompliant: isOnCampus ? true : s.job.rtoCompliant,
           },
           stats: {
             ...s.stats,
@@ -2287,21 +2355,44 @@ export const useGameStore = create<GameState & GameActions>()(
 
       submitPromoPacket: () => {
         const s = get();
-        if (!s.job) return;
+        if (!s.job) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: '⚠️ No Active Employment: You must accept a tech offer before submitting a promotion packet!',
+            emoji: '🏢',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
+
         const career = CAREER_BY_ID[s.job.careerId];
         if (!career) return;
         const nextLvl = career.levels[s.job.levelIndex + 1];
-        if (!nextLvl) return;
+        if (!nextLvl) {
+          sfx.play('tap');
+          const notice = {
+            id: uid(),
+            text: `👑 Top Level Reached: You are already at the pinnacle level of ${career.company} (${career.levels[s.job.levelIndex]?.code})!`,
+            emoji: '👑',
+            tone: 'good' as const,
+            time: s.time,
+          };
+          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          return;
+        }
 
-        const shiftsAtLevel = s.job.shiftsAtLevel ?? s.job.shiftsCompleted ?? 0;
+        const shiftsAtLevel = Math.max(s.job.shiftsAtLevel ?? 0, s.job.shiftsCompleted ?? 0);
         const reqShifts = nextLvl.minShiftsForPromo ?? 3;
         const reqDeliverables = nextLvl.requiredDeliverables ?? 1;
         const deliverablesDone = s.job.deliverablesCompleted ?? 0;
         const primaryPass =
-          Math.floor(s.skills[nextLvl.requiredSkill.skill] ?? 0) >= nextLvl.requiredSkill.level;
+          Math.floor((s.skills[nextLvl.requiredSkill.skill] ?? 0) + 0.001) >= nextLvl.requiredSkill.level;
         const secondaryPass =
           !nextLvl.secondarySkill ||
-          Math.floor(s.skills[nextLvl.secondarySkill.skill] ?? 0) >= nextLvl.secondarySkill.level;
+          (Boolean(nextLvl.secondarySkill) && Math.floor((s.skills[nextLvl.secondarySkill.skill] ?? 0) + 0.001) >= nextLvl.secondarySkill.level);
         const unlockedNodes = s.unlockedTechNodes ?? ['node_git_monorepo'];
         const techNodePass =
           !nextLvl.requiredTechNode || unlockedNodes.includes(nextLvl.requiredTechNode);
@@ -2344,7 +2435,7 @@ export const useGameStore = create<GameState & GameActions>()(
               ...s.job,
               levelIndex: s.job.levelIndex + 1,
               performance: 42,
-              shiftsAtLevel: 0,
+              shiftsAtLevel,
             },
             stats: {
               ...s.stats,
@@ -2357,25 +2448,30 @@ export const useGameStore = create<GameState & GameActions>()(
         } else {
           sfx.play('error');
           const missing: string[] = [];
-          if (!perfPass) missing.push(`${reqPerf}% Perf (at ${Math.round(s.job.performance)}%)`);
-          if (!tenurePass) missing.push(`${reqShifts} Shifts (at ${shiftsAtLevel})`);
-          if (!primaryPass)
-            missing.push(`${nextLvl.requiredSkill.skill} Lv.${nextLvl.requiredSkill.level}`);
-          if (!secondaryPass && nextLvl.secondarySkill)
-            missing.push(`${nextLvl.secondarySkill.skill} Lv.${nextLvl.secondarySkill.level}`);
+          if (!perfPass) missing.push(`${reqPerf}% Calibration (current ${Math.round(s.job.performance)}%)`);
+          if (!tenurePass) missing.push(`${reqShifts} Shifts (logged ${shiftsAtLevel})`);
+          if (!primaryPass) {
+            const pMeta = SKILLS_META.find((m) => m.key === nextLvl.requiredSkill.skill);
+            missing.push(`${pMeta?.label || nextLvl.requiredSkill.skill} Lv.${nextLvl.requiredSkill.level} (current Lv.${Math.floor((s.skills[nextLvl.requiredSkill.skill] ?? 0) + 0.001)})`);
+          }
+          if (!secondaryPass && nextLvl.secondarySkill) {
+            const secSkill = nextLvl.secondarySkill;
+            const sMeta = SKILLS_META.find((m) => m.key === secSkill.skill);
+            missing.push(`${sMeta?.label || secSkill.skill} Lv.${secSkill.level} (current Lv.${Math.floor((s.skills[secSkill.skill] ?? 0) + 0.001)})`);
+          }
           if (!techNodePass && nextLvl.requiredTechNode) {
             const reqNodeDef = SKILL_TREE_NODE_BY_ID[nextLvl.requiredTechNode];
             missing.push(`Tech Tree: ${reqNodeDef?.title || nextLvl.requiredTechNode}`);
           }
           if (!delivPass)
-            missing.push(`${reqDeliverables} Shipped Deliverables (at ${deliverablesDone})`);
-          if (!rtoPass) missing.push('3/3 Hybrid Office Days');
+            missing.push(`${reqDeliverables} Shipped Deliverables (current ${deliverablesDone})`);
+          if (!rtoPass) missing.push('3/3 Hybrid Office Days (Fix in Career Hub / Badge In)');
 
           const notice = {
             id: uid(),
-            text: `Promo Committee Feedback for ${nextLvl.code}: Complete remaining gates — ${missing.join(' · ')}.`,
-            emoji: '📋',
-            tone: 'info' as const,
+            text: `⚠️ Promo Blocked for ${nextLvl.code}: Missing ${missing.join(' · ')}`,
+            emoji: '⚠️',
+            tone: 'bad' as const,
             time: s.time,
           };
           set({
@@ -2489,16 +2585,43 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        // Pick preferredSkill if specified, otherwise first unmet required skill, or primary skill of the node
-        const targetReq =
-          (preferredSkill && node.requiredSkills.find((req) => req.skill === preferredSkill)) ||
-          node.requiredSkills.find((req) => Math.floor(s.skills[req.skill] ?? 0) < req.level) ||
-          node.requiredSkills[0];
+        // Determine target skill to train
+        let targetReq =
+          (preferredSkill && (node.requiredSkills.find((req) => req.skill === preferredSkill) || { skill: preferredSkill, level: 10 })) ||
+          node.requiredSkills.find((req) => Math.floor((s.skills[req.skill] ?? 0) + 0.001) < req.level);
+
+        if (!targetReq) {
+          // If all node required skills are met, check if current career promo target needs any skill on this node
+          if (s.job) {
+            const curCareer = CAREER_BY_ID[s.job.careerId];
+            const nextLvl = curCareer?.levels[s.job.levelIndex + 1];
+            if (nextLvl) {
+              const promoSkills = [nextLvl.requiredSkill, nextLvl.secondarySkill].filter(Boolean) as { skill: SkillKey; level: number }[];
+              const matchingPromoReq = promoSkills.find(
+                (ps) =>
+                  node.requiredSkills.some((ns) => ns.skill === ps.skill) &&
+                  Math.floor((s.skills[ps.skill] ?? 0) + 0.001) < ps.level
+              );
+              if (matchingPromoReq) {
+                targetReq = matchingPromoReq;
+              }
+            }
+          }
+        }
+
+        if (!targetReq) {
+          // Fall back to skill on the node with lowest current level
+          const sorted = [...node.requiredSkills].sort(
+            (a, b) => (s.skills[a.skill] ?? 0) - (s.skills[b.skill] ?? 0)
+          );
+          targetReq = sorted[0] || node.requiredSkills[0];
+        }
+
         const sk = targetReq.skill;
         const meta = SKILLS_META.find((m) => m.key === sk);
-        const prevFloor = Math.floor(s.skills[sk] ?? 0);
+        const prevFloor = Math.floor((s.skills[sk] ?? 0) + 0.001);
         const nextVal = Math.min(10, +((s.skills[sk] ?? 0) + 0.55).toFixed(2));
-        const newFloor = Math.floor(nextVal);
+        const newFloor = Math.floor(nextVal + 0.001);
         const leveledUp = newFloor > prevFloor;
         const karmaGain = leveledUp ? 6 : 2;
         const royaltyCash =
@@ -2537,6 +2660,9 @@ export const useGameStore = create<GameState & GameActions>()(
         const career = CAREER_BY_ID[s.job.careerId];
         const lvl = career.levels[s.job.levelIndex];
         const ratio = Math.max(0.1, s.workShift.elapsedMinutes / s.workShift.totalMinutes);
+        const earnedPartialShift = ratio >= 0.5;
+        const nextShiftsCompleted = (s.job.shiftsCompleted ?? 0) + (earnedPartialShift ? 1 : 0);
+        const nextShiftsAtLevel = Math.max(s.job.shiftsAtLevel ?? 0, s.job.shiftsCompleted ?? 0) + (earnedPartialShift ? 1 : 0);
         const execHaloMult = s.unlockedPerks.includes('perk_exec_halo') ? 1.25 : 1.0;
         const earnedCash = Math.round(lvl.shiftPay * ratio * 0.75 * execHaloMult);
         const earnedRsu = Math.round(lvl.rsuPerShift * ratio * 0.75 * execHaloMult);
@@ -2551,7 +2677,7 @@ export const useGameStore = create<GameState & GameActions>()(
         sfx.play('cash');
         const notice = {
           id: uid(),
-          text: `Left shift early · Collected ${formatCurrency(earnedCash)} cash + ${formatCurrency(earnedRsu)} RSU.`,
+          text: `Left shift early (${Math.round(ratio * 100)}% complete) · Collected ${formatCurrency(earnedCash)} cash + ${formatCurrency(earnedRsu)} RSU${earnedPartialShift ? ' & +1 Shift Credit' : ''}.`,
           emoji: '💸',
           tone: 'cash' as const,
           time: s.time,
@@ -2562,6 +2688,11 @@ export const useGameStore = create<GameState & GameActions>()(
           unvestedRsu: s.unvestedRsu + earnedRsu,
           finance: fin,
           workShift: null,
+          job: {
+            ...s.job,
+            shiftsCompleted: nextShiftsCompleted,
+            shiftsAtLevel: nextShiftsAtLevel,
+          },
           stats: {
             ...s.stats,
             earnedToday: s.stats.earnedToday + earnedCash,
@@ -2720,8 +2851,8 @@ export const useGameStore = create<GameState & GameActions>()(
             careerId,
             levelIndex: qualifiedIndex,
             performance: roundsPassed === 3 ? 48 : 38,
-            shiftsCompleted: 0,
-            shiftsAtLevel: 0,
+            shiftsCompleted: s.job?.shiftsCompleted ?? 0,
+            shiftsAtLevel: Math.max(s.job?.shiftsAtLevel ?? 0, s.job?.shiftsCompleted ?? 0),
             deliverablesCompleted: s.job?.deliverablesCompleted ?? 0,
             activeProjectId: getNextCareerProject(careerId, undefined, s.job?.completedProjects),
             projectProgress: 0,
@@ -2928,8 +3059,8 @@ export const useGameStore = create<GameState & GameActions>()(
             careerId,
             levelIndex: qualifiedIndex,
             performance: 42,
-            shiftsCompleted: 0,
-            shiftsAtLevel: 0,
+            shiftsCompleted: s.job?.shiftsCompleted ?? 0,
+            shiftsAtLevel: Math.max(s.job?.shiftsAtLevel ?? 0, s.job?.shiftsCompleted ?? 0),
             deliverablesCompleted: s.job?.deliverablesCompleted ?? 0,
             activeProjectId: getNextCareerProject(careerId, undefined, s.job?.completedProjects),
             projectProgress: 0,
@@ -5133,96 +5264,205 @@ export const useGameStore = create<GameState & GameActions>()(
 
       pitchStartupVC: () => {
         const s = get();
-        const st = s.startup;
-        if (st.productProgress < 50) {
+        let st = { ...s.startup };
+        if (typeof st.users === 'number' && st.users > 200_000) {
+          st.users = 42_580;
+        }
+
+        const difficulty = st.difficultyMode || 'realistic';
+        const req = getStartupNextStageRequirements(st.stage, difficulty);
+
+        if (!req || !req.nextStage) {
           sfx.play('error');
           const notice = {
             id: uid(),
-            text: `Build your Startup MVP to at least 50% (currently ${Math.round(st.productProgress)}%) before pitching VCs!`,
-            emoji: '🚀',
-            tone: 'bad' as const,
+            text: `All venture rounds are closed! ${st.name} is a generation-defining Decacorn ($10B Market Cap). You conquered Silicon Valley!`,
+            emoji: '🏆',
+            tone: 'good' as const,
             time: s.time,
           };
-          set({ notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
+          set({ startup: st, notices: [notice, ...s.notices.slice(0, 29)], lastToast: notice });
           return;
         }
 
-        const stages: Array<GameState['startup']['stage']> = [
-          'Ideation',
-          'Weekend Prototype',
-          'YC Batch',
-          'Seed Funded',
-          'Series A Unicorn',
-        ];
-        const currIdx = stages.indexOf(st.stage);
-        const nextStage = stages[Math.min(stages.length - 1, currIdx + 1)];
+        // Validate traction gates
+        const missing: string[] = [];
+        if (st.productProgress < req.minMvp) {
+          missing.push(`MVP Readiness ${Math.round(st.productProgress)}% / ${req.minMvp}%`);
+        }
+        if (st.users < req.minUsers) {
+          missing.push(`Active Devs ${st.users.toLocaleString()} / ${req.minUsers.toLocaleString()}`);
+        }
+        if (st.mrr < req.minMrr) {
+          missing.push(`Stripe MRR ${formatCurrency(st.mrr)} / ${formatCurrency(req.minMrr)}`);
+        }
+        if ((s.skills.hustle || 0) < req.minHustle) {
+          missing.push(`Hustle Lv.${Math.floor(s.skills.hustle || 0)} / Lv.${req.minHustle}`);
+        }
+        if ((s.skills.systemDesign || 0) < req.minSysDesign) {
+          missing.push(`System Design Lv.${Math.floor(s.skills.systemDesign || 0)} / Lv.${req.minSysDesign}`);
+        }
 
+        if (missing.length > 0) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `VC Diligence Pass: '${st.name} has promise, but Sand Hill VCs passed. Meet these milestones to close ${req.stageTitle}: ${missing.join(', ')}.'`,
+            emoji: '🛑',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({
+            startup: { ...st, rejections: (st.rejections || 0) + 1 },
+            notices: [notice, ...s.notices.slice(0, 29)],
+            lastToast: notice,
+          });
+          return;
+        }
+
+        // Hardcore mode diligence variance check (if player hustle is barely at minimum, 25% delay)
+        if (difficulty === 'hardcore' && Math.floor(s.skills.hustle || 0) === req.minHustle && Math.random() < 0.25) {
+          sfx.play('error');
+          const notice = {
+            id: uid(),
+            text: `Term sheet delayed in VC partner meeting! Sequoia partner probed cloud unit economics. Level up Hustle or grow MRR to close.`,
+            emoji: '⏳',
+            tone: 'bad' as const,
+            time: s.time,
+          };
+          set({
+            startup: { ...st, rejections: (st.rejections || 0) + 1 },
+            notices: [notice, ...s.notices.slice(0, 29)],
+            lastToast: notice,
+          });
+          return;
+        }
+
+        const nextStage = req.nextStage;
         const vcMult = s.unlockedPerks.includes('perk_vc_whisperer') ? 1.35 : 1.0;
-        const fundingGrant = Math.round(
-          (nextStage === 'Weekend Prototype'
-            ? 25000
-            : nextStage === 'YC Batch'
-              ? 125000
-              : nextStage === 'Seed Funded'
-                ? 450000
-                : 1500000) * vcMult
-        );
-
-        const newVal = Math.round(
-          (nextStage === 'Weekend Prototype'
-            ? 3500000
-            : nextStage === 'YC Batch'
-              ? 12000000
-              : nextStage === 'Seed Funded'
-                ? 42000000
-                : 1000000000) * vcMult
-        );
-
-        const newMrr = Math.round(
-          (nextStage === 'Weekend Prototype'
-            ? 3500
-            : nextStage === 'YC Batch'
-              ? 18000
-              : nextStage === 'Seed Funded'
-                ? 85000
-                : 320000) * vcMult
-        );
+        const newVal = Math.round(req.valuation * vcMult);
+        const fundingGrant = Math.round(req.companyGrant * vcMult);
+        const founderLiquidity = Math.round(req.founderSecondary * vcMult);
+        const newMrr = Math.max(st.mrr, Math.round(req.targetMrr * vcMult));
+        const newDevs = st.users + req.prDevSurge;
 
         const fin = recordCashFlow(ensureFinanceState(s), {
           time: s.time,
-          label: `${st.name} ${nextStage} VC Secondary Liquidity`,
+          label: `${st.name} ${req.stageTitle} Founder Secondary Liquidity`,
           emoji: '🦄',
-          amount: fundingGrant,
+          amount: founderLiquidity,
           category: 'startup',
         });
 
         sfx.play('levelup');
         const notice = {
           id: uid(),
-          text: `TERM SHEET SIGNED! ${st.name} reached ${nextStage} (${formatCurrency(newVal)} valuation) · +${formatCurrency(fundingGrant)} founder liquidity & +12 ⚡ Karma!`,
+          text: `TERM SHEET SIGNED! ${st.name} closed ${req.stageTitle} (${formatCurrency(newVal)} valuation)! +${formatCurrency(founderLiquidity)} founder secondary cash & +${req.prDevSurge.toLocaleString()} PR dev signups!`,
           emoji: '🦄',
           tone: 'cash' as const,
           time: s.time,
         };
 
+        const nextProductProgress = nextStage === 'Decacorn IPO' ? 100 : 20;
+
         set({
-          cash: s.cash + fundingGrant,
-          karma: s.karma + 12,
+          cash: s.cash + founderLiquidity,
+          karma: s.karma + 15,
           finance: fin,
           startup: {
             ...st,
             stage: nextStage,
-            productProgress: nextStage === 'Series A Unicorn' ? 100 : 20,
-            users: st.users * 4 + 2500,
+            productProgress: nextProductProgress,
+            users: newDevs,
             mrr: newMrr,
             valuation: newVal,
             ycAccepted: nextStage === 'YC Batch' || st.ycAccepted,
             fundedAmount: st.fundedAmount + fundingGrant,
+            difficultyMode: difficulty,
+            lastActivityDay: Math.floor(s.time / 1440) + 1,
           },
           moodlets: [
             ...s.moodlets.filter((m) => m.id !== 'yc_momentum'),
-            { id: 'yc_momentum', expiresAt: s.time + 480 },
+            { id: 'yc_momentum', expiresAt: s.time + 720 },
           ],
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      setStartupDifficulty: (mode: StartupDifficulty) => {
+        const s = get();
+        let st = { ...s.startup };
+        if (typeof st.users === 'number' && st.users > 200_000) {
+          st.users = 42_580;
+        }
+        sfx.play('tap');
+        const labels: Record<StartupDifficulty, string> = {
+          easy: 'Casual Bootcamp (Zero burn, lenient VCs, no churn)',
+          realistic: 'Realistic Silicon Valley (Traction gates, cloud GPU burn & dev churn)',
+          hardcore: 'Founder Hardcore (High GPU bills, ruthless partner diligence & rapid churn)',
+        };
+        const notice = {
+          id: uid(),
+          text: `Startup Difficulty Mode set to: ${labels[mode]}.`,
+          emoji: mode === 'easy' ? '🌱' : mode === 'realistic' ? '⚡' : '🔥',
+          tone: 'info' as const,
+          time: s.time,
+        };
+        set({
+          startup: { ...st, difficultyMode: mode },
+          notices: [notice, ...s.notices.slice(0, 29)],
+          lastToast: notice,
+        });
+      },
+
+      launchStartupProductHunt: () => {
+        const s = get();
+        let st = { ...s.startup };
+        if (typeof st.users === 'number' && st.users > 200_000) {
+          st.users = 42_580;
+        }
+
+        const difficulty = st.difficultyMode || 'realistic';
+        const mult = difficulty === 'hardcore' ? 0.8 : difficulty === 'easy' ? 1.35 : 1.0;
+        const devGain = Math.round((140 + Math.random() * 80) * mult);
+        const mrrGain = Math.round((300 + Math.random() * 150) * mult);
+        const cashGrant = Math.round(380 * mult);
+        const mvpGain = difficulty === 'hardcore' ? 2 : 4;
+        const currentDay = Math.floor(s.time / 1440) + 1;
+
+        const fin = recordCashFlow(ensureFinanceState(s), {
+          time: s.time,
+          label: `ProductHunt Day-1 Customer Subscriptions (${st.name})`,
+          emoji: '🚀',
+          amount: cashGrant,
+          category: 'startup',
+        });
+
+        sfx.play('cash');
+        const notice = {
+          id: uid(),
+          text: `🚀 Trending on ProductHunt! +${devGain} organic dev signups, +${formatCurrency(mrrGain)}/m Stripe MRR, +${mvpGain}% MVP polish & +${formatCurrency(cashGrant)} founder revenue!`,
+          emoji: '🚀',
+          tone: 'cash' as const,
+          time: s.time,
+        };
+
+        const nextSkills = { ...s.skills };
+        nextSkills.hustle = clamp((nextSkills.hustle || 0) + 0.25, 0, 10);
+
+        set({
+          cash: s.cash + cashGrant,
+          karma: s.karma + 2,
+          skills: nextSkills,
+          finance: fin,
+          startup: {
+            ...st,
+            users: st.users + devGain,
+            mrr: st.mrr + mrrGain,
+            productProgress: clamp(st.productProgress + mvpGain, 0, 100),
+            lastActivityDay: currentDay,
+          },
           notices: [notice, ...s.notices.slice(0, 29)],
           lastToast: notice,
         });
@@ -5390,7 +5630,8 @@ export const useGameStore = create<GameState & GameActions>()(
             let bestStationId: string | undefined;
             let bestPos: { x: number; y: number } | undefined;
 
-            for (const st of venue.stations) {
+            const activeFloorStations = venue.floors?.[s.campusFloorIndex || 0]?.stations || venue.stations;
+            for (const st of activeFloorStations) {
               for (const actId of st.actionIds) {
                 const act = ACTIONS[actId];
                 if (!act) continue;
@@ -5535,6 +5776,7 @@ export const useGameStore = create<GameState & GameActions>()(
         let pgeChangeAt = s.pgeChangeAt;
         let weather = s.weather;
         let locationId = s.locationId;
+        let campusFloorIndex = s.campusFloorIndex ?? 0;
         let travel = s.travel ? { ...s.travel } : null;
         let workShift = s.workShift ? { ...s.workShift } : null;
         let job = s.job ? { ...s.job } : null;
@@ -5714,25 +5956,75 @@ export const useGameStore = create<GameState & GameActions>()(
             }
           }
 
-          // Startup daily revenue payout
-          if (startup.mrr > 0) {
+          // Startup daily revenue payout & cloud burn
+          if (typeof startup.users === 'number' && startup.users > 200_000) {
+            startup.users = 42_580;
+          }
+          const startupDiff = startup.difficultyMode || 'realistic';
+          const dailyCloudBurn = getStartupDailyBurnRate(startup.stage, startupDiff);
+
+          if (startup.mrr > 0 || dailyCloudBurn > 0) {
             const vcMrrMult = s.unlockedPerks.includes('perk_vc_whisperer') ? 1.35 : 1.0;
-            const dailyRev = Math.round((startup.mrr * vcMrrMult) / 7);
-            cash += dailyRev;
-            stats.earnedToday += dailyRev;
-            stats.earnedTotal += dailyRev;
-            finance = recordCashFlow(finance, {
-              time: newTime,
-              label: `Stripe MRR Payout (${startup.name})`,
-              emoji: '💳',
-              amount: dailyRev,
-              category: 'startup',
-            });
-            pushNotice(
-              `Stripe Payout: +${formatCurrency(dailyRev)} recurring revenue from ${startup.name}!`,
-              '💳',
-              'cash'
-            );
+            const grossDailyRev = Math.round((startup.mrr * vcMrrMult) / 7);
+            const netDaily = grossDailyRev - dailyCloudBurn;
+
+            if (netDaily >= 0) {
+              cash += netDaily;
+              stats.earnedToday += netDaily;
+              stats.earnedTotal += netDaily;
+              finance = recordCashFlow(finance, {
+                time: newTime,
+                label: `Stripe MRR Net Payout (${startup.name}${dailyCloudBurn > 0 ? ` · -$${dailyCloudBurn} AWS/GPU` : ''})`,
+                emoji: '💳',
+                amount: netDaily,
+                category: 'startup',
+              });
+              pushNotice(
+                `Stripe Payout: +${formatCurrency(netDaily)} net recurring revenue from ${startup.name}${dailyCloudBurn > 0 ? ` (+${formatCurrency(grossDailyRev)} gross, -${formatCurrency(dailyCloudBurn)} cloud GPU burn)` : ''}!`,
+                '💳',
+                'cash'
+              );
+            } else {
+              const deficit = Math.abs(netDaily);
+              if (cash >= deficit) {
+                cash -= deficit;
+                finance = recordCashFlow(finance, {
+                  time: newTime,
+                  label: `Cloud Infra & GPU Deficit (${startup.name})`,
+                  emoji: '🔥',
+                  amount: -deficit,
+                  category: 'startup',
+                });
+                pushNotice(
+                  `⚠️ AWS Cloud Bill: ${startup.name} burned -${formatCurrency(deficit)} in GPU cluster hosting over Stripe MRR.`,
+                  '🔥',
+                  'bad'
+                );
+              } else {
+                pushNotice(
+                  `🚨 Cloud Hosting Overdue! ${startup.name} could not cover -${formatCurrency(deficit)} AWS bill. Ship code or raise revenue!`,
+                  '🚨',
+                  'bad'
+                );
+              }
+            }
+          }
+
+          // Daily Dev Churn for inactive startups (if idle without shipping updates for 2+ days)
+          if (startupDiff !== 'easy' && startup.users > 25) {
+            const lastActive = startup.lastActivityDay || 1;
+            if (newDay - lastActive >= 2) {
+              const churnPct = startupDiff === 'hardcore' ? 0.025 : 0.012;
+              const churned = Math.max(1, Math.round(startup.users * churnPct));
+              startup.users = Math.max(15, startup.users - churned);
+              if (churned >= 5) {
+                pushNotice(
+                  `📉 Dev Churn: -${churned} active developers churned due to no recent product updates. Ship code at your desk to retain devs!`,
+                  '📉',
+                  'bad'
+                );
+              }
+            }
           }
 
           // Weekly rent every 7 days if home is not owned
@@ -5767,9 +6059,17 @@ export const useGameStore = create<GameState & GameActions>()(
           const weekdayAfterRollover = Math.floor(newTime / 1440) % 7;
           if (weekdayAfterRollover === 0 && newDay > 2 && job) {
             const officeLogged = job.officeDaysThisWeek ?? 0;
+            const wfaLogged = (job.weeklyAttendance || []).filter((a) => a === 'wfa').length;
+            const officeAndWfa = officeLogged + wfaLogged;
+            const wfhLogged = job.wfhDaysThisWeek ?? 0;
             const career = CAREER_BY_ID[job.careerId];
-            if (officeLogged >= 3) {
-              const stipend = 500;
+            const isCompliant =
+              officeAndWfa >= 3 ||
+              (officeAndWfa >= 1 && wfhLogged <= 2) ||
+              (job.shiftsCompleted ?? 0) <= 2;
+
+            if (isCompliant) {
+              const stipend = officeLogged >= 3 ? 500 : 250;
               cash += stipend;
               stats.earnedToday += stipend;
               stats.earnedTotal += stipend;
@@ -5790,7 +6090,7 @@ export const useGameStore = create<GameState & GameActions>()(
                 wfaDaysRemaining: Math.min(4, (job.wfaDaysRemaining ?? 4) + 2),
               };
               pushNotice(
-                `Hybrid RTO Audit Passed (${officeLogged}/3 Office Days at ${career?.company || 'HQ'})! +$500 Commuter Stipend, +8% Calibration, & WFA Passport topped up.`,
+                `Hybrid RTO Audit Passed (${officeAndWfa}/3 Compliant Days at ${career?.company || 'HQ'})! +$${stipend} Commuter Stipend, +8% Calibration, & WFA Passport topped up.`,
                 '🏢',
                 'good'
               );
@@ -5887,6 +6187,7 @@ export const useGameStore = create<GameState & GameActions>()(
             const dest = travel.to;
             const modeDef = COMMUTE_MODES.find((m) => m.id === travel!.mode);
             locationId = dest;
+            campusFloorIndex = 0;
             travel = null;
             pos = { x: 3, y: 3 };
             targetPos = null;
@@ -6111,19 +6412,22 @@ export const useGameStore = create<GameState & GameActions>()(
             const reqShifts = nextLvl?.minShiftsForPromo ?? 4;
             const reqDeliv = nextLvl?.requiredDeliverables ?? 1;
             const reqPerf = s.unlockedPerks.includes('perk_exec_halo') ? 82 : 92;
-            const hasPrimary = nextLvl ? Math.floor(skills[nextLvl.requiredSkill.skill]) >= nextLvl.requiredSkill.level : false;
+            const currentShifts = Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted ?? 0);
+            const hasPrimary = nextLvl
+              ? Math.floor((skills[nextLvl.requiredSkill.skill] ?? 0) + 0.001) >= nextLvl.requiredSkill.level
+              : false;
             const hasSecondary = nextLvl?.secondarySkill
-              ? Math.floor(skills[nextLvl.secondarySkill.skill]) >= nextLvl.secondarySkill.level
+              ? Math.floor((skills[nextLvl.secondarySkill.skill] ?? 0) + 0.001) >= nextLvl.secondarySkill.level
               : true;
             const unlockedNodes = s.unlockedTechNodes ?? ['node_git_monorepo'];
             const hasTechNode =
               !nextLvl?.requiredTechNode || unlockedNodes.includes(nextLvl.requiredTechNode);
-            const rtoOk = job.rtoCompliant !== false && ((job.officeDaysThisWeek ?? 0) >= 3 || job.shiftsCompleted <= 3);
+            const rtoOk = job.rtoCompliant !== false;
 
             if (
               nextLvl &&
-              job.performance >= reqPerf &&
-              job.shiftsAtLevel >= reqShifts &&
+              Math.round(job.performance) >= reqPerf &&
+              currentShifts >= reqShifts &&
               (job.deliverablesCompleted ?? 0) >= reqDeliv &&
               hasPrimary &&
               hasSecondary &&
@@ -6131,8 +6435,8 @@ export const useGameStore = create<GameState & GameActions>()(
               rtoOk
             ) {
               job.levelIndex += 1;
-              job.performance = 35;
-              job.shiftsAtLevel = 0;
+              job.performance = 42;
+              job.shiftsAtLevel = currentShifts;
               const spotBonus = Math.round(nextLvl.baseSalary * 0.06);
               cash += spotBonus;
               karma += 12;
@@ -6306,6 +6610,8 @@ export const useGameStore = create<GameState & GameActions>()(
                 const gain = def.startupProgress * progressStep * homeStartupMult * angelMult;
                 startup.productProgress = clamp(startup.productProgress + gain, 0, 100);
                 startup.users += Math.round(gain * 12 * angelUserMult);
+                if (startup.users > 200_000) startup.users = 42_580;
+                startup.lastActivityDay = newDay;
               }
 
               if (current.elapsedMinutes >= current.totalMinutes) {
@@ -6352,8 +6658,62 @@ export const useGameStore = create<GameState & GameActions>()(
                   ];
                 }
 
+                if (job && def.workPerformanceDelta) {
+                  job.performance = clamp(job.performance + def.workPerformanceDelta, 0, 100);
+                  pushNotice(`Work Calibration: +${def.workPerformanceDelta}% performance rating!`, '📈', 'good');
+                }
+
+                if (job && (def.category === 'work' || locationId === CAREER_BY_ID[job.careerId]?.locationId)) {
+                  job.rtoCompliant = true;
+                }
+
+                if (job && def.projectProgressDelta) {
+                  const activeProjId =
+                    job.activeProjectId || getNextCareerProject(job.careerId, undefined, job.completedProjects);
+                  const currentProg = job.projectProgress || 0;
+                  const nextProg = currentProg + def.projectProgressDelta;
+                  if (nextProg >= 100) {
+                    const projDef = WORK_PROJECT_BY_ID[activeProjId];
+                    const completedList = job.completedProjects || [];
+                    const nextCompleted = completedList.includes(activeProjId) ? completedList : [...completedList, activeProjId];
+                    const bonusCash = projDef?.rewardCash ?? 1400;
+                    const bonusPerf = projDef?.promoPerfBoost ?? 10;
+                    cash += bonusCash;
+                    karma += 4;
+                    stats.earnedToday += bonusCash;
+                    stats.earnedTotal += bonusCash;
+                    finance = recordCashFlow(finance, {
+                      time: newTime,
+                      label: `Charter Milestone Bonus (${projDef?.title || 'Core Initiative'})`,
+                      emoji: projDef?.emoji || '🚀',
+                      amount: bonusCash,
+                      category: 'bounties',
+                    });
+                    job.deliverablesCompleted = (job.deliverablesCompleted ?? 0) + 1;
+                    job.shiftsCompleted = (job.shiftsCompleted ?? 0) + 1;
+                    job.shiftsAtLevel = Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted);
+                    job.completedProjects = nextCompleted;
+                    job.activeProjectId = getNextCareerProject(job.careerId, activeProjId, nextCompleted);
+                    job.projectProgress = 0;
+                    job.performance = clamp(job.performance + bonusPerf, 0, 100);
+                    pushNotice(
+                      `Shipped Charter Milestone "${projDef?.title || 'Core Initiative'}"! +1 Deliverable, +4 ⚡ Karma & +${formatCurrency(bonusCash)} spot bonus!`,
+                      projDef?.emoji || '🚀',
+                      'good'
+                    );
+                  } else {
+                    job.projectProgress = nextProg;
+                    pushNotice(`R&D Project Progress: +${def.projectProgressDelta}% (${nextProg}%)`, '🚀', 'good');
+                  }
+                }
+
+                if (def.rsuBonus) {
+                  unvestedRsu += def.rsuBonus;
+                  pushNotice(`Spot Equity Grant: +$${def.rsuBonus.toLocaleString()} Unvested RSUs!`, '💎', 'cash');
+                }
+
                 if (def.id === 'grind_leetcode') stats.leetCodeSolved += 1;
-                if (def.category === 'skill' || def.category === 'hustle') stats.commitsPushed += 1;
+                if (def.category === 'skill' || def.category === 'hustle' || def.category === 'work') stats.commitsPushed += 1;
                 if (
                   def.id === 'brew_pourover' ||
                   def.id === 'pull_espresso_shot' ||
@@ -6367,7 +6727,8 @@ export const useGameStore = create<GameState & GameActions>()(
                   goalIndex === 1 &&
                   (def.id === 'grind_leetcode' ||
                     def.id === 'build_startup_mvp' ||
-                    def.id === 'vibe_code_ai')
+                    def.id === 'vibe_code_ai' ||
+                    def.id === 'claim_ergonomic_desk')
                 ) {
                   goalIndex = 2;
                   cash += GOALS[1].rewardCash;
@@ -6556,6 +6917,7 @@ export const useGameStore = create<GameState & GameActions>()(
           pgeChangeAt,
           weather,
           locationId,
+          campusFloorIndex,
           travel,
           workShift,
           job,
@@ -6610,6 +6972,7 @@ export const useGameStore = create<GameState & GameActions>()(
         freeWill: state.freeWill,
         homeId: state.homeId,
         locationId: state.locationId,
+        campusFloorIndex: state.campusFloorIndex,
         objects: state.objects,
         pos: state.pos,
         targetPos: state.targetPos,
@@ -6646,6 +7009,17 @@ export const useGameStore = create<GameState & GameActions>()(
             normalizedRels[npc.id] = ensureRelationshipState(npc.id, state.relationships?.[npc.id]);
           }
           state.relationships = normalizedRels;
+          if (state.startup) {
+            if (typeof state.startup.users === 'number' && state.startup.users > 200_000) {
+              state.startup.users = 42_580;
+            }
+            if (!state.startup.difficultyMode) {
+              state.startup.difficultyMode = 'realistic';
+            }
+            if (!state.startup.lastActivityDay) {
+              state.startup.lastActivityDay = Math.floor(state.time / 1440) + 1;
+            }
+          }
         }
       },
     }

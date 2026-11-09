@@ -332,17 +332,17 @@ export const WorkCareerModal: React.FC = () => {
   const completedProjects = effectiveJob.completedProjects ?? [];
 
   // Multi-Gate Promo Checklist calculations
-  const shiftsAtLevel = effectiveJob.shiftsAtLevel ?? effectiveJob.shiftsCompleted ?? 0;
+  const shiftsAtLevel = Math.max(effectiveJob.shiftsAtLevel ?? 0, effectiveJob.shiftsCompleted ?? 0);
   const reqShifts = nextLevel?.minShiftsForPromo ?? 3;
   const reqDeliverables = nextLevel?.requiredDeliverables ?? 1;
   const primarySkillKey = nextLevel?.requiredSkill.skill ?? currentLevel.requiredSkill.skill;
   const primarySkillReq = nextLevel?.requiredSkill.level ?? currentLevel.requiredSkill.level;
-  const primarySkillCur = Math.floor(skills[primarySkillKey] ?? 0);
+  const primarySkillCur = Math.floor((skills[primarySkillKey] ?? 0) + 0.001);
   const primarySkillMeta = SKILLS_META.find((sk) => sk.key === primarySkillKey);
 
   const secondarySkillKey = nextLevel?.secondarySkill?.skill;
   const secondarySkillReq = nextLevel?.secondarySkill?.level ?? 0;
-  const secondarySkillCur = secondarySkillKey ? Math.floor(skills[secondarySkillKey] ?? 0) : 0;
+  const secondarySkillCur = secondarySkillKey ? Math.floor((skills[secondarySkillKey] ?? 0) + 0.001) : 0;
   const secondarySkillMeta = secondarySkillKey
     ? SKILLS_META.find((sk) => sk.key === secondarySkillKey)
     : null;
@@ -1059,23 +1059,23 @@ export const WorkCareerModal: React.FC = () => {
         {/* =========================================================
             INLINE STATUS / FEEDBACK BANNER (FOR MODAL ACTIONS)
         ========================================================= */}
-        {lastToast && Math.abs(time - lastToast.time) <= 20 && (
+        {lastToast && (
           <div
-            className={`flex items-center justify-between gap-3 border-b px-6 py-2 text-xs font-extrabold ${
+            className={`flex items-center justify-between gap-3 border-b px-6 py-2.5 text-xs font-extrabold shadow-sm ${
               lastToast.tone === 'bad'
-                ? 'border-rose-500/30 bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                ? 'border-rose-500/40 bg-rose-500/20 text-rose-800 ring-1 ring-rose-500/30 dark:text-rose-200'
                 : lastToast.tone === 'good'
-                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                  : 'border-sky-500/30 bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                  ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-800 ring-1 ring-emerald-500/30 dark:text-emerald-200'
+                  : 'border-sky-500/40 bg-sky-500/20 text-sky-800 ring-1 ring-sky-500/30 dark:text-sky-200'
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm">{lastToast.emoji}</span>
-              <span>{lastToast.text}</span>
+              <span className="text-base shrink-0">{lastToast.emoji}</span>
+              <span className="leading-tight">{lastToast.text}</span>
             </div>
             <button
               onClick={dismissToast}
-              className="btn-press rounded-lg bg-black/10 px-2 py-0.5 text-[10px] font-black hover:bg-black/20 dark:bg-white/10"
+              className="btn-press shrink-0 rounded-lg bg-black/10 px-2.5 py-1 text-[10px] font-black hover:bg-black/20 dark:bg-white/10"
             >
               Dismiss
             </button>

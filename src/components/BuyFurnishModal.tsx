@@ -372,6 +372,8 @@ export const BuyFurnishModal: React.FC = () => {
       ? FURNITURE_CATALOG
       : cat === 'best'
       ? FURNITURE_CATALOG.filter(isBestUpgrade)
+      : cat === 'stored'
+      ? FURNITURE_CATALOG.filter((f) => (storedFurnitureById[f.id] || 0) > 0)
       : FURNITURE_CATALOG.filter((f) => f.category === cat);
 
   const spotlightItem =
@@ -385,7 +387,10 @@ export const BuyFurnishModal: React.FC = () => {
   return (
     <div className="pointer-events-none fixed inset-0 z-25 flex flex-col justify-between overflow-hidden">
       {/* TOP FURNISHING STUDIO BAR (Sits cleanly below Top HUD Bar, keeps room interactive) */}
-      <div className="pointer-events-none mx-auto mt-14 flex w-full max-w-5xl flex-col items-center gap-2 px-3 sm:px-5">
+      <div
+        ref={topBarRef}
+        className="pointer-events-none mx-auto mt-14 flex w-full max-w-5xl flex-col items-center gap-2 px-3 sm:px-5"
+      >
         <div className="apple-glass-heavy pointer-events-auto flex w-full flex-wrap items-center justify-between gap-2 rounded-3xl border border-sky-400/35 px-4 py-2.5 text-xs text-[var(--ink)] shadow-xl">
           {/* Left: Studio Mode Badge + Vibe Score + Synergies */}
           <div className="flex flex-wrap items-center gap-2.5">
@@ -432,19 +437,8 @@ export const BuyFurnishModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Auto-Feng Shui, Rotate Selected, Tray Size & Done */}
+          {/* Right: Auto-Feng Shui, Tray Size & Done */}
           <div className="flex flex-wrap items-center gap-1.5">
-            {selectedFurnishUid && (
-              <button
-                onClick={() => rotatePlacedFurniture(selectedFurnishUid)}
-                className="btn-press flex items-center gap-1 rounded-2xl bg-sky-500/15 px-3 py-1.5 text-xs font-extrabold text-sky-600 hover:bg-sky-500/25 dark:text-sky-300"
-                title="Rotate selected room item 90° (Shortcut: R)"
-              >
-                <RotateCw className="size-3.5" />
-                <span>Rotate</span>
-              </button>
-            )}
-
             <button
               onClick={autoArrangeRoom}
               className="btn-press flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm hover:opacity-95"
@@ -483,14 +477,92 @@ export const BuyFurnishModal: React.FC = () => {
           </div>
         </div>
 
+        {/* Selected Furniture Quick-Action Sub-Bar (Stacked cleanly below Top Studio Bar without overlapping buttons) */}
+        {selectedFurnishObj && selectedFurnishDef && (
+          <div className="apple-glass-heavy pointer-events-auto flex w-full flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-400/50 bg-sky-500/10 px-3.5 py-2 text-xs text-[var(--ink)] shadow-xl animate-target-pop">
+            <div className="flex items-center gap-2">
+              <span className="grid size-8 place-items-center rounded-xl bg-white/80 text-xl shadow-inner dark:bg-white/10">
+                {selectedFurnishDef.emoji}
+              </span>
+              <div>
+                <div className="font-extrabold leading-tight text-[var(--ink)]">
+                  {selectedFurnishDef.name}
+                </div>
+                <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
+                  Tile ({selectedFurnishObj.x}, {selectedFurnishObj.y}) · Drag to move or swap
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => rotatePlacedFurniture(selectedFurnishObj.uid)}
+                className="btn-press flex items-center gap-1 rounded-xl bg-[var(--mist)] px-2.5 py-1.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
+                title="Rotate 90° (Shortcut: R)"
+              >
+                <RotateCw className="size-3.5 text-[#007AFF]" />
+                <span>Rotate (R)</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  storeFurnitureInBackpack(selectedFurnishObj.uid);
+                  setSelectedFurnishUid(null);
+                }}
+                className="btn-press flex items-center gap-1 rounded-xl bg-indigo-500/15 px-2.5 py-1.5 text-xs font-extrabold text-indigo-700 hover:bg-indigo-500/25 dark:text-indigo-300"
+                title="Pack into Backpack (100% value preserved, can unpack for free anytime)"
+              >
+                <span>🎒 Pack</span>
+              </button>
+
+              {furnishUpgradeTargetDef && (
+                <button
+                  onClick={() => upgradePlacedFurniture(selectedFurnishObj.uid)}
+                  className="btn-press flex items-center gap-1 rounded-xl bg-[#007AFF] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs hover:bg-[#0066CC]"
+                  title={`Upgrade to ${furnishUpgradeTargetDef.name} (Trade-in credit: ${formatCurrency(furnishResaleValue)})`}
+                >
+                  <ArrowUpCircle className="size-3.5" />
+                  <span>
+                    ⬆️ Upgrade ({formatCurrency(furnishUpgradeNetCost)}) · {furnishUpgradeTargetDef.emoji}
+                  </span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  sellFurniture(selectedFurnishObj.uid);
+                  setSelectedFurnishUid(null);
+                }}
+                className="btn-press flex items-center gap-1 rounded-xl bg-rose-500/15 px-2.5 py-1.5 text-xs font-extrabold text-rose-600 hover:bg-rose-500/25 dark:text-rose-400"
+                title="Sell item"
+              >
+                <Trash2 className="size-3.5" />
+                <span>Sell +{formatCurrency(furnishResaleValue)}</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedFurnishUid(null)}
+                className="btn-press grid size-7 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+                title="Deselect (Esc)"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Active Stamp-Placement Banner when user clicked "Place on Tile" */}
         {pendingPlaceId && FURNITURE_BY_ID[pendingPlaceId] && (
           <div className="apple-glass-heavy pointer-events-auto flex items-center gap-3 rounded-full border border-emerald-500/50 bg-emerald-500/15 px-4 py-1.5 text-xs font-extrabold text-emerald-700 shadow-lg dark:text-emerald-300">
             <span className="text-lg">{FURNITURE_BY_ID[pendingPlaceId].emoji}</span>
             <span>
               Click any floor tile in the room to place{' '}
-              <strong>{FURNITURE_BY_ID[pendingPlaceId].name}</strong> (
-              {formatCurrency(FURNITURE_BY_ID[pendingPlaceId].price)})
+              <strong>{FURNITURE_BY_ID[pendingPlaceId].name}</strong>{' '}
+              {storedFurnitureById[pendingPlaceId] > 0 ? (
+                <span className="text-indigo-600 dark:text-indigo-300">(🎒 Free from Pack)</span>
+              ) : (
+                `(${formatCurrency(FURNITURE_BY_ID[pendingPlaceId].price)})`
+              )}
             </span>
             <button
               onClick={() => setPendingPlaceId(null)}
@@ -521,6 +593,7 @@ export const BuyFurnishModal: React.FC = () => {
               {CATEGORIES.map((c) => {
                 const active = cat === c.id;
                 const isBestTab = c.id === 'best';
+                const isStoredTab = c.id === 'stored';
                 return (
                   <button
                     key={c.id}
@@ -532,14 +605,21 @@ export const BuyFurnishModal: React.FC = () => {
                       active
                         ? isBestTab
                           ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs'
+                          : isStoredTab
+                          ? 'bg-indigo-600 text-white shadow-xs'
                           : 'bg-[#007AFF] text-white shadow-xs'
                         : isBestTab
                         ? 'apple-pill border border-amber-500/40 text-amber-600 dark:text-amber-400'
+                        : isStoredTab
+                        ? 'apple-pill border border-indigo-500/40 text-indigo-600 dark:text-indigo-400'
                         : 'apple-pill text-[var(--ink)]'
                     }`}
                   >
                     <span className="text-sm">{c.emoji}</span>
-                    <span>{c.label}</span>
+                    <span>
+                      {c.label}
+                      {isStoredTab && totalStoredCount > 0 ? ` (${totalStoredCount})` : ''}
+                    </span>
                   </button>
                 );
               })}
@@ -605,11 +685,22 @@ export const BuyFurnishModal: React.FC = () => {
                   const ownedCount = objects.filter(
                     (o) => o.objectId === item.id
                   ).length;
-                  const canAfford = cash >= item.price;
+                  const storedCount = storedFurnitureById[item.id] || 0;
+                  const hasStored = storedCount > 0;
+                  const canAfford = hasStored || cash >= item.price;
                   const topPick = isBestUpgrade(item);
                   const statChips = getFurnitureStatChips(item);
                   const isStampingThis = pendingPlaceId === item.id;
                   const isDraggingThis = catalogDrag?.furnitureId === item.id;
+
+                  const handleSelectStamp = () => {
+                    if (!canAfford) return;
+                    const nextStamp = isStampingThis ? null : item.id;
+                    setPendingPlaceId(nextStamp);
+                    if (nextStamp && trayMode === 'expanded') {
+                      setTrayMode('dock');
+                    }
+                  };
 
                   return (
                     <div
@@ -636,6 +727,8 @@ export const BuyFurnishModal: React.FC = () => {
                       } ${
                         isStampingThis || isDraggingThis
                           ? 'border-emerald-400 bg-emerald-500/10 ring-2 ring-emerald-400/40'
+                          : hasStored
+                          ? 'border-indigo-500/40 bg-indigo-500/5 hover:border-indigo-500 hover:shadow-lg dark:bg-indigo-950/20'
                           : topPick
                           ? 'border-amber-500/40 bg-white/65 hover:border-amber-500/80 hover:shadow-lg dark:bg-slate-900/65'
                           : 'border-white/40 bg-white/55 hover:border-[#007AFF]/50 hover:shadow-lg dark:border-white/10 dark:bg-slate-900/55'
@@ -643,16 +736,15 @@ export const BuyFurnishModal: React.FC = () => {
                     >
                       {/* HERO ICON STAGE (Takes center stage with 3D isometric pedestal & giant emoji) */}
                       <div
-                        onClick={() => {
-                          if (!canAfford) return;
-                          setPendingPlaceId(isStampingThis ? null : item.id);
-                        }}
+                        onClick={handleSelectStamp}
                         title={
-                          canAfford
+                          hasStored
+                            ? `Drag ${item.name} onto room floor or click to unpack from Backpack (Free)`
+                            : canAfford
                             ? `Drag ${item.name} onto the room floor, or click to pick up & place on any tile`
                             : `Need ${formatCurrency(item.price)}`
                         }
-                        className="relative flex h-28 w-full flex-col items-center justify-center overflow-hidden rounded-2xl transition-colors"
+                        className="relative flex h-28 w-full flex-col items-center justify-center overflow-hidden rounded-2xl transition-colors cursor-pointer"
                         style={{
                           background: `radial-gradient(circle at 50% 58%, ${item.accentColor}44 0%, ${item.color}1F 68%, transparent 100%)`,
                         }}
@@ -670,9 +762,13 @@ export const BuyFurnishModal: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Top-Right Owned / Drag Hint Badge */}
-                        <div className="absolute top-1.5 right-2">
-                          {ownedCount > 0 ? (
+                        {/* Top-Right Owned / Stored / Drag Hint Badge */}
+                        <div className="absolute top-1.5 right-2 flex flex-col items-end gap-1">
+                          {hasStored ? (
+                            <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[9px] font-extrabold text-white shadow-2xs">
+                              🎒 ×{storedCount} Pack
+                            </span>
+                          ) : ownedCount > 0 ? (
                             <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-extrabold text-white shadow-2xs">
                               ×{ownedCount}
                             </span>
@@ -740,28 +836,39 @@ export const BuyFurnishModal: React.FC = () => {
                         </div>
 
                         <div className="mt-1.5 flex items-center gap-1">
-                          <button
-                            disabled={!canAfford}
-                            onClick={() => buyAndPlaceFurniture(item.id)}
-                            className={`btn-press flex flex-1 items-center justify-center gap-1 rounded-xl px-2.5 py-1.5 text-[11px] font-extrabold transition-all ${
-                              canAfford
-                                ? 'bg-[#007AFF] text-white shadow-xs hover:bg-[#0066CC]'
-                                : 'cursor-not-allowed bg-[var(--mist)] text-[var(--ink-soft)]'
-                            }`}
-                          >
-                            <Sparkles className="size-3 shrink-0" />
-                            <span>{formatCurrency(item.price)}</span>
-                          </button>
+                          {hasStored ? (
+                            <button
+                              onClick={() => buyAndPlaceFurniture(item.id)}
+                              className="btn-press flex flex-1 items-center justify-center gap-1 rounded-xl bg-indigo-600 px-2 py-1.5 text-[11px] font-extrabold text-white shadow-xs hover:bg-indigo-500"
+                              title="Unpack from Backpack and place in room (Free)"
+                            >
+                              <Home className="size-3 shrink-0" />
+                              <span>🎒 Place Free</span>
+                            </button>
+                          ) : (
+                            <button
+                              disabled={!canAfford}
+                              onClick={() => buyAndPlaceFurniture(item.id)}
+                              className={`btn-press flex flex-1 items-center justify-center gap-1 rounded-xl px-2.5 py-1.5 text-[11px] font-extrabold transition-all ${
+                                canAfford
+                                  ? 'bg-[#007AFF] text-white shadow-xs hover:bg-[#0066CC]'
+                                  : 'cursor-not-allowed bg-[var(--mist)] text-[var(--ink-soft)]'
+                              }`}
+                            >
+                              <Sparkles className="size-3 shrink-0" />
+                              <span>{formatCurrency(item.price)}</span>
+                            </button>
+                          )}
 
                           {canAfford && (
                             <button
-                              onClick={() =>
-                                setPendingPlaceId(isStampingThis ? null : item.id)
-                              }
+                              onClick={handleSelectStamp}
                               title="Pick up & click any floor tile to place"
                               className={`btn-press grid size-7 shrink-0 place-items-center rounded-xl text-xs font-extrabold transition-all ${
                                 isStampingThis
                                   ? 'bg-emerald-500 text-white shadow-xs'
+                                  : hasStored
+                                  ? 'bg-indigo-500/15 text-indigo-700 hover:bg-indigo-500/25 dark:text-indigo-300'
                                   : 'bg-[var(--mist)] text-[var(--ink)] hover:bg-[#007AFF]/15'
                               }`}
                             >
@@ -782,21 +889,25 @@ export const BuyFurnishModal: React.FC = () => {
       {/* FLOATING DRAG GHOST BADGE UNDER CURSOR WHEN DRAGGING FROM CATALOG */}
       {catalogDrag && activeDraggingDef && (
         <div
-          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2"
+          className={`pointer-events-none fixed z-50 -translate-x-1/2 transition-transform duration-75 ${
+            catalogDrag.targetTile ? '-translate-y-[115%]' : '-translate-y-1/2'
+          }`}
           style={{
             left: catalogDrag.clientX,
             top: catalogDrag.clientY,
           }}
         >
           <div className="flex flex-col items-center">
-            <div className="grid size-16 place-items-center rounded-3xl border-2 border-emerald-400 bg-slate-900/90 text-5xl shadow-2xl">
+            <div className="grid size-14 place-items-center rounded-3xl border-2 border-emerald-400 bg-slate-900/90 text-4xl shadow-2xl">
               {activeDraggingDef.emoji}
             </div>
             <span className="mt-1 rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-extrabold text-white shadow-md">
               {catalogDrag.targetTile
-                ? `Drop at (${catalogDrag.targetTile.x}, ${catalogDrag.targetTile.y}) · ${formatCurrency(
-                    activeDraggingDef.price
-                  )}`
+                ? `Drop at (${catalogDrag.targetTile.x}, ${catalogDrag.targetTile.y}) · ${
+                    storedFurnitureById[activeDraggingDef.id] > 0
+                      ? '🎒 Free from Pack'
+                      : formatCurrency(activeDraggingDef.price)
+                  }`
                 : 'Drag onto apartment floor'}
             </span>
           </div>

@@ -272,6 +272,8 @@ export const IsometricScene: React.FC = () => {
     currentTileY: number;
     moved: boolean;
   } | null>(null);
+  const draggingPlacedRef = useRef(draggingPlaced);
+  draggingPlacedRef.current = draggingPlaced;
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Camera Zoom & Pan State
@@ -379,9 +381,11 @@ export const IsometricScene: React.FC = () => {
     if (!draggingPlaced) return;
 
     const onPointerMove = (e: PointerEvent) => {
-      const dist = Math.hypot(e.clientX - draggingPlaced.startX, e.clientY - draggingPlaced.startY);
+      const curr = draggingPlacedRef.current;
+      if (!curr) return;
+      const dist = Math.hypot(e.clientX - curr.startX, e.clientY - curr.startY);
       const threshold = isFurnishMode ? 4 : 9;
-      if (!draggingPlaced.moved && dist < threshold) return;
+      if (!curr.moved && dist < threshold) return;
 
       const tile = getIsoTileFromClientPoint(e.clientX, e.clientY, gridSize, true);
       if (tile) {
@@ -399,30 +403,32 @@ export const IsometricScene: React.FC = () => {
     };
 
     const onPointerUp = () => {
-      if (draggingPlaced.moved) {
+      const curr = draggingPlacedRef.current;
+      if (!curr) return;
+      if (curr.moved) {
         if (
-          draggingPlaced.currentTileX !== draggingPlaced.origTileX ||
-          draggingPlaced.currentTileY !== draggingPlaced.origTileY
+          curr.currentTileX !== curr.origTileX ||
+          curr.currentTileY !== curr.origTileY
         ) {
           movePlacedFurniture(
-            draggingPlaced.uid,
-            draggingPlaced.currentTileX,
-            draggingPlaced.currentTileY
+            curr.uid,
+            curr.currentTileX,
+            curr.currentTileY
           );
         } else {
-          setSelectedFurnishUid(draggingPlaced.uid);
+          setSelectedFurnishUid(curr.uid);
         }
       } else {
         // Quick tap without dragging
         const found = useGameStore
           .getState()
-          .objects.find((o) => o.uid === draggingPlaced.uid);
+          .objects.find((o) => o.uid === curr.uid);
         if (isFurnishMode) {
           setSelectedFurnishUid(
-            selectedFurnishUid === draggingPlaced.uid ? null : draggingPlaced.uid
+            selectedFurnishUid === curr.uid ? null : curr.uid
           );
         } else if (found) {
-          setPopoverAnchor({ x: draggingPlaced.startX, y: draggingPlaced.startY });
+          setPopoverAnchor({ x: curr.startX, y: curr.startY });
           setSelectedObject(found);
           setSelectedStation(null);
           setSelectedNpc(null);
@@ -431,14 +437,22 @@ export const IsometricScene: React.FC = () => {
       setDraggingPlaced(null);
     };
 
+    const onCancel = () => {
+      setDraggingPlaced(null);
+    };
+
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('blur', onCancel);
     return () => {
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('blur', onCancel);
     };
   }, [
-    draggingPlaced,
+    Boolean(draggingPlaced),
     gridSize,
     isFurnishMode,
     movePlacedFurniture,
@@ -446,7 +460,7 @@ export const IsometricScene: React.FC = () => {
     setSelectedFurnishUid,
   ]);
 
-  // Furnish Mode Keyboard Shortcuts (R to rotate selected item, Escape to cancel/exit)
+  // Furnish Mode Keyboard Shortcuts (R to rotate, Del/Backspace to pack, Escape to cancel/exit)
   useEffect(() => {
     if (!isFurnishMode) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -464,13 +478,22 @@ export const IsometricScene: React.FC = () => {
         rotatePlacedFurniture(selectedFurnishUid);
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        if (pendingPlaceId) {
+        if (draggingPlacedRef.current) {
+          setDraggingPlaced(null);
+        } else if (pendingPlaceId) {
           setPendingPlaceId(null);
         } else if (selectedFurnishUid) {
           setSelectedFurnishUid(null);
         } else {
           setView('live');
         }
+      } else if (
+        (e.key === 'Delete' || e.key === 'Backspace') &&
+        selectedFurnishUid
+      ) {
+        e.preventDefault();
+        storeFurnitureInBackpack(selectedFurnishUid);
+        setSelectedFurnishUid(null);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -483,6 +506,7 @@ export const IsometricScene: React.FC = () => {
     setPendingPlaceId,
     setSelectedFurnishUid,
     setView,
+    storeFurnitureInBackpack,
   ]);
 
   const hour = getHourOfDay(time);
@@ -626,6 +650,7 @@ export const IsometricScene: React.FC = () => {
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    if (isFurnishMode && (draggingPlaced || catalogDrag)) return;
     dragRef.current = {
       active: true,
       startX: e.clientX,
@@ -638,6 +663,10 @@ export const IsometricScene: React.FC = () => {
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!dragRef.current.active) return;
+    if (isFurnishMode && (draggingPlaced || catalogDrag)) {
+      dragRef.current.active = false;
+      return;
+    }
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
     if (Math.hypot(dx, dy) > 5) {
@@ -674,22 +703,6 @@ export const IsometricScene: React.FC = () => {
     ? Math.max(0, upgradeTargetDef.price - resaleValue)
     : 0;
 
-  // Furnish Mode selected object definitions
-  const selectedFurnishObj = selectedFurnishUid
-    ? objects.find((o) => o.uid === selectedFurnishUid) || null
-    : null;
-  const selectedFurnishDef = selectedFurnishObj
-    ? FURNITURE_BY_ID[selectedFurnishObj.objectId] || null
-    : null;
-  const furnishUpgradeTargetDef = selectedFurnishDef
-    ? getNextUpgradeFurniture(selectedFurnishDef)
-    : null;
-  const furnishResaleValue = selectedFurnishDef
-    ? Math.round(selectedFurnishDef.price * 0.65)
-    : 0;
-  const furnishUpgradeNetCost = furnishUpgradeTargetDef
-    ? Math.max(0, furnishUpgradeTargetDef.price - furnishResaleValue)
-    : 0;
 
   const handleUpgradeFurniture = () => {
     if (!selectedObject || !selectedFurnitureDef || !upgradeTargetDef) return;
@@ -1901,6 +1914,7 @@ export const IsometricScene: React.FC = () => {
           <g
             transform={`translate(${botScreen.sx}, ${botScreen.sy})`}
             className="cursor-pointer"
+            pointerEvents={isFurnishMode ? 'none' : undefined}
             onMouseEnter={() => setBotHovered(true)}
             onMouseLeave={() => setBotHovered(false)}
             onClick={(e) => {
@@ -2002,6 +2016,7 @@ export const IsometricScene: React.FC = () => {
               <g
                 transform={`translate(${center.sx}, ${center.sy})`}
                 className="cursor-pointer"
+                pointerEvents={isFurnishMode ? 'none' : undefined}
                 onMouseEnter={() => setPcSlotHovered(true)}
                 onMouseLeave={() => setPcSlotHovered(false)}
                 onClick={(e) => {
@@ -2129,11 +2144,17 @@ export const IsometricScene: React.FC = () => {
                     onMouseLeave={() =>
                       setHoveredObjectUid((prev) => (prev === placed.uid ? null : prev))
                     }
+                    onMouseDown={(e) => {
+                      if (isFurnishMode) e.stopPropagation();
+                    }}
                     onPointerDown={(e) => {
                       if (!isFurnishMode) return;
                       e.stopPropagation();
+                      if (pendingPlaceId) {
+                        buyAndPlaceFurniture(pendingPlaceId, { x: placed.x, y: placed.y });
+                        return;
+                      }
                       setSelectedFurnishUid(placed.uid);
-                      setPendingPlaceId(null);
                       setDraggingPlaced({
                         uid: placed.uid,
                         objectId: placed.objectId,
@@ -2150,6 +2171,10 @@ export const IsometricScene: React.FC = () => {
                       e.stopPropagation();
                       if (dragRef.current.moved) return;
                       if (isFurnishMode) {
+                        if (pendingPlaceId) {
+                          buyAndPlaceFurniture(pendingPlaceId, { x: placed.x, y: placed.y });
+                          return;
+                        }
                         setSelectedFurnishUid(placed.uid);
                         return;
                       }
@@ -2579,6 +2604,7 @@ export const IsometricScene: React.FC = () => {
         <g
           transform={`translate(${simScreen.sx}, ${simScreen.sy})`}
           className="cursor-pointer transition-transform duration-300 ease-out"
+          pointerEvents={isFurnishMode ? 'none' : undefined}
           onMouseEnter={() => setSimHovered(true)}
           onMouseLeave={() => setSimHovered(false)}
           onClick={(e) => {
@@ -3007,7 +3033,13 @@ export const IsometricScene: React.FC = () => {
 
       {/* Sleek Minimal Camera Zoom & Reset Pill */}
       <div
-        className={`apple-pill absolute left-4 z-20 flex items-center gap-1 rounded-full px-2 py-1 text-[var(--ink)] opacity-80 transition-opacity hover:opacity-100 ${isFurnishMode ? 'top-20' : 'bottom-20'
+        className={`apple-pill absolute left-4 z-20 flex items-center gap-1 rounded-full px-2 py-1 text-[var(--ink)] opacity-80 transition-all hover:opacity-100 ${isFurnishMode
+            ? trayMode === 'dock'
+              ? 'bottom-[180px]'
+              : trayMode === 'expanded'
+                ? 'top-24'
+                : 'bottom-16'
+            : 'bottom-20'
           }`}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
@@ -3341,86 +3373,6 @@ export const IsometricScene: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Selected Furniture Quick-Action Pill in Furnish Mode (Rotate / Upgrade / Sell) */}
-      {isFurnishMode && selectedFurnishObj && selectedFurnishDef && (
-        <div
-          className="pointer-events-auto absolute top-20 right-4 z-30 max-w-md animate-target-pop"
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="apple-glass-heavy flex flex-wrap items-center gap-2 rounded-2xl border border-sky-400/40 px-3.5 py-2.5 text-xs text-[var(--ink)] shadow-xl">
-            <div className="flex items-center gap-2 pr-1">
-              <span className="grid size-9 place-items-center rounded-xl bg-sky-500/15 text-2xl shadow-inner">
-                {selectedFurnishDef.emoji}
-              </span>
-              <div>
-                <div className="font-extrabold leading-tight text-[var(--ink)]">
-                  {selectedFurnishDef.name}
-                </div>
-                <div className="text-[10px] font-semibold text-[var(--ink-soft)]">
-                  Tile ({selectedFurnishObj.x}, {selectedFurnishObj.y}) · Drag to move or swap
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => rotatePlacedFurniture(selectedFurnishObj.uid)}
-              className="btn-press flex items-center gap-1 rounded-xl bg-[var(--mist)] px-2.5 py-1.5 text-xs font-extrabold text-[var(--ink)] hover:bg-[#007AFF]/15"
-              title="Rotate 90° (Shortcut: R)"
-            >
-              <RotateCw className="size-3.5 text-[#007AFF]" />
-              <span>Rotate (R)</span>
-            </button>
-
-            <button
-              onClick={() => {
-                storeFurnitureInBackpack(selectedFurnishObj.uid);
-                setSelectedFurnishUid(null);
-              }}
-              className="btn-press flex items-center gap-1 rounded-xl bg-indigo-500/15 px-2.5 py-1.5 text-xs font-extrabold text-indigo-700 hover:bg-indigo-500/25 dark:text-indigo-300"
-              title="Pack into Backpack (100% value preserved)"
-            >
-              <span>🎒 Pack</span>
-            </button>
-
-            {furnishUpgradeTargetDef && (
-              <button
-                onClick={() => {
-                  buyFurniture(furnishUpgradeTargetDef.id);
-                  setSelectedFurnishUid(selectedFurnishObj.uid);
-                }}
-                className="btn-press flex items-center gap-1 rounded-xl bg-[#007AFF] px-2.5 py-1.5 text-xs font-extrabold text-white shadow-xs"
-              >
-                <ArrowUpCircle className="size-3.5" />
-                <span>
-                  ⬆️ {furnishUpgradeTargetDef.emoji} ({formatCurrency(furnishUpgradeNetCost)})
-                </span>
-              </button>
-            )}
-
-            {objects.length > 3 && (
-              <button
-                onClick={() => {
-                  sellFurniture(selectedFurnishObj.uid);
-                  setSelectedFurnishUid(null);
-                }}
-                className="btn-press flex items-center gap-1 rounded-xl bg-rose-500/15 px-2.5 py-1.5 text-xs font-extrabold text-rose-600 hover:bg-rose-500/25 dark:text-rose-400"
-              >
-                <Trash2 className="size-3.5" />
-                <span>Sell +{formatCurrency(furnishResaleValue)}</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setSelectedFurnishUid(null)}
-              className="btn-press grid size-7 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
-              title="Deselect"
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Enlarged, Unclipped Apple visionOS NPC Popover */}
       {selectedNpc && (() => {

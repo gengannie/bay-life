@@ -534,6 +534,18 @@ export const AppleHUD: React.FC = () => {
       }
 
       const key = e.key.toLowerCase();
+      // When in Furnishing Studio mode, suppress global modal shortcuts so decorating is undisturbed
+      if (s.view === 'buy') {
+        if (key === 'b' || key === 'escape') {
+          e.preventDefault();
+          setView('live');
+        } else if (e.code === 'Space') {
+          e.preventDefault();
+          setSpeed(s.speed === 0 ? 1 : 0);
+        }
+        return;
+      }
+
       if (e.code === 'Space') {
         e.preventDefault();
         setSpeed(s.speed === 0 ? 1 : 0);
@@ -551,7 +563,7 @@ export const AppleHUD: React.FC = () => {
         setView(s.view === 'map' ? 'live' : 'map');
       } else if (key === 'b' && s.locationId === 'home') {
         e.preventDefault();
-        setView(s.view === 'buy' ? 'live' : 'buy');
+        setView('buy');
       } else if (key === 'c' && s.locationId === 'home') {
         e.preventDefault();
         setActiveModal(s.activeModal === 'computer' ? null : 'computer');
@@ -673,7 +685,7 @@ export const AppleHUD: React.FC = () => {
           <button
             onClick={() => setActiveModal('phone', 'wealth')}
             className="btn-press flex items-center gap-1.5 font-mono text-xs font-bold text-emerald-600 sm:text-[13px] dark:text-emerald-400"
-            title="Open Schwab & Net Worth"
+            title="Open Schwaab Private Wealth & Cash Flow"
           >
             <span>{formatCurrency(cash)}</span>
             {vestedRsu > 0 && (
@@ -762,15 +774,24 @@ export const AppleHUD: React.FC = () => {
 
       {/* DYNAMIC ISLAND TOAST NOTIFICATION */}
       {lastToast && (
-        <div className="pointer-events-none fixed top-14 left-1/2 z-40 w-fit max-w-[calc(100%-32px)] -translate-x-1/2">
-          <div className="apple-glass-heavy pointer-events-auto flex items-center gap-2.5 rounded-full px-4 py-2 text-[var(--ink)] shadow-lg">
-            <span className="shrink-0 text-sm">{lastToast.emoji}</span>
-            <span className="truncate text-xs font-semibold text-[var(--ink)]">
+        <div className="pointer-events-none fixed top-14 left-1/2 z-[80] w-fit max-w-[calc(100%-32px)] -translate-x-1/2 animate-target-pop">
+          <div
+            className={`apple-glass-heavy pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-2.5 shadow-2xl transition-all ${
+              lastToast.tone === 'bad'
+                ? 'border-2 border-rose-500/80 bg-rose-500/20 text-rose-800 ring-2 ring-rose-500/30 dark:text-rose-200'
+                : lastToast.tone === 'good'
+                  ? 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
+                  : 'border border-black/10 text-[var(--ink)] dark:border-white/10'
+            }`}
+          >
+            <span className="shrink-0 text-base">{lastToast.emoji}</span>
+            <span className="line-clamp-2 max-w-md text-xs font-bold leading-tight">
               {lastToast.text}
             </span>
             <button
               onClick={dismissToast}
-              className="btn-press grid size-5 shrink-0 place-items-center rounded-full bg-[var(--mist)] text-[var(--ink-soft)]"
+              className="btn-press grid size-5 shrink-0 place-items-center rounded-full bg-black/10 text-[var(--ink-soft)] hover:bg-black/20 dark:bg-white/10"
+              aria-label="Dismiss notification"
             >
               <X className="size-3" />
             </button>
@@ -1162,7 +1183,7 @@ export const AppleHUD: React.FC = () => {
                             />
                           </div>
                           <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
-                            Shifts: {job.shiftsAtLevel || 0}/{nextLevel?.minShiftsForPromo || 3} req
+                            Shifts: {Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted ?? 0)}/{nextLevel?.minShiftsForPromo || 3} req
                           </div>
                         </div>
 
@@ -1181,7 +1202,7 @@ export const AppleHUD: React.FC = () => {
                           </div>
                           <div className="mt-1 text-[9px] font-semibold text-[var(--ink-soft)]">
                             Deliverables {job.deliverablesCompleted || 0}/
-                            {nextLevel?.requiredDeliverables || 1} · Shifts {job.shiftsAtLevel || 0}/
+                            {nextLevel?.requiredDeliverables || 1} · Shifts {Math.max(job.shiftsAtLevel ?? 0, job.shiftsCompleted ?? 0)}/
                             {nextLevel?.minShiftsForPromo || 3}
                           </div>
                         </div>
